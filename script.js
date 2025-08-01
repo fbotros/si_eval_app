@@ -411,11 +411,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (/[\s.,!?;:"'()]/.test(lastChar)) {
                 debugLog("Punctuation detected", lastChar);
-
-                // Extract the current text and add any new words to the dictionary
-                const currentText = currentValue.slice(0, -1); // Exclude the last character (space/punctuation)
-                addUserInputToDictionary(currentText);
-
                 // Try to perform autocorrect
                 performAutocorrect(lastChar);
             }
@@ -425,23 +420,6 @@ document.addEventListener('DOMContentLoaded', function() {
         previousInputValue = currentValue;
     });
 
-    // Function to add words from user input to dictionary
-    function addUserInputToDictionary(text) {
-        const words = extractWords(text);
-        let newWordsAdded = 0;
-
-        words.forEach(word => {
-            // Only add words with length > 2 that aren't already in the dictionary
-            if (word.length > 2 && !dictionary.includes(word)) {
-                dictionary.push(word);
-                newWordsAdded++;
-            }
-        });
-
-        if (newWordsAdded > 0) {
-            console.log(`Added ${newWordsAdded} new words from user input to dictionary. Dictionary now has ${dictionary.length} words`);
-        }
-    }
 
     // Handle Enter key to move to next prompt
     inputArea.addEventListener('keydown', function(e) {
@@ -449,9 +427,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (e.key === 'Enter') {
             e.preventDefault(); // Prevent default Enter behavior
-
-            // Add words from user input to dictionary
-            addUserInputToDictionary(inputArea.value);
 
             // Calculate results for the current prompt
             const promptResult = calculatePromptResult();
@@ -520,28 +495,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Add keydown event for all browsers
-    inputArea.addEventListener('keydown', function(e) {
-        if (!testActive) return;
+    // // Add keydown event for all browsers
+    // inputArea.addEventListener('keydown', function(e) {
+    //     if (!testActive) return;
 
-        // Check for space or punctuation
-        const punctuation = [' ', '.', ',', '!', '?', ';', ':', '"', "'", '(', ')'];
-        const key = e.key || String.fromCharCode(e.keyCode || e.which);
+    //     // Check for space or punctuation
+    //     const punctuation = [' ', '.', ',', '!', '?', ';', ':', '"', "'", '(', ')'];
+    //     const key = e.key || String.fromCharCode(e.keyCode || e.which);
 
-        if (punctuation.includes(key)) {
-            // Perform autocorrect and append the pressed character
-            try {
-                if (performAutocorrect(key)) {
-                    e.preventDefault(); // Prevent default if correction was made
-                    // Update the previous value to match the new corrected value
-                    // This prevents the input handler from double-correcting
-                    previousInputValue = inputArea.value;
-                }
-            } catch (error) {
-                console.error("Error in autocorrect keydown handler:", error);
-            }
-        }
-    });
+    //     if (punctuation.includes(key)) {
+    //         // Perform autocorrect and append the pressed character
+    //         try {
+    //             if (performAutocorrect(key)) {
+    //                 e.preventDefault(); // Prevent default if correction was made
+    //                 // Update the previous value to match the new corrected value
+    //                 // This prevents the input handler from double-correcting
+    //                 previousInputValue = inputArea.value;
+    //             }
+    //         } catch (error) {
+    //             console.error("Error in autocorrect keydown handler:", error);
+    //         }
+    //     }
+    // });
 
     // Function to detect mobile or VR browsers
     function isMobileOrVRBrowser() {
