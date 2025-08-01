@@ -268,22 +268,77 @@ document.addEventListener('DOMContentLoaded', function() {
         autocorrectIndicator.style.display = 'none';
     }
 
+    // Track the previous input value to detect changes
+    let previousInputValue = '';
+
     // Start test when user starts typing
     inputArea.addEventListener('input', function(e) {
         if (!testActive) {
             startTest();
         }
 
-        // Check if the user has typed a space or punctuation
-        const lastChar = inputArea.value.slice(-1);
-        if (/[\s.,!?;:"'()]/.test(lastChar)) {
-            // Extract the current text and add any new words to the dictionary
-            const currentText = inputArea.value.slice(0, -1); // Exclude the last character (space/punctuation)
-            addUserInputToDictionary(currentText);
+        // Get the current input value
+        const currentValue = inputArea.value;
+
+        // If there's no previous value, just update and return
+        if (!previousInputValue) {
+            previousInputValue = currentValue;
+            return;
         }
 
-        // No longer check for autocorrections as user types
-        // The autocorrect will only happen when space or punctuation is pressed
+        // Check if a space or punctuation was added
+        if (currentValue.length > previousInputValue.length) {
+            const lastChar = currentValue.slice(-1);
+            if (/[\s.,!?;:"'()]/.test(lastChar)) {
+                // Extract the current text and add any new words to the dictionary
+                const currentText = currentValue.slice(0, -1); // Exclude the last character (space/punctuation)
+                addUserInputToDictionary(currentText);
+
+                // Perform autocorrect for the input event
+                try {
+                    // We need to check if the word before the punctuation needs correction
+                    const textBeforePunctuation = currentValue.slice(0, -1);
+                    const words = textBeforePunctuation.trim().split(/[\s.,!?;:"'()]/);
+                    if (words.length > 0) {
+                        const lastWord = words[words.length - 1].toLowerCase();
+
+                        // Skip very short words (1-2 characters)
+                        if (lastWord.length > 2) {
+                            // Find the closest word in the dictionary
+                            const correctedWord = findClosestWord(lastWord);
+
+                            // If a correction was found and it's different from the original word
+                            if (correctedWord !== lastWord) {
+                                // Replace the last word with the corrected one
+                                const lastIndex = textBeforePunctuation.lastIndexOf(lastWord);
+                                if (lastIndex !== -1) {
+                                    const newText = textBeforePunctuation.substring(0, lastIndex) + correctedWord;
+
+                                    // Update the input value with the correction and the punctuation
+                                    inputArea.value = newText + lastChar;
+
+                                    // Try to move cursor to the end
+                                    try {
+                                        inputArea.selectionStart = inputArea.value.length;
+                                        inputArea.selectionEnd = inputArea.value.length;
+                                    } catch (e) {
+                                        console.log("Selection adjustment not supported");
+                                    }
+
+                                    // Hide the indicator after correction
+                                    hideAutocorrectIndicator();
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error("Autocorrect error in input handler:", error);
+                }
+            }
+        }
+
+        // Update the previous value
+        previousInputValue = inputArea.value;
     });
 
     // Function to add words from user input to dictionary
@@ -381,7 +436,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Add autocorrect functionality with improved browser compatibility
+    // Keep the keydown event for desktop browsers
+    // This will still work on devices that properly support keydown events
     inputArea.addEventListener('keydown', function(e) {
         if (!testActive) return;
 
@@ -394,6 +450,9 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 if (performAutocorrect(key)) {
                     e.preventDefault(); // Prevent default if correction was made
+                    // Update the previous value to match the new corrected value
+                    // This prevents the input handler from double-correcting
+                    previousInputValue = inputArea.value;
                 }
             } catch (error) {
                 console.error("Error in autocorrect keydown handler:", error);
