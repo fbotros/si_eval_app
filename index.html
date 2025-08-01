@@ -152,11 +152,12 @@
 <body>
     <div class="container">
         <h1>Fadi's 30-Second Typing Test</h1>
-        <p class="instructions">Start typing in the box below to begin the 30-second test. Smart autocorrect is enabled - it will silently fix typos when you press space or punctuation. After the test ends, results will be downloaded as a JSON file.</p>
+        <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next one. Smart autocorrect is enabled - it will silently fix typos when you press space or punctuation. After the test ends, results will be downloaded as a JSON file.</p>
 
         <div class="test-container">
-            <div class="sample-text" id="sample-text">
-                The quick brown fox jumps over the lazy dog. Programming is the process of creating a set of instructions that tell a computer how to perform a task. Programming can be done using a variety of computer programming languages, such as JavaScript, Python, and C++.
+            <div class="sample-text" id="sample-text"></div>
+            <div class="progress-indicator" style="text-align: center; margin-bottom: 10px; color: #7f8c8d;">
+                Prompt <span id="current-prompt">1</span> of <span id="total-prompts">0</span>
             </div>
 
             <div class="autocorrect-container">
@@ -173,18 +174,52 @@
         </div>
 
         <div class="results" id="results">
-            <h2>Your Results</h2>
+            <h2>Your Average Results</h2>
             <div class="metric">Words per minute: <span id="wpm">0</span></div>
             <div class="metric">Characters per minute: <span id="cpm">0</span></div>
             <div class="metric">Accuracy: <span id="accuracy">0%</span></div>
             <div class="metric">Correct characters: <span id="correct-chars">0</span></div>
             <div class="metric">Incorrect characters: <span id="incorrect-chars">0</span></div>
+            <div class="metric">Prompts completed: <span id="prompts-completed">0</span>/<span id="total-prompts-results">0</span></div>
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const sampleText = document.getElementById('sample-text').innerText;
+            // Array of prompts for the typing test
+            const prompts = [
+                "The quick brown fox jumps over the lazy dog.",
+                "Programming is the process of creating instructions for computers.",
+                "JavaScript is a high-level programming language used for web development.",
+                "Python is known for its readability and simple syntax.",
+                "Artificial intelligence aims to mimic human cognitive functions.",
+                "Virtual reality creates an immersive digital environment.",
+                "Cloud computing delivers services over the internet.",
+                "Cybersecurity protects systems from digital attacks.",
+                "Machine learning uses algorithms to analyze and learn from data.",
+                "Blockchain is a distributed ledger technology."
+            ];
+
+            const sampleTextElement = document.getElementById('sample-text');
+            const currentPromptElement = document.getElementById('current-prompt');
+            const totalPromptsElement = document.getElementById('total-prompts');
+
+            let currentPromptIndex = 0;
+            let promptResults = [];
+
+            // Initialize the first prompt
+            totalPromptsElement.textContent = prompts.length;
+            updateCurrentPrompt();
+
+            function updateCurrentPrompt() {
+                currentPromptElement.textContent = currentPromptIndex + 1;
+                sampleTextElement.innerText = prompts[currentPromptIndex];
+            }
+
+            // Get the current prompt text
+            function getCurrentPromptText() {
+                return prompts[currentPromptIndex];
+            }
             const inputArea = document.getElementById('input-area');
             const timer = document.getElementById('timer');
             const startButton = document.getElementById('start-button');
@@ -201,6 +236,7 @@
             let testActive = false;
             let lastTypedWord = '';
             let lastSuggestion = '';
+            let startTime = 0; // Track when the current prompt started
 
             // Function to start the test
             function startTest() {
@@ -209,6 +245,8 @@
                 // Start the test
                 testActive = true;
                 results.style.display = 'none';
+                promptResults = []; // Clear previous results
+                startTime = Date.now(); // Record start time
 
                 // Start the timer
                 timeLeft = 30;
@@ -378,6 +416,30 @@
                 // The autocorrect will only happen when space or punctuation is pressed
             });
 
+            // Handle Enter key to move to next prompt
+            inputArea.addEventListener('keydown', function(e) {
+                if (!testActive) return;
+
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent default Enter behavior
+
+                    // Calculate results for the current prompt
+                    const promptResult = calculatePromptResult();
+                    promptResults.push(promptResult);
+
+                    // Move to the next prompt or end the test
+                    if (currentPromptIndex < prompts.length - 1) {
+                        currentPromptIndex++;
+                        updateCurrentPrompt();
+                        inputArea.value = '';
+                        startTime = Date.now(); // Reset start time for the new prompt
+                    } else {
+                        // End the test if all prompts are completed
+                        endTest();
+                    }
+                }
+            });
+
             // Function to perform autocorrect
             function performAutocorrect(appendChar) {
                 const text = inputArea.value;
@@ -457,8 +519,14 @@
                 // Hide the autocorrect indicator
                 hideAutocorrectIndicator();
 
-                // Calculate results
-                calculateResults();
+                // Calculate results for the current prompt if not already done
+                if (inputArea.value.trim().length > 0) {
+                    const promptResult = calculatePromptResult();
+                    promptResults.push(promptResult);
+                }
+
+                // Calculate and display average results
+                calculateAverageResults();
 
                 // Display results
                 results.style.display = 'block';
@@ -474,52 +542,113 @@
                 startButton.textContent = 'Reset Test';
                 results.style.display = 'none';
                 hideAutocorrectIndicator();
+
+                // Reset prompt index and update display
+                currentPromptIndex = 0;
+                updateCurrentPrompt();
+                promptResults = [];
             }
 
-            function calculateResults() {
+            // Calculate results for the current prompt
+            function calculatePromptResult() {
                 const typedText = inputArea.value;
+                const promptText = getCurrentPromptText();
                 const typedLength = typedText.length;
+                const promptLength = promptText.length;
+
+                // Use Levenshtein distance to calculate edit distance
+                const editDistance = levenshteinDistance(typedText, promptText);
+
+                // Calculate accuracy as 1 minus normalized edit distance
+                const maxDistance = Math.max(typedLength, promptLength);
+                const normalizedDistance = maxDistance > 0 ? editDistance / maxDistance : 0;
+                const accuracy = Math.floor((1 - normalizedDistance) * 100);
 
                 // Calculate correct and incorrect characters
                 let correctChars = 0;
                 let incorrectChars = 0;
 
                 for (let i = 0; i < typedLength; i++) {
-                    if (i < sampleText.length && typedText[i] === sampleText[i]) {
+                    if (i < promptLength && typedText[i] === promptText[i]) {
                         correctChars++;
                     } else {
                         incorrectChars++;
                     }
                 }
 
-                // Calculate accuracy
-                const accuracy = typedLength > 0 ? Math.floor((correctChars / typedLength) * 100) : 0;
+                // Calculate time spent on this prompt in minutes
+                const endTime = Date.now();
+                const timeSpentMs = endTime - startTime;
+                const minutes = timeSpentMs / 60000; // Convert ms to minutes
 
-                // Calculate WPM (assuming average word length of 5 characters)
-                const minutes = (30 - timeLeft) / 60;
-                const words = (correctChars + incorrectChars) / 5;
+                // Calculate WPM and CPM
+                const words = typedLength / 5; // Assume average word is 5 characters
                 const wpm = minutes > 0 ? Math.floor(words / minutes) : 0;
+                const cpm = minutes > 0 ? Math.floor(typedLength / minutes) : 0;
 
-                // Calculate CPM
-                const cpm = minutes > 0 ? Math.floor(correctChars / minutes) : 0;
-
-                // Update results display
-                wpmElement.textContent = wpm;
-                cpmElement.textContent = cpm;
-                accuracyElement.textContent = `${accuracy}%`;
-                correctCharsElement.textContent = correctChars;
-                incorrectCharsElement.textContent = incorrectChars;
-
-                // Create results object
-                const resultsData = {
-                    date: new Date().toISOString(),
+                return {
+                    promptIndex: currentPromptIndex,
+                    promptText: promptText,
+                    typedText: typedText,
                     wpm: wpm,
                     cpm: cpm,
                     accuracy: accuracy,
+                    editDistance: editDistance,
                     correctChars: correctChars,
                     incorrectChars: incorrectChars,
                     totalChars: typedLength,
-                    testDuration: 30
+                    timeSpentMs: timeSpentMs
+                };
+            }
+
+            // Calculate average results across all completed prompts
+            function calculateAverageResults() {
+                if (promptResults.length === 0) {
+                    return;
+                }
+
+                // Calculate averages
+                let totalWpm = 0;
+                let totalCpm = 0;
+                let totalAccuracy = 0;
+                let totalCorrectChars = 0;
+                let totalIncorrectChars = 0;
+                let totalChars = 0;
+
+                promptResults.forEach(result => {
+                    totalWpm += result.wpm;
+                    totalCpm += result.cpm;
+                    totalAccuracy += result.accuracy;
+                    totalCorrectChars += result.correctChars;
+                    totalIncorrectChars += result.incorrectChars;
+                    totalChars += result.totalChars;
+                });
+
+                const avgWpm = Math.floor(totalWpm / promptResults.length);
+                const avgCpm = Math.floor(totalCpm / promptResults.length);
+                const avgAccuracy = Math.floor(totalAccuracy / promptResults.length);
+
+                // Update results display
+                wpmElement.textContent = avgWpm;
+                cpmElement.textContent = avgCpm;
+                accuracyElement.textContent = `${avgAccuracy}%`;
+                correctCharsElement.textContent = totalCorrectChars;
+                incorrectCharsElement.textContent = totalIncorrectChars;
+                document.getElementById('prompts-completed').textContent = promptResults.length;
+                document.getElementById('total-prompts-results').textContent = prompts.length;
+
+                // Create results object with both individual prompt results and averages
+                const resultsData = {
+                    date: new Date().toISOString(),
+                    averageWpm: avgWpm,
+                    averageCpm: avgCpm,
+                    averageAccuracy: avgAccuracy,
+                    totalCorrectChars: totalCorrectChars,
+                    totalIncorrectChars: totalIncorrectChars,
+                    totalChars: totalChars,
+                    promptsCompleted: promptResults.length,
+                    totalPrompts: prompts.length,
+                    promptResults: promptResults
                 };
 
                 // Download results as JSON
