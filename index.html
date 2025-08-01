@@ -187,18 +187,19 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Array of prompts for the typing test
-            const prompts = [
+            const originalPrompts = [
+                "Stability of the nation.",
+                "Rectangular objects have four sides.",
+                "Why do you ask silly questions?",
+                "Learn to walk before you run.",
+                "Important news always seems to be late.",
                 "The quick brown fox jumps over the lazy dog.",
-                "Programming is the process of creating instructions for computers.",
-                "JavaScript is a high-level programming language used for web development.",
-                "Python is known for its readability and simple syntax.",
-                "Artificial intelligence aims to mimic human cognitive functions.",
-                "Virtual reality creates an immersive digital environment.",
-                "Cloud computing delivers services over the internet.",
-                "Cybersecurity protects systems from digital attacks.",
-                "Machine learning uses algorithms to analyze and learn from data.",
-                "Blockchain is a distributed ledger technology."
+                "A steep learning curve in riding a unicycle.",
+                "Be discreet about your meeting."
             ];
+
+            // Create a copy of the prompts that we'll shuffle
+            let prompts = [...originalPrompts];
 
             const sampleTextElement = document.getElementById('sample-text');
             const currentPromptElement = document.getElementById('current-prompt');
@@ -207,18 +208,43 @@
             let currentPromptIndex = 0;
             let promptResults = [];
 
-            // Initialize the first prompt
+            // Fisher-Yates shuffle algorithm
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]]; // Swap elements
+                }
+                return array;
+            }
+
+            // Function to shuffle prompts
+            function shufflePrompts() {
+                // Create a fresh copy with index tracking
+                prompts = originalPrompts.map((text, index) => ({
+                    text: text,
+                    originalIndex: index
+                }));
+                shuffleArray(prompts);
+            }
+
+            // Initialize with shuffled prompts
+            shufflePrompts();
             totalPromptsElement.textContent = prompts.length;
             updateCurrentPrompt();
 
             function updateCurrentPrompt() {
                 currentPromptElement.textContent = currentPromptIndex + 1;
-                sampleTextElement.innerText = prompts[currentPromptIndex];
+                sampleTextElement.innerText = prompts[currentPromptIndex].text;
             }
 
             // Get the current prompt text
             function getCurrentPromptText() {
-                return prompts[currentPromptIndex];
+                return prompts[currentPromptIndex].text;
+            }
+
+            // Get the current prompt's original index
+            function getCurrentPromptOriginalIndex() {
+                return prompts[currentPromptIndex].originalIndex;
             }
             const inputArea = document.getElementById('input-area');
             const timer = document.getElementById('timer');
@@ -556,6 +582,9 @@
                 results.style.display = 'none';
                 hideAutocorrectIndicator();
 
+                // Shuffle prompts for a new test
+                shufflePrompts();
+
                 // Reset prompt index and update display
                 currentPromptIndex = 0;
                 updateCurrentPrompt();
@@ -601,6 +630,7 @@
 
                 return {
                     promptIndex: currentPromptIndex,
+                    originalPromptIndex: getCurrentPromptOriginalIndex(),
                     promptText: promptText,
                     typedText: typedText,
                     wpm: wpm,
@@ -661,6 +691,7 @@
                     totalChars: totalChars,
                     promptsCompleted: promptResults.length,
                     totalPrompts: prompts.length,
+                    promptOrder: prompts.map(p => p.originalIndex), // Include the order of prompts in this test
                     promptResults: promptResults
                 };
 
