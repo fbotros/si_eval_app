@@ -18,11 +18,13 @@
             </div>
 
             <div class="autocorrect-container">
-                <textarea class="input-area" id="input-area" placeholder="Start typing here..."></textarea>
+                <textarea class="input-area" id="input-area" placeholder="Start typing here..."
+                    autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
                 <div class="autocorrect-indicator" id="autocorrect-indicator">
                     <span class="autocorrect-word" id="autocorrect-current-word"></span>
                     <span id="autocorrect-suggestion"></span>
                 </div>
+                <div id="debug-info" style="font-size: 10px; color: #999; margin-top: 5px;"></div>
             </div>
 
             <div class="timer" id="timer">Time: 30s</div>

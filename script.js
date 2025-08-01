@@ -272,15 +272,54 @@ document.addEventListener('DOMContentLoaded', function() {
     let previousInputValue = '';
     let lastWordCorrected = false;
 
-    // Debug function to log to console - useful for debugging on Oculus Quest
+    // Debug function to log to console and to the page - useful for debugging on mobile devices
     function debugLog(message, data) {
         console.log(`[DEBUG] ${message}`, data);
+
+        // Also show debug info on the page for mobile devices
+        const debugElement = document.getElementById('debug-info');
+        if (debugElement) {
+            const timestamp = new Date().toISOString().substr(11, 8); // HH:MM:SS
+            let debugText = `${timestamp} - ${message}: `;
+
+            if (typeof data === 'object') {
+                try {
+                    debugText += JSON.stringify(data).substring(0, 100); // Limit length
+                } catch (e) {
+                    debugText += "[Object]";
+                }
+            } else {
+                debugText += data;
+            }
+
+            // Keep only the last 5 debug messages
+            const currentText = debugElement.innerHTML;
+            const lines = currentText.split('<br>');
+            if (lines.length > 4) {
+                lines.shift(); // Remove oldest line
+            }
+            lines.push(debugText);
+
+            debugElement.innerHTML = lines.join('<br>');
+        }
     }
+
+    // Initialize the app with a message to show it's working
+    debugLog("App initialized", { mobile: isMobileOrVRBrowser() });
+
+    // Track input changes with a timer for mobile devices
+    let inputCheckInterval;
 
     // Start test when user starts typing
     inputArea.addEventListener('input', function(e) {
         if (!testActive) {
             startTest();
+
+            // For mobile devices, set up an interval to check for changes
+            if (isMobileOrVRBrowser() && !inputCheckInterval) {
+                inputCheckInterval = setInterval(checkForInputChanges, 200);
+                debugLog("Mobile input check interval started", {});
+            }
         }
 
         // Get the current input value
@@ -288,8 +327,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Debug
         debugLog("Input event", {
-            current: currentValue,
-            previous: previousInputValue,
+            current: currentValue.slice(-10), // Show just the last 10 chars for brevity
+            previous: previousInputValue ? previousInputValue.slice(-10) : '',
             length: currentValue.length,
             prevLength: previousInputValue ? previousInputValue.length : 0
         });
@@ -316,78 +355,128 @@ document.addEventListener('DOMContentLoaded', function() {
                 const currentText = currentValue.slice(0, -1); // Exclude the last character (space/punctuation)
                 addUserInputToDictionary(currentText);
 
-                // SIMPLIFIED AUTOCORRECT APPROACH FOR OCULUS QUEST
-                try {
-                    // Split the text by spaces and punctuation
-                    const allText = currentValue.slice(0, -1); // Text without the last punctuation
-                    const words = allText.split(/[\s.,!?;:"'()]+/);
-
-                    if (words.length > 0) {
-                        const lastWord = words[words.length - 1].toLowerCase();
-                        debugLog("Last word", lastWord);
-
-                        // Skip very short words (1-2 characters)
-                        if (lastWord.length > 2) {
-                            // Find the closest word in the dictionary
-                            const correctedWord = findClosestWord(lastWord);
-                            debugLog("Correction check", { original: lastWord, corrected: correctedWord });
-
-                            // If a correction was found and it's different from the original word
-                            if (correctedWord !== lastWord) {
-                                debugLog("Correction found", { from: lastWord, to: correctedWord });
-
-                                // SIMPLIFIED REPLACEMENT STRATEGY
-                                // Instead of trying to find the exact position, we'll rebuild the text
-                                // by replacing the last occurrence of the word
-
-                                // First, find all occurrences of the word in the text
-                                const regex = new RegExp(`\\b${lastWord}\\b`, 'gi');
-                                let match;
-                                let lastMatchIndex = -1;
-                                let allText = currentValue.slice(0, -1); // Text without the last punctuation
-
-                                // Find the last occurrence of the word
-                                while ((match = regex.exec(allText)) !== null) {
-                                    lastMatchIndex = match.index;
-                                }
-
-                                if (lastMatchIndex !== -1) {
-                                    // Replace the last occurrence of the word
-                                    const beforeWord = allText.substring(0, lastMatchIndex);
-                                    const afterWord = allText.substring(lastMatchIndex + lastWord.length);
-
-                                    // Create the corrected text
-                                    const correctedText = beforeWord + correctedWord + afterWord + lastChar;
-                                    debugLog("Corrected text", {
-                                        before: currentValue,
-                                        after: correctedText,
-                                        beforeWord,
-                                        afterWord
-                                    });
-
-                                    // Update the input value
-                                    inputArea.value = correctedText;
-                                    lastWordCorrected = true;
-
-                                    // No need to try to position the cursor - just let it go to the end
-                                    // which is the default behavior
-
-                                    // Hide the indicator after correction
-                                    hideAutocorrectIndicator();
-                                }
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error("Autocorrect error in input handler:", error);
-                    debugLog("Error in autocorrect", error);
-                }
+                // Try to perform autocorrect
+                performMobileAutocorrect(currentValue, lastChar);
             }
         }
 
         // Update the previous value
-        previousInputValue = inputArea.value;
+        previousInputValue = currentValue;
     });
+
+    // Function to check for input changes on mobile devices
+    function checkForInputChanges() {
+        if (!testActive) return;
+
+        const currentValue = inputArea.value;
+
+        // If the value hasn't changed, do nothing
+        if (currentValue === previousInputValue) return;
+
+        debugLog("Interval check", {
+            current: currentValue.slice(-10),
+            previous: previousInputValue ? previousInputValue.slice(-10) : '',
+            changed: currentValue !== previousInputValue
+        });
+
+        // If the value has changed and ends with punctuation, try autocorrect
+        if (currentValue.length > 0) {
+            const lastChar = currentValue.slice(-1);
+
+            if (/[\s.,!?;:"'()]/.test(lastChar) && !lastWordCorrected) {
+                debugLog("Punctuation detected in interval", lastChar);
+
+                // Try to perform autocorrect
+                performMobileAutocorrect(currentValue, lastChar);
+            }
+        }
+
+        // Update the previous value
+        previousInputValue = currentValue;
+    }
+
+    // Specialized autocorrect function for mobile devices
+    function performMobileAutocorrect(currentValue, lastChar) {
+        try {
+            // Split the text by spaces and punctuation
+            const allText = currentValue.slice(0, -1); // Text without the last punctuation
+            const words = allText.split(/[\s.,!?;:"'()]+/);
+
+            if (words.length > 0) {
+                const lastWord = words[words.length - 1].toLowerCase();
+                debugLog("Last word", lastWord);
+
+                // Skip very short words (1-2 characters)
+                if (lastWord.length > 2) {
+                    // Find the closest word in the dictionary
+                    const correctedWord = findClosestWord(lastWord);
+                    debugLog("Correction check", { original: lastWord, corrected: correctedWord });
+
+                    // If a correction was found and it's different from the original word
+                    if (correctedWord !== lastWord) {
+                        debugLog("Correction found", { from: lastWord, to: correctedWord });
+
+                        // SIMPLIFIED REPLACEMENT STRATEGY
+                        // Instead of trying to find the exact position, we'll rebuild the text
+                        // by replacing the last occurrence of the word
+
+                        try {
+                            // First, find all occurrences of the word in the text
+                            const regex = new RegExp(`\\b${lastWord}\\b`, 'gi');
+                            let match;
+                            let lastMatchIndex = -1;
+
+                            // Find the last occurrence of the word
+                            while ((match = regex.exec(allText)) !== null) {
+                                lastMatchIndex = match.index;
+                            }
+
+                            if (lastMatchIndex !== -1) {
+                                // Replace the last occurrence of the word
+                                const beforeWord = allText.substring(0, lastMatchIndex);
+                                const afterWord = allText.substring(lastMatchIndex + lastWord.length);
+
+                                // Create the corrected text
+                                const correctedText = beforeWord + correctedWord + afterWord + lastChar;
+                                debugLog("Corrected text", {
+                                    before: currentValue.slice(-20),
+                                    after: correctedText.slice(-20)
+                                });
+
+                                // Update the input value
+                                inputArea.value = correctedText;
+                                lastWordCorrected = true;
+
+                                // Hide the indicator after correction
+                                hideAutocorrectIndicator();
+                            } else {
+                                debugLog("Word not found in text", { word: lastWord, text: allText.slice(-20) });
+                            }
+                        } catch (regexError) {
+                            // If regex fails, try a simpler approach
+                            debugLog("Regex failed, trying simpler approach", regexError);
+
+                            // Simple approach: just replace the last word
+                            const words = allText.split(/\s+/);
+                            if (words.length > 0) {
+                                const lastIndex = words.length - 1;
+                                if (words[lastIndex].toLowerCase() === lastWord) {
+                                    words[lastIndex] = correctedWord;
+                                    inputArea.value = words.join(' ') + lastChar;
+                                    lastWordCorrected = true;
+                                    hideAutocorrectIndicator();
+                                    debugLog("Simple correction applied", { result: inputArea.value.slice(-20) });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Autocorrect error in mobile handler:", error);
+            debugLog("Error in mobile autocorrect", error.toString());
+        }
+    }
 
     // Function to add words from user input to dictionary
     function addUserInputToDictionary(text) {
@@ -521,9 +610,19 @@ document.addEventListener('DOMContentLoaded', function() {
         // Check for VR headsets
         const isVR = /VR|XR|Oculus|HTC_VIVE|SamsungGear|Windows Mixed Reality|HoloLens/i.test(navigator.userAgent);
 
-        debugLog("Browser detection", { isOculus, isMobile, isVR, userAgent: navigator.userAgent });
+        // Also check for touch support as a fallback
+        const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
-        return isOculus || isMobile || isVR;
+        return isOculus || isMobile || isVR || hasTouch;
+    }
+
+    // Clean up when the test ends
+    function cleanupMobileHandlers() {
+        if (inputCheckInterval) {
+            clearInterval(inputCheckInterval);
+            inputCheckInterval = null;
+            debugLog("Mobile input check interval stopped", {});
+        }
     }
 
     // Reset button functionality
@@ -538,6 +637,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function endTest() {
         clearInterval(timerInterval);
         testActive = false;
+
+        // Clean up mobile handlers
+        cleanupMobileHandlers();
 
         // Disable the input area so users can't type anymore
         inputArea.disabled = true;
@@ -559,11 +661,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Display results
         results.style.display = 'block';
+
+        debugLog("Test ended", { promptsCompleted: promptResults.length });
     }
 
     function resetTest() {
         clearInterval(timerInterval);
         testActive = false;
+
+        // Clean up mobile handlers
+        cleanupMobileHandlers();
+
         timeLeft = 30;
         updateTimerDisplay();
         inputArea.value = '';
@@ -582,6 +690,12 @@ document.addEventListener('DOMContentLoaded', function() {
         currentPromptIndex = 0;
         updateCurrentPrompt();
         promptResults = [];
+
+        // Reset tracking variables
+        previousInputValue = '';
+        lastWordCorrected = false;
+
+        debugLog("Test reset", { mobile: isMobileOrVRBrowser() });
     }
 
     // Function to add a new prompt to the test
