@@ -152,7 +152,7 @@
 <body>
     <div class="container">
         <h1>Fadi's 30-Second Typing Test</h1>
-        <p class="instructions">Start typing in the box below to begin the 30-second test. Smart autocorrect is enabled - it will fix typos using an edit distance of up to 2 when you press space or punctuation. After the test ends, results will be downloaded as a JSON file.</p>
+        <p class="instructions">Start typing in the box below to begin the 30-second test. Smart autocorrect is enabled - it will silently fix typos when you press space or punctuation. After the test ends, results will be downloaded as a JSON file.</p>
 
         <div class="test-container">
             <div class="sample-text" id="sample-text">
@@ -374,17 +374,8 @@
                     startTest();
                 }
 
-                // Check for potential autocorrections as user types
-                positionAutocorrectIndicator();
-            });
-
-            // Update indicator position when cursor moves
-            inputArea.addEventListener('click', positionAutocorrectIndicator);
-            inputArea.addEventListener('keyup', function(e) {
-                // Only update on navigation keys
-                if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
-                    positionAutocorrectIndicator();
-                }
+                // No longer check for autocorrections as user types
+                // The autocorrect will only happen when space or punctuation is pressed
             });
 
             // Function to perform autocorrect
@@ -440,8 +431,7 @@
                         e.preventDefault(); // Prevent default if correction was made
                     }
 
-                    // Hide the indicator
-                    hideAutocorrectIndicator();
+                    // No need to hide the indicator since it's never shown
                 }
             });
 
