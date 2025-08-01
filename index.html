@@ -119,32 +119,29 @@
         }
         .autocorrect-indicator {
             position: absolute;
-            top: -30px;
+            top: -40px;
             left: 10px;
-            background-color: rgba(52, 152, 219, 0.9);
+            background-color: #3498db; /* Solid color for better visibility */
             color: white;
-            padding: 2px 8px;
+            padding: 4px 10px;
             border-radius: 4px;
-            font-size: 0.9rem;
+            font-size: 1rem; /* Slightly larger font */
             pointer-events: none;
             z-index: 100;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-            opacity: 0;
-            transition: opacity 0.2s;
-            display: flex;
-            align-items: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            display: none; /* Start hidden, use display instead of opacity */
         }
         .autocorrect-indicator::after {
             content: '';
             position: absolute;
-            bottom: -5px;
+            bottom: -8px;
             left: 50%;
             transform: translateX(-50%);
             width: 0;
             height: 0;
-            border-left: 5px solid transparent;
-            border-right: 5px solid transparent;
-            border-top: 5px solid rgba(52, 152, 219, 0.9);
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 8px solid #3498db;
         }
         .autocorrect-word {
             font-weight: bold;
@@ -362,13 +359,13 @@
                 document.getElementById('autocorrect-current-word').textContent = currentWord + ' →';
                 document.getElementById('autocorrect-suggestion').textContent = suggestion;
 
-                // Show the indicator
-                autocorrectIndicator.style.opacity = '1';
+                // Show the indicator - using display property instead of opacity
+                autocorrectIndicator.style.display = 'flex';
             }
 
             // Function to hide the autocorrect indicator
             function hideAutocorrectIndicator() {
-                autocorrectIndicator.style.opacity = '0';
+                autocorrectIndicator.style.display = 'none';
             }
 
             // Start test when user starts typing
