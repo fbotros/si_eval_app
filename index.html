@@ -109,6 +109,47 @@
             margin-bottom: 1rem;
             color: #7f8c8d;
         }
+        /* Autocorrect indicator styles */
+        .autocorrect-container {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+        .input-area {
+            margin-bottom: 0 !important;
+        }
+        .autocorrect-indicator {
+            position: absolute;
+            top: -30px;
+            left: 10px;
+            background-color: rgba(52, 152, 219, 0.9);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            pointer-events: none;
+            z-index: 100;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+        }
+        .autocorrect-indicator::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 5px solid rgba(52, 152, 219, 0.9);
+        }
+        .autocorrect-word {
+            font-weight: bold;
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
@@ -121,7 +162,13 @@
                 The quick brown fox jumps over the lazy dog. Programming is the process of creating a set of instructions that tell a computer how to perform a task. Programming can be done using a variety of computer programming languages, such as JavaScript, Python, and C++.
             </div>
 
-            <textarea class="input-area" id="input-area" placeholder="Start typing here..."></textarea>
+            <div class="autocorrect-container">
+                <textarea class="input-area" id="input-area" placeholder="Start typing here..."></textarea>
+                <div class="autocorrect-indicator" id="autocorrect-indicator">
+                    <span class="autocorrect-word" id="autocorrect-current-word"></span>
+                    <span id="autocorrect-suggestion"></span>
+                </div>
+            </div>
 
             <div class="timer" id="timer">Time: 30s</div>
 
@@ -150,10 +197,13 @@
             const accuracyElement = document.getElementById('accuracy');
             const correctCharsElement = document.getElementById('correct-chars');
             const incorrectCharsElement = document.getElementById('incorrect-chars');
+            const autocorrectIndicator = document.getElementById('autocorrect-indicator');
 
             let timeLeft = 30;
             let timerInterval;
             let testActive = false;
+            let lastTypedWord = '';
+            let lastSuggestion = '';
 
             // Function to start the test
             function startTest() {
@@ -260,10 +310,83 @@
                 return closestWord || word;
             }
 
+            // Function to position the autocorrect indicator
+            function positionAutocorrectIndicator() {
+                if (!testActive) return;
+
+                const text = inputArea.value;
+                const cursorPosition = inputArea.selectionStart;
+
+                // Find the start of the current word
+                let wordStart = cursorPosition;
+                while (wordStart > 0 && !/[\s.,!?;:"'()]/.test(text.charAt(wordStart - 1))) {
+                    wordStart--;
+                }
+
+                // Extract the current word
+                const currentWord = text.substring(wordStart, cursorPosition).toLowerCase();
+
+                // Skip very short words (1-2 characters)
+                if (currentWord.length <= 2) {
+                    hideAutocorrectIndicator();
+                    lastTypedWord = currentWord;
+                    return;
+                }
+
+                // Check if the word has changed
+                if (currentWord === lastTypedWord) {
+                    return;
+                }
+
+                lastTypedWord = currentWord;
+
+                // Find the closest word in the dictionary
+                const correctedWord = findClosestWord(currentWord);
+
+                // If a correction was found and it's different from the original word
+                if (correctedWord !== currentWord) {
+                    // Show the autocorrect indicator with the suggested word
+                    showAutocorrectIndicator(correctedWord, wordStart);
+                    lastSuggestion = correctedWord;
+                } else {
+                    hideAutocorrectIndicator();
+                }
+            }
+
+            // Function to show the autocorrect indicator
+            function showAutocorrectIndicator(suggestion, wordStart) {
+                // Get the current word being typed
+                const currentWord = inputArea.value.substring(wordStart, inputArea.selectionStart);
+
+                // Set the indicator text
+                document.getElementById('autocorrect-current-word').textContent = currentWord + ' →';
+                document.getElementById('autocorrect-suggestion').textContent = suggestion;
+
+                // Show the indicator
+                autocorrectIndicator.style.opacity = '1';
+            }
+
+            // Function to hide the autocorrect indicator
+            function hideAutocorrectIndicator() {
+                autocorrectIndicator.style.opacity = '0';
+            }
+
             // Start test when user starts typing
             inputArea.addEventListener('input', function(e) {
                 if (!testActive) {
                     startTest();
+                }
+
+                // Check for potential autocorrections as user types
+                positionAutocorrectIndicator();
+            });
+
+            // Update indicator position when cursor moves
+            inputArea.addEventListener('click', positionAutocorrectIndicator);
+            inputArea.addEventListener('keyup', function(e) {
+                // Only update on navigation keys
+                if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+                    positionAutocorrectIndicator();
                 }
             });
 
@@ -294,6 +417,9 @@
                                     // Move cursor to the end
                                     inputArea.selectionStart = inputArea.value.length;
                                     inputArea.selectionEnd = inputArea.value.length;
+
+                                    // Hide the indicator after correction
+                                    hideAutocorrectIndicator();
                                 }, 0);
 
                                 return true; // Correction was made
@@ -313,7 +439,12 @@
 
                 if (punctuation.includes(e.key)) {
                     // Perform autocorrect and append the pressed character
-                    performAutocorrect(e.key);
+                    if (performAutocorrect(e.key)) {
+                        e.preventDefault(); // Prevent default if correction was made
+                    }
+
+                    // Hide the indicator
+                    hideAutocorrectIndicator();
                 }
             });
 
@@ -336,6 +467,9 @@
                 // Change button text
                 startButton.textContent = 'Start New Test';
 
+                // Hide the autocorrect indicator
+                hideAutocorrectIndicator();
+
                 // Calculate results
                 calculateResults();
 
@@ -352,6 +486,7 @@
                 inputArea.disabled = false;
                 startButton.textContent = 'Reset Test';
                 results.style.display = 'none';
+                hideAutocorrectIndicator();
             }
 
             function calculateResults() {
@@ -375,7 +510,7 @@
 
                 // Calculate WPM (assuming average word length of 5 characters)
                 const minutes = (30 - timeLeft) / 60;
-                const words = correctChars / 5;
+                const words = (correctChars + incorrectChars) / 5;
                 const wpm = minutes > 0 ? Math.floor(words / minutes) : 0;
 
                 // Calculate CPM
