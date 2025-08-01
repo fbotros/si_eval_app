@@ -114,7 +114,7 @@
 <body>
     <div class="container">
         <h1>Fadi's 30-Second Typing Test</h1>
-        <p class="instructions">Start typing in the box below to begin the 30-second test. After the test ends, click the "Start New Test" button to try again.</p>
+        <p class="instructions">Start typing in the box below to begin the 30-second test. After the test ends, results will be downloaded as a JSON file and you can click "Start New Test" to try again.</p>
 
         <div class="test-container">
             <div class="sample-text" id="sample-text">
@@ -253,6 +253,51 @@
                 accuracyElement.textContent = `${accuracy}%`;
                 correctCharsElement.textContent = correctChars;
                 incorrectCharsElement.textContent = incorrectChars;
+
+                // Create results object
+                const resultsData = {
+                    date: new Date().toISOString(),
+                    wpm: wpm,
+                    cpm: cpm,
+                    accuracy: accuracy,
+                    correctChars: correctChars,
+                    incorrectChars: incorrectChars,
+                    totalChars: typedLength,
+                    testDuration: 30
+                };
+
+                // Download results as JSON
+                downloadResultsAsJson(resultsData);
+            }
+
+            function downloadResultsAsJson(data) {
+                // Create a JSON string from the data
+                const jsonString = JSON.stringify(data, null, 2);
+
+                // Create a Blob with the JSON data
+                const blob = new Blob([jsonString], { type: 'application/json' });
+
+                // Create a URL for the Blob
+                const url = URL.createObjectURL(blob);
+
+                // Create a temporary link element
+                const link = document.createElement('a');
+                link.href = url;
+
+                // Set the filename with date
+                const date = new Date();
+                const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+                link.download = `typing-test-results-${formattedDate}.json`;
+
+                // Append the link to the body
+                document.body.appendChild(link);
+
+                // Trigger the download
+                link.click();
+
+                // Clean up
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
             }
         });
     </script>
