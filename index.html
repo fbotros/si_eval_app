@@ -440,60 +440,73 @@
                 }
             });
 
-            // Function to perform autocorrect
+            // Function to perform autocorrect - improved for cross-browser compatibility
             function performAutocorrect(appendChar) {
-                const text = inputArea.value;
-                if (text.length > 0) {
-                    // Get the last word
-                    const words = text.trim().split(/[\s.,!?;:"'()]/);
-                    const lastWord = words[words.length - 1].toLowerCase();
+                try {
+                    const text = inputArea.value;
+                    if (text.length > 0) {
+                        // Get the last word - more robust splitting
+                        const words = text.trim().split(/[\s.,!?;:"'()]/);
+                        if (words.length === 0) return false;
 
-                    // Skip very short words (1-2 characters)
-                    if (lastWord.length > 2) {
-                        // Find the closest word in the dictionary
-                        const correctedWord = findClosestWord(lastWord);
+                        const lastWord = words[words.length - 1].toLowerCase();
 
-                        // If a correction was found and it's different from the original word
-                        if (correctedWord !== lastWord) {
-                            // Replace the last word with the corrected one
-                            const lastIndex = text.lastIndexOf(lastWord);
-                            if (lastIndex !== -1) {
-                                const newText = text.substring(0, lastIndex) + correctedWord;
+                        // Skip very short words (1-2 characters)
+                        if (lastWord.length > 2) {
+                            // Find the closest word in the dictionary
+                            const correctedWord = findClosestWord(lastWord);
 
-                                // Update the input area with the corrected text
-                                setTimeout(() => {
+                            // If a correction was found and it's different from the original word
+                            if (correctedWord !== lastWord) {
+                                // Replace the last word with the corrected one
+                                const lastIndex = text.lastIndexOf(lastWord);
+                                if (lastIndex !== -1) {
+                                    const newText = text.substring(0, lastIndex) + correctedWord;
+
+                                    // Direct update approach for better cross-browser compatibility
                                     inputArea.value = newText + appendChar;
 
-                                    // Move cursor to the end
-                                    inputArea.selectionStart = inputArea.value.length;
-                                    inputArea.selectionEnd = inputArea.value.length;
+                                    // Try to move cursor to the end - wrapped in try/catch for browser compatibility
+                                    try {
+                                        inputArea.selectionStart = inputArea.value.length;
+                                        inputArea.selectionEnd = inputArea.value.length;
+                                    } catch (e) {
+                                        // Some browsers might not support selection manipulation
+                                        console.log("Selection adjustment not supported");
+                                    }
 
                                     // Hide the indicator after correction
                                     hideAutocorrectIndicator();
-                                }, 0);
 
-                                return true; // Correction was made
+                                    return true; // Correction was made
+                                }
                             }
                         }
                     }
+                    return false; // No correction was made
+                } catch (error) {
+                    console.error("Autocorrect error:", error);
+                    return false; // Error occurred, don't attempt correction
                 }
-                return false; // No correction was made
             }
 
-            // Add autocorrect functionality
+            // Add autocorrect functionality with improved browser compatibility
             inputArea.addEventListener('keydown', function(e) {
                 if (!testActive) return;
 
                 // Check for space or punctuation
                 const punctuation = [' ', '.', ',', '!', '?', ';', ':', '"', "'", '(', ')'];
+                const key = e.key || String.fromCharCode(e.keyCode || e.which);
 
-                if (punctuation.includes(e.key)) {
+                if (punctuation.includes(key)) {
                     // Perform autocorrect and append the pressed character
-                    if (performAutocorrect(e.key)) {
-                        e.preventDefault(); // Prevent default if correction was made
+                    try {
+                        if (performAutocorrect(key)) {
+                            e.preventDefault(); // Prevent default if correction was made
+                        }
+                    } catch (error) {
+                        console.error("Error in autocorrect keydown handler:", error);
                     }
-
-                    // No need to hide the indicator since it's never shown
                 }
             });
 
