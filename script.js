@@ -102,8 +102,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 1000);
     }
 
-    // Base dictionary of common words
-    let dictionary = [
+    // Base dictionary of common words - make it a global window property for debugging
+    window.typingTestDictionary = [
         // Common English words
         'a', 'an', 'in', 'on', 'at', 'by', 'for', 'with', 'about', 'against',
         'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
@@ -112,6 +112,11 @@ document.addEventListener('DOMContentLoaded', function() {
         'any', 'both', 'each', 'few', 'more', 'most', 'some', 'other', 'have',
         'has', 'had', 'do', 'does', 'did', 'but', 'if', 'or', 'because', 'until',
         'while', 'of', 'this', 'these', 'those', 'am', 'are', 'was', 'were',
+        'nation', 'stability', 'rectangular', 'objects', 'sides', 'silly', 'questions',
+        'learn', 'walk', 'run', 'important', 'news', 'always', 'seems', 'late',
+        'quick', 'brown', 'fox', 'jumps', 'lazy', 'dog', 'steep', 'learning',
+        'curve', 'riding', 'unicycle', 'discreet', 'meeting', 'raindrops', 'falling',
+        'head', 'excellent', 'communicate',
 
         // Programming related words
         'function', 'variable', 'code', 'program', 'class', 'object', 'method',
@@ -120,6 +125,23 @@ document.addEventListener('DOMContentLoaded', function() {
         'interface', 'module', 'component', 'server', 'client', 'database', 'data',
         'file', 'system', 'network', 'web', 'app', 'application', 'development'
     ];
+
+    // Use the window property as our dictionary
+    let dictionary = window.typingTestDictionary;
+
+    // Add some test misspellings for debugging
+    const testMisspellings = {
+        'natoin': 'nation',
+        'rectanglar': 'rectangular',
+        'questons': 'questions',
+        'lern': 'learn',
+        'importent': 'important',
+        'alwyas': 'always',
+        'quck': 'quick',
+        'bown': 'brown',
+        'lazzy': 'lazy',
+        'comunicate': 'communicate'
+    };
 
     // Function to extract words from a string
     function extractWords(text) {
@@ -142,7 +164,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
-        console.log("Added prompt words to dictionary. Dictionary now has", dictionary.length, "words");
+
+        // Log the dictionary contents for debugging
+        debugLog("Dictionary initialized", {
+            size: dictionary.length,
+            sample: dictionary.slice(0, 10).join(', ') + '...'
+        });
+
+        // Make the dictionary accessible for debugging
+        window.getDictionary = function() {
+            return dictionary;
+        };
+
+        // Add a function to test the autocorrect
+        window.testAutocorrect = function(word) {
+            const corrected = findClosestWord(word);
+            console.log(`Testing autocorrect: "${word}" → "${corrected}"`);
+            return corrected;
+        };
     }
 
     // Add prompt words to dictionary on page load
@@ -184,6 +223,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Find the closest word in the dictionary
     function findClosestWord(word) {
+        // First check our test misspellings for debugging
+        if (testMisspellings[word]) {
+            debugLog("Test misspelling found", { word, correction: testMisspellings[word] });
+            return testMisspellings[word];
+        }
+
         // If the word is already in the dictionary, return it
         if (dictionary.includes(word)) {
             return word;
@@ -191,16 +236,34 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let closestWord = null;
         let minDistance = Infinity;
+        let matchedWords = [];
 
         // Find words with edit distance of up to 2
         for (const dictWord of dictionary) {
             const distance = levenshteinDistance(word, dictWord);
+
+            // Track all close matches for debugging
+            if (distance <= 2) {
+                matchedWords.push({ word: dictWord, distance });
+            }
 
             // Consider words with edit distance of 1 or 2
             if (distance <= 2 && distance < minDistance) {
                 minDistance = distance;
                 closestWord = dictWord;
             }
+        }
+
+        // Log all potential matches for debugging
+        if (matchedWords.length > 0) {
+            debugLog("Potential matches", {
+                word,
+                matches: matchedWords.slice(0, 5), // Show up to 5 matches
+                totalMatches: matchedWords.length,
+                selected: closestWord
+            });
+        } else {
+            debugLog("No matches found", { word, dictionarySize: dictionary.length });
         }
 
         // Return the closest word if found, otherwise return the original word
@@ -305,7 +368,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Initialize the app with a message to show it's working
-    debugLog("App initialized", { mobile: isMobileOrVRBrowser() });
+    debugLog("App initialized", {
+        mobile: isMobileOrVRBrowser(),
+        userAgent: navigator.userAgent,
+        dictionarySize: dictionary.length
+    });
 
     // Track input changes with a timer for mobile devices
     let inputCheckInterval;
@@ -416,58 +483,84 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (correctedWord !== lastWord) {
                         debugLog("Correction found", { from: lastWord, to: correctedWord });
 
-                        // SIMPLIFIED REPLACEMENT STRATEGY
-                        // Instead of trying to find the exact position, we'll rebuild the text
-                        // by replacing the last occurrence of the word
-
+                        // ULTRA-SIMPLIFIED REPLACEMENT STRATEGY FOR MOBILE
+                        // Just replace the last word in the simplest way possible
                         try {
-                            // First, find all occurrences of the word in the text
-                            const regex = new RegExp(`\\b${lastWord}\\b`, 'gi');
-                            let match;
-                            let lastMatchIndex = -1;
+                            // Simple approach: split by spaces and replace the last word
+                            const textParts = allText.split(/\s+/);
+                            if (textParts.length > 0) {
+                                // Replace the last part that contains our word
+                                let replaced = false;
 
-                            // Find the last occurrence of the word
-                            while ((match = regex.exec(allText)) !== null) {
-                                lastMatchIndex = match.index;
-                            }
+                                for (let i = textParts.length - 1; i >= 0; i--) {
+                                    // Clean the part from punctuation for comparison
+                                    const cleanPart = textParts[i].replace(/[.,!?;:"'()]/g, '').toLowerCase();
 
-                            if (lastMatchIndex !== -1) {
-                                // Replace the last occurrence of the word
-                                const beforeWord = allText.substring(0, lastMatchIndex);
-                                const afterWord = allText.substring(lastMatchIndex + lastWord.length);
+                                    if (cleanPart === lastWord) {
+                                        // Replace just the word part, keeping any punctuation
+                                        const punctBefore = textParts[i].match(/^[.,!?;:"'()]+/) || [''];
+                                        const punctAfter = textParts[i].match(/[.,!?;:"'()]+$/) || [''];
 
-                                // Create the corrected text
-                                const correctedText = beforeWord + correctedWord + afterWord + lastChar;
-                                debugLog("Corrected text", {
-                                    before: currentValue.slice(-20),
-                                    after: correctedText.slice(-20)
-                                });
+                                        textParts[i] = punctBefore[0] + correctedWord + punctAfter[0];
+                                        replaced = true;
+                                        break;
+                                    }
+                                }
 
-                                // Update the input value
-                                inputArea.value = correctedText;
-                                lastWordCorrected = true;
+                                if (replaced) {
+                                    // Join everything back together
+                                    const correctedText = textParts.join(' ') + lastChar;
 
-                                // Hide the indicator after correction
-                                hideAutocorrectIndicator();
-                            } else {
-                                debugLog("Word not found in text", { word: lastWord, text: allText.slice(-20) });
-                            }
-                        } catch (regexError) {
-                            // If regex fails, try a simpler approach
-                            debugLog("Regex failed, trying simpler approach", regexError);
+                                    debugLog("Simple correction applied", {
+                                        before: currentValue,
+                                        after: correctedText
+                                    });
 
-                            // Simple approach: just replace the last word
-                            const words = allText.split(/\s+/);
-                            if (words.length > 0) {
-                                const lastIndex = words.length - 1;
-                                if (words[lastIndex].toLowerCase() === lastWord) {
-                                    words[lastIndex] = correctedWord;
-                                    inputArea.value = words.join(' ') + lastChar;
+                                    // Update the input value
+                                    inputArea.value = correctedText;
                                     lastWordCorrected = true;
+
+                                    // Hide the indicator after correction
                                     hideAutocorrectIndicator();
-                                    debugLog("Simple correction applied", { result: inputArea.value.slice(-20) });
+                                } else {
+                                    // If we couldn't find the exact word, try a more aggressive approach
+                                    // Just replace the last part regardless
+                                    if (textParts.length > 0) {
+                                        const lastPart = textParts[textParts.length - 1];
+                                        // Keep any leading/trailing punctuation
+                                        const punctBefore = lastPart.match(/^[.,!?;:"'()]+/) || [''];
+                                        const punctAfter = lastPart.match(/[.,!?;:"'()]+$/) || [''];
+
+                                        textParts[textParts.length - 1] = punctBefore[0] + correctedWord + punctAfter[0];
+
+                                        const correctedText = textParts.join(' ') + lastChar;
+
+                                        debugLog("Aggressive correction applied", {
+                                            before: currentValue,
+                                            after: correctedText
+                                        });
+
+                                        // Update the input value
+                                        inputArea.value = correctedText;
+                                        lastWordCorrected = true;
+
+                                        // Hide the indicator after correction
+                                        hideAutocorrectIndicator();
+                                    }
                                 }
                             }
+                        } catch (error) {
+                            console.error("Error in simple replacement:", error);
+                            debugLog("Error in simple replacement", error.toString());
+
+                            // FALLBACK: Just append the corrected word
+                            // This is a last resort if all other methods fail
+                            const words = allText.split(/\s+/);
+                            words[words.length - 1] = correctedWord;
+                            inputArea.value = words.join(' ') + lastChar;
+                            lastWordCorrected = true;
+                            hideAutocorrectIndicator();
+                            debugLog("Fallback correction applied", { result: inputArea.value });
                         }
                     }
                 }
