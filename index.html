@@ -195,7 +195,9 @@
                 "Important news always seems to be late.",
                 "The quick brown fox jumps over the lazy dog.",
                 "A steep learning curve in riding a unicycle.",
-                "Be discreet about your meeting."
+                "Be discreet about your meeting.",
+                "Raindrops keep falling on my head.",
+                "An excellent way to communicate."
             ];
 
             // Create a copy of the prompts that we'll shuffle
@@ -287,14 +289,8 @@
                 }, 1000);
             }
 
-            // Dictionary of common words
-            const dictionary = [
-                // Words from the sample text
-                'the', 'quick', 'brown', 'fox', 'jumps', 'over', 'lazy', 'dog',
-                'programming', 'is', 'process', 'of', 'creating', 'set', 'instructions',
-                'that', 'tell', 'computer', 'how', 'to', 'perform', 'task', 'can', 'be',
-                'done', 'using', 'variety', 'languages', 'such', 'as', 'javascript', 'python', 'and',
-
+            // Base dictionary of common words
+            let dictionary = [
                 // Common English words
                 'a', 'an', 'in', 'on', 'at', 'by', 'for', 'with', 'about', 'against',
                 'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
@@ -311,6 +307,33 @@
                 'interface', 'module', 'component', 'server', 'client', 'database', 'data',
                 'file', 'system', 'network', 'web', 'app', 'application', 'development'
             ];
+
+            // Function to extract words from a string
+            function extractWords(text) {
+                // Remove punctuation and split by spaces
+                return text.toLowerCase()
+                    .replace(/[.,!?;:"'()]/g, '')
+                    .split(/\s+/)
+                    .filter(word => word.length > 0);
+            }
+
+            // Function to add all words from prompts to the dictionary
+            function addPromptWordsToDictionary() {
+                // Extract all words from all prompts
+                originalPrompts.forEach(prompt => {
+                    const words = extractWords(prompt);
+                    words.forEach(word => {
+                        // Add word to dictionary if it's not already there
+                        if (!dictionary.includes(word)) {
+                            dictionary.push(word);
+                        }
+                    });
+                });
+                console.log("Added prompt words to dictionary. Dictionary now has", dictionary.length, "words");
+            }
+
+            // Add prompt words to dictionary on page load
+            addPromptWordsToDictionary();
 
             // Calculate Levenshtein distance between two strings
             function levenshteinDistance(a, b) {
@@ -438,9 +461,35 @@
                     startTest();
                 }
 
+                // Check if the user has typed a space or punctuation
+                const lastChar = inputArea.value.slice(-1);
+                if (/[\s.,!?;:"'()]/.test(lastChar)) {
+                    // Extract the current text and add any new words to the dictionary
+                    const currentText = inputArea.value.slice(0, -1); // Exclude the last character (space/punctuation)
+                    addUserInputToDictionary(currentText);
+                }
+
                 // No longer check for autocorrections as user types
                 // The autocorrect will only happen when space or punctuation is pressed
             });
+
+            // Function to add words from user input to dictionary
+            function addUserInputToDictionary(text) {
+                const words = extractWords(text);
+                let newWordsAdded = 0;
+
+                words.forEach(word => {
+                    // Only add words with length > 2 that aren't already in the dictionary
+                    if (word.length > 2 && !dictionary.includes(word)) {
+                        dictionary.push(word);
+                        newWordsAdded++;
+                    }
+                });
+
+                if (newWordsAdded > 0) {
+                    console.log(`Added ${newWordsAdded} new words from user input to dictionary. Dictionary now has ${dictionary.length} words`);
+                }
+            }
 
             // Handle Enter key to move to next prompt
             inputArea.addEventListener('keydown', function(e) {
@@ -448,6 +497,9 @@
 
                 if (e.key === 'Enter') {
                     e.preventDefault(); // Prevent default Enter behavior
+
+                    // Add words from user input to dictionary
+                    addUserInputToDictionary(inputArea.value);
 
                     // Calculate results for the current prompt
                     const promptResult = calculatePromptResult();
@@ -582,6 +634,9 @@
                 results.style.display = 'none';
                 hideAutocorrectIndicator();
 
+                // Update dictionary with any new prompt words
+                addPromptWordsToDictionary();
+
                 // Shuffle prompts for a new test
                 shufflePrompts();
 
@@ -589,6 +644,28 @@
                 currentPromptIndex = 0;
                 updateCurrentPrompt();
                 promptResults = [];
+            }
+
+            // Function to add a new prompt to the test
+            function addNewPrompt(promptText) {
+                // Add the new prompt to the original prompts array
+                originalPrompts.push(promptText);
+
+                // Update the dictionary with words from the new prompt
+                const words = extractWords(promptText);
+                words.forEach(word => {
+                    if (!dictionary.includes(word)) {
+                        dictionary.push(word);
+                    }
+                });
+
+                // Update the total prompts count
+                totalPromptsElement.textContent = originalPrompts.length;
+
+                console.log("Added new prompt and updated dictionary. Dictionary now has", dictionary.length, "words");
+
+                // Reshuffle prompts to include the new one
+                shufflePrompts();
             }
 
             // Calculate results for the current prompt
