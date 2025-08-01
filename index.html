@@ -3,39 +3,250 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World</title>
+    <title>30-Second Typing Test</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
             margin: 0;
-            background-color: #f0f0f0;
+            background-color: #f5f5f5;
+            color: #333;
         }
         .container {
-            text-align: center;
+            width: 80%;
+            max-width: 800px;
             padding: 2rem;
             border-radius: 10px;
             background-color: white;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
         h1 {
-            color: #333;
-            font-size: 3rem;
-            margin-bottom: 1rem;
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
         }
-        p {
-            color: #666;
-            font-size: 1.2rem;
+        .test-container {
+            margin-bottom: 1.5rem;
+        }
+        .sample-text {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            border-left: 4px solid #3498db;
+        }
+        .input-area {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.1rem;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            resize: none;
+            margin-bottom: 1rem;
+            transition: border-color 0.3s;
+        }
+        .input-area:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        .input-area.disabled {
+            background-color: #f5f5f5;
+            cursor: not-allowed;
+        }
+        .timer {
+            font-size: 1.5rem;
+            text-align: center;
+            margin-bottom: 1rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .button {
+            display: block;
+            width: 200px;
+            margin: 0 auto;
+            padding: 0.8rem;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #2980b9;
+        }
+        .button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+        .results h2 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .metric {
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+        .metric span {
+            font-weight: bold;
+            color: #3498db;
+        }
+        .instructions {
+            text-align: center;
+            margin-bottom: 1rem;
+            color: #7f8c8d;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Hello World</h1>
-        <p>Welcome to my simple landing page!</p>
+        <h1>30-Second Typing Test</h1>
+        <p class="instructions">Type the text below as quickly and accurately as you can.</p>
+
+        <div class="test-container">
+            <div class="sample-text" id="sample-text">
+                The quick brown fox jumps over the lazy dog. Programming is the process of creating a set of instructions that tell a computer how to perform a task. Programming can be done using a variety of computer programming languages, such as JavaScript, Python, and C++.
+            </div>
+
+            <textarea class="input-area" id="input-area" placeholder="Start typing here..." disabled></textarea>
+
+            <div class="timer" id="timer">Time: 30s</div>
+
+            <button class="button" id="start-button">Start Test</button>
+        </div>
+
+        <div class="results" id="results">
+            <h2>Your Results</h2>
+            <div class="metric">Words per minute: <span id="wpm">0</span></div>
+            <div class="metric">Characters per minute: <span id="cpm">0</span></div>
+            <div class="metric">Accuracy: <span id="accuracy">0%</span></div>
+            <div class="metric">Correct characters: <span id="correct-chars">0</span></div>
+            <div class="metric">Incorrect characters: <span id="incorrect-chars">0</span></div>
+        </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sampleText = document.getElementById('sample-text').innerText;
+            const inputArea = document.getElementById('input-area');
+            const timer = document.getElementById('timer');
+            const startButton = document.getElementById('start-button');
+            const results = document.getElementById('results');
+            const wpmElement = document.getElementById('wpm');
+            const cpmElement = document.getElementById('cpm');
+            const accuracyElement = document.getElementById('accuracy');
+            const correctCharsElement = document.getElementById('correct-chars');
+            const incorrectCharsElement = document.getElementById('incorrect-chars');
+
+            let timeLeft = 30;
+            let timerInterval;
+            let testActive = false;
+
+            // Start the test
+            startButton.addEventListener('click', function() {
+                if (testActive) {
+                    // Reset for a new test
+                    resetTest();
+                    return;
+                }
+
+                // Start the test
+                testActive = true;
+                inputArea.disabled = false;
+                inputArea.value = '';
+                inputArea.focus();
+                startButton.textContent = 'Reset Test';
+                results.style.display = 'none';
+
+                // Start the timer
+                timeLeft = 30;
+                updateTimerDisplay();
+                timerInterval = setInterval(function() {
+                    timeLeft--;
+                    updateTimerDisplay();
+
+                    if (timeLeft <= 0) {
+                        endTest();
+                    }
+                }, 1000);
+            });
+
+            function updateTimerDisplay() {
+                timer.textContent = `Time: ${timeLeft}s`;
+            }
+
+            function endTest() {
+                clearInterval(timerInterval);
+                testActive = false;
+                inputArea.disabled = true;
+                startButton.textContent = 'Start New Test';
+
+                // Calculate results
+                calculateResults();
+
+                // Display results
+                results.style.display = 'block';
+            }
+
+            function resetTest() {
+                clearInterval(timerInterval);
+                testActive = false;
+                timeLeft = 30;
+                updateTimerDisplay();
+                inputArea.value = '';
+                inputArea.disabled = true;
+                startButton.textContent = 'Start Test';
+                results.style.display = 'none';
+            }
+
+            function calculateResults() {
+                const typedText = inputArea.value;
+                const typedLength = typedText.length;
+
+                // Calculate correct and incorrect characters
+                let correctChars = 0;
+                let incorrectChars = 0;
+
+                for (let i = 0; i < typedLength; i++) {
+                    if (i < sampleText.length && typedText[i] === sampleText[i]) {
+                        correctChars++;
+                    } else {
+                        incorrectChars++;
+                    }
+                }
+
+                // Calculate accuracy
+                const accuracy = typedLength > 0 ? Math.floor((correctChars / typedLength) * 100) : 0;
+
+                // Calculate WPM (assuming average word length of 5 characters)
+                const minutes = (30 - timeLeft) / 60;
+                const words = correctChars / 5;
+                const wpm = minutes > 0 ? Math.floor(words / minutes) : 0;
+
+                // Calculate CPM
+                const cpm = minutes > 0 ? Math.floor(correctChars / minutes) : 0;
+
+                // Update results display
+                wpmElement.textContent = wpm;
+                cpmElement.textContent = cpm;
+                accuracyElement.textContent = `${accuracy}%`;
+                correctCharsElement.textContent = correctChars;
+                incorrectCharsElement.textContent = incorrectChars;
+            }
+        });
+    </script>
 </body>
 </html>
