@@ -377,19 +377,10 @@ document.addEventListener('DOMContentLoaded', function() {
         dictionarySize: dictionary.length
     });
 
-    // Track input changes with a timer for mobile devices
-    let inputCheckInterval;
-
     // Start test when user starts typing
     inputArea.addEventListener('input', function(e) {
         if (!testActive) {
             startTest();
-
-            // For mobile devices, set up an interval to check for changes
-            if (isMobileOrVRBrowser() && !inputCheckInterval) {
-                inputCheckInterval = setInterval(checkForInputChanges, 200);
-                debugLog("Mobile input check interval started", {});
-            }
         }
 
         // Get the current input value
@@ -426,153 +417,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 addUserInputToDictionary(currentText);
 
                 // Try to perform autocorrect
-                performMobileAutocorrect(currentValue, lastChar);
+                performAutocorrect(lastChar);
             }
         }
 
         // Update the previous value
         previousInputValue = currentValue;
     });
-
-    // Function to check for input changes on mobile devices
-    function checkForInputChanges() {
-        if (!testActive) return;
-
-        const currentValue = inputArea.value;
-
-        // If the value hasn't changed, do nothing
-        if (currentValue === previousInputValue) return;
-
-        debugLog("Interval check", {
-            current: currentValue.slice(-10),
-            previous: previousInputValue ? previousInputValue.slice(-10) : '',
-            changed: currentValue !== previousInputValue
-        });
-
-        // If the value has changed and ends with punctuation, try autocorrect
-        if (currentValue.length > 0) {
-            const lastChar = currentValue.slice(-1);
-
-            if (/[\s.,!?;:"'()]/.test(lastChar) && !lastWordCorrected) {
-                debugLog("Punctuation detected in interval", lastChar);
-
-                // Try to perform autocorrect
-                performMobileAutocorrect(currentValue, lastChar);
-            }
-        }
-
-        // Update the previous value
-        previousInputValue = currentValue;
-    }
-
-    // Specialized autocorrect function for mobile devices
-    function performMobileAutocorrect(currentValue, lastChar) {
-        try {
-            // Split the text by spaces and punctuation
-            const allText = currentValue.slice(0, -1); // Text without the last punctuation
-            const words = allText.split(/[\s.,!?;:"'()]+/);
-
-            if (words.length > 0) {
-                const lastWord = words[words.length - 1].toLowerCase();
-                debugLog("Last word", lastWord);
-
-                // Skip very short words (1-2 characters)
-                if (lastWord.length > 2) {
-                    // Find the closest word in the dictionary
-                    const correctedWord = findClosestWord(lastWord);
-                    debugLog("Correction check", { original: lastWord, corrected: correctedWord });
-
-                    // If a correction was found and it's different from the original word
-                    if (correctedWord !== lastWord) {
-                        debugLog("Correction found", { from: lastWord, to: correctedWord });
-
-                        // ULTRA-SIMPLIFIED REPLACEMENT STRATEGY FOR MOBILE
-                        // Just replace the last word in the simplest way possible
-                        try {
-                            // Simple approach: split by spaces and replace the last word
-                            const textParts = allText.split(/\s+/);
-                            if (textParts.length > 0) {
-                                // Replace the last part that contains our word
-                                let replaced = false;
-
-                                for (let i = textParts.length - 1; i >= 0; i--) {
-                                    // Clean the part from punctuation for comparison
-                                    const cleanPart = textParts[i].replace(/[.,!?;:"'()]/g, '').toLowerCase();
-
-                                    if (cleanPart === lastWord) {
-                                        // Replace just the word part, keeping any punctuation
-                                        const punctBefore = textParts[i].match(/^[.,!?;:"'()]+/) || [''];
-                                        const punctAfter = textParts[i].match(/[.,!?;:"'()]+$/) || [''];
-
-                                        textParts[i] = punctBefore[0] + correctedWord + punctAfter[0];
-                                        replaced = true;
-                                        break;
-                                    }
-                                }
-
-                                if (replaced) {
-                                    // Join everything back together
-                                    const correctedText = textParts.join(' ') + lastChar;
-
-                                    debugLog("Simple correction applied", {
-                                        before: currentValue,
-                                        after: correctedText
-                                    });
-
-                                    // Update the input value
-                                    inputArea.value = correctedText;
-                                    lastWordCorrected = true;
-
-                                    // Hide the indicator after correction
-                                    hideAutocorrectIndicator();
-                                } else {
-                                    // If we couldn't find the exact word, try a more aggressive approach
-                                    // Just replace the last part regardless
-                                    if (textParts.length > 0) {
-                                        const lastPart = textParts[textParts.length - 1];
-                                        // Keep any leading/trailing punctuation
-                                        const punctBefore = lastPart.match(/^[.,!?;:"'()]+/) || [''];
-                                        const punctAfter = lastPart.match(/[.,!?;:"'()]+$/) || [''];
-
-                                        textParts[textParts.length - 1] = punctBefore[0] + correctedWord + punctAfter[0];
-
-                                        const correctedText = textParts.join(' ') + lastChar;
-
-                                        debugLog("Aggressive correction applied", {
-                                            before: currentValue,
-                                            after: correctedText
-                                        });
-
-                                        // Update the input value
-                                        inputArea.value = correctedText;
-                                        lastWordCorrected = true;
-
-                                        // Hide the indicator after correction
-                                        hideAutocorrectIndicator();
-                                    }
-                                }
-                            }
-                        } catch (error) {
-                            console.error("Error in simple replacement:", error);
-                            debugLog("Error in simple replacement", error.toString());
-
-                            // FALLBACK: Just append the corrected word
-                            // This is a last resort if all other methods fail
-                            const words = allText.split(/\s+/);
-                            words[words.length - 1] = correctedWord;
-                            inputArea.value = words.join(' ') + lastChar;
-                            lastWordCorrected = true;
-                            hideAutocorrectIndicator();
-                            debugLog("Fallback correction applied", { result: inputArea.value });
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            console.error("Autocorrect error in mobile handler:", error);
-            debugLog("Error in mobile autocorrect", error.toString());
-        }
-    }
 
     // Function to add words from user input to dictionary
     function addUserInputToDictionary(text) {
@@ -669,31 +520,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Keep the keydown event for desktop browsers only
-    // We'll disable this for mobile/VR browsers to avoid conflicts
-    if (!isMobileOrVRBrowser()) {
-        inputArea.addEventListener('keydown', function(e) {
-            if (!testActive) return;
+    // Add keydown event for all browsers
+    inputArea.addEventListener('keydown', function(e) {
+        if (!testActive) return;
 
-            // Check for space or punctuation
-            const punctuation = [' ', '.', ',', '!', '?', ';', ':', '"', "'", '(', ')'];
-            const key = e.key || String.fromCharCode(e.keyCode || e.which);
+        // Check for space or punctuation
+        const punctuation = [' ', '.', ',', '!', '?', ';', ':', '"', "'", '(', ')'];
+        const key = e.key || String.fromCharCode(e.keyCode || e.which);
 
-            if (punctuation.includes(key)) {
-                // Perform autocorrect and append the pressed character
-                try {
-                    if (performAutocorrect(key)) {
-                        e.preventDefault(); // Prevent default if correction was made
-                        // Update the previous value to match the new corrected value
-                        // This prevents the input handler from double-correcting
-                        previousInputValue = inputArea.value;
-                    }
-                } catch (error) {
-                    console.error("Error in autocorrect keydown handler:", error);
+        if (punctuation.includes(key)) {
+            // Perform autocorrect and append the pressed character
+            try {
+                if (performAutocorrect(key)) {
+                    e.preventDefault(); // Prevent default if correction was made
+                    // Update the previous value to match the new corrected value
+                    // This prevents the input handler from double-correcting
+                    previousInputValue = inputArea.value;
                 }
+            } catch (error) {
+                console.error("Error in autocorrect keydown handler:", error);
             }
-        });
-    }
+        }
+    });
 
     // Function to detect mobile or VR browsers
     function isMobileOrVRBrowser() {
@@ -712,14 +560,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return isOculus || isMobile || isVR || hasTouch;
     }
 
-    // Clean up when the test ends
-    function cleanupMobileHandlers() {
-        if (inputCheckInterval) {
-            clearInterval(inputCheckInterval);
-            inputCheckInterval = null;
-            debugLog("Mobile input check interval stopped", {});
-        }
-    }
 
     // Reset button functionality
     startButton.addEventListener('click', function() {
@@ -733,9 +573,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function endTest() {
         clearInterval(timerInterval);
         testActive = false;
-
-        // Clean up mobile handlers
-        cleanupMobileHandlers();
 
         // Disable the input area so users can't type anymore
         inputArea.disabled = true;
@@ -764,9 +601,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function resetTest() {
         clearInterval(timerInterval);
         testActive = false;
-
-        // Clean up mobile handlers
-        cleanupMobileHandlers();
 
         timeLeft = 30;
         updateTimerDisplay();
