@@ -240,6 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Find words with edit distance of up to 2
         for (const dictWord of dictionary) {
+            debugLog("Checking word", { dictWord })
             const distance = levenshteinDistance(word, dictWord);
 
             // Track all close matches for debugging
@@ -253,6 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 closestWord = dictWord;
             }
         }
+        debugLog("Num of words checked", { total: dictionary.length, matched: matchedWords.length });
 
         // Log all potential matches for debugging
         if (matchedWords.length > 0) {
@@ -918,7 +920,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         // Download results as JSON
-        downloadResultsAsJson(resultsData);
+        // downloadResultsAsJson(resultsData);
     }
 
     function downloadResultsAsJson(data) {
