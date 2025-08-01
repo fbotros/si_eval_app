@@ -114,18 +114,18 @@
 <body>
     <div class="container">
         <h1>30-Second Typing Test</h1>
-        <p class="instructions">Type the text below as quickly and accurately as you can.</p>
+        <p class="instructions">Start typing in the box below to begin the 30-second test. After the test ends, click the "Start New Test" button to try again.</p>
 
         <div class="test-container">
             <div class="sample-text" id="sample-text">
                 The quick brown fox jumps over the lazy dog. Programming is the process of creating a set of instructions that tell a computer how to perform a task. Programming can be done using a variety of computer programming languages, such as JavaScript, Python, and C++.
             </div>
 
-            <textarea class="input-area" id="input-area" placeholder="Start typing here..." disabled></textarea>
+            <textarea class="input-area" id="input-area" placeholder="Start typing here..."></textarea>
 
             <div class="timer" id="timer">Time: 30s</div>
 
-            <button class="button" id="start-button">Start Test</button>
+            <button class="button" id="start-button">Reset Test</button>
         </div>
 
         <div class="results" id="results">
@@ -155,20 +155,12 @@
             let timerInterval;
             let testActive = false;
 
-            // Start the test
-            startButton.addEventListener('click', function() {
-                if (testActive) {
-                    // Reset for a new test
-                    resetTest();
-                    return;
-                }
+            // Function to start the test
+            function startTest() {
+                if (testActive) return;
 
                 // Start the test
                 testActive = true;
-                inputArea.disabled = false;
-                inputArea.value = '';
-                inputArea.focus();
-                startButton.textContent = 'Reset Test';
                 results.style.display = 'none';
 
                 // Start the timer
@@ -182,6 +174,18 @@
                         endTest();
                     }
                 }, 1000);
+            }
+
+            // Start test when user starts typing
+            inputArea.addEventListener('input', function(e) {
+                if (!testActive) {
+                    startTest();
+                }
+            });
+
+            // Reset button functionality
+            startButton.addEventListener('click', function() {
+                resetTest();
             });
 
             function updateTimerDisplay() {
@@ -191,7 +195,11 @@
             function endTest() {
                 clearInterval(timerInterval);
                 testActive = false;
+
+                // Disable the input area so users can't type anymore
                 inputArea.disabled = true;
+
+                // Change button text
                 startButton.textContent = 'Start New Test';
 
                 // Calculate results
@@ -207,8 +215,8 @@
                 timeLeft = 30;
                 updateTimerDisplay();
                 inputArea.value = '';
-                inputArea.disabled = true;
-                startButton.textContent = 'Start Test';
+                inputArea.disabled = false;
+                startButton.textContent = 'Reset Test';
                 results.style.display = 'none';
             }
 
