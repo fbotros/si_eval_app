@@ -231,6 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // If the word is already in the dictionary, return it
         if (dictionary.includes(word)) {
+            debugLog("Word found in dictionary", word);
             return word;
         }
 
