@@ -270,6 +270,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Track the previous input value to detect changes
     let previousInputValue = '';
+    let lastWordCorrected = false;
+
+    // Debug function to log to console - useful for debugging on Oculus Quest
+    function debugLog(message, data) {
+        console.log(`[DEBUG] ${message}`, data);
+    }
 
     // Start test when user starts typing
     inputArea.addEventListener('input', function(e) {
@@ -280,50 +286,91 @@ document.addEventListener('DOMContentLoaded', function() {
         // Get the current input value
         const currentValue = inputArea.value;
 
+        // Debug
+        debugLog("Input event", {
+            current: currentValue,
+            previous: previousInputValue,
+            length: currentValue.length,
+            prevLength: previousInputValue ? previousInputValue.length : 0
+        });
+
         // If there's no previous value, just update and return
         if (!previousInputValue) {
             previousInputValue = currentValue;
             return;
         }
 
-        // Check if a space or punctuation was added
+        // Reset the correction flag if the user is typing a new character
         if (currentValue.length > previousInputValue.length) {
+            lastWordCorrected = false;
+        }
+
+        // Check if a space or punctuation was added
+        if (currentValue.length > previousInputValue.length && !lastWordCorrected) {
             const lastChar = currentValue.slice(-1);
+
             if (/[\s.,!?;:"'()]/.test(lastChar)) {
+                debugLog("Punctuation detected", lastChar);
+
                 // Extract the current text and add any new words to the dictionary
                 const currentText = currentValue.slice(0, -1); // Exclude the last character (space/punctuation)
                 addUserInputToDictionary(currentText);
 
-                // Perform autocorrect for the input event
+                // SIMPLIFIED AUTOCORRECT APPROACH FOR OCULUS QUEST
                 try {
-                    // We need to check if the word before the punctuation needs correction
-                    const textBeforePunctuation = currentValue.slice(0, -1);
-                    const words = textBeforePunctuation.trim().split(/[\s.,!?;:"'()]/);
+                    // Split the text by spaces and punctuation
+                    const allText = currentValue.slice(0, -1); // Text without the last punctuation
+                    const words = allText.split(/[\s.,!?;:"'()]+/);
+
                     if (words.length > 0) {
                         const lastWord = words[words.length - 1].toLowerCase();
+                        debugLog("Last word", lastWord);
 
                         // Skip very short words (1-2 characters)
                         if (lastWord.length > 2) {
                             // Find the closest word in the dictionary
                             const correctedWord = findClosestWord(lastWord);
+                            debugLog("Correction check", { original: lastWord, corrected: correctedWord });
 
                             // If a correction was found and it's different from the original word
                             if (correctedWord !== lastWord) {
-                                // Replace the last word with the corrected one
-                                const lastIndex = textBeforePunctuation.lastIndexOf(lastWord);
-                                if (lastIndex !== -1) {
-                                    const newText = textBeforePunctuation.substring(0, lastIndex) + correctedWord;
+                                debugLog("Correction found", { from: lastWord, to: correctedWord });
 
-                                    // Update the input value with the correction and the punctuation
-                                    inputArea.value = newText + lastChar;
+                                // SIMPLIFIED REPLACEMENT STRATEGY
+                                // Instead of trying to find the exact position, we'll rebuild the text
+                                // by replacing the last occurrence of the word
 
-                                    // Try to move cursor to the end
-                                    try {
-                                        inputArea.selectionStart = inputArea.value.length;
-                                        inputArea.selectionEnd = inputArea.value.length;
-                                    } catch (e) {
-                                        console.log("Selection adjustment not supported");
-                                    }
+                                // First, find all occurrences of the word in the text
+                                const regex = new RegExp(`\\b${lastWord}\\b`, 'gi');
+                                let match;
+                                let lastMatchIndex = -1;
+                                let allText = currentValue.slice(0, -1); // Text without the last punctuation
+
+                                // Find the last occurrence of the word
+                                while ((match = regex.exec(allText)) !== null) {
+                                    lastMatchIndex = match.index;
+                                }
+
+                                if (lastMatchIndex !== -1) {
+                                    // Replace the last occurrence of the word
+                                    const beforeWord = allText.substring(0, lastMatchIndex);
+                                    const afterWord = allText.substring(lastMatchIndex + lastWord.length);
+
+                                    // Create the corrected text
+                                    const correctedText = beforeWord + correctedWord + afterWord + lastChar;
+                                    debugLog("Corrected text", {
+                                        before: currentValue,
+                                        after: correctedText,
+                                        beforeWord,
+                                        afterWord
+                                    });
+
+                                    // Update the input value
+                                    inputArea.value = correctedText;
+                                    lastWordCorrected = true;
+
+                                    // No need to try to position the cursor - just let it go to the end
+                                    // which is the default behavior
 
                                     // Hide the indicator after correction
                                     hideAutocorrectIndicator();
@@ -333,6 +380,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 } catch (error) {
                     console.error("Autocorrect error in input handler:", error);
+                    debugLog("Error in autocorrect", error);
                 }
             }
         }
@@ -436,29 +484,47 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Keep the keydown event for desktop browsers
-    // This will still work on devices that properly support keydown events
-    inputArea.addEventListener('keydown', function(e) {
-        if (!testActive) return;
+    // Keep the keydown event for desktop browsers only
+    // We'll disable this for mobile/VR browsers to avoid conflicts
+    if (!isMobileOrVRBrowser()) {
+        inputArea.addEventListener('keydown', function(e) {
+            if (!testActive) return;
 
-        // Check for space or punctuation
-        const punctuation = [' ', '.', ',', '!', '?', ';', ':', '"', "'", '(', ')'];
-        const key = e.key || String.fromCharCode(e.keyCode || e.which);
+            // Check for space or punctuation
+            const punctuation = [' ', '.', ',', '!', '?', ';', ':', '"', "'", '(', ')'];
+            const key = e.key || String.fromCharCode(e.keyCode || e.which);
 
-        if (punctuation.includes(key)) {
-            // Perform autocorrect and append the pressed character
-            try {
-                if (performAutocorrect(key)) {
-                    e.preventDefault(); // Prevent default if correction was made
-                    // Update the previous value to match the new corrected value
-                    // This prevents the input handler from double-correcting
-                    previousInputValue = inputArea.value;
+            if (punctuation.includes(key)) {
+                // Perform autocorrect and append the pressed character
+                try {
+                    if (performAutocorrect(key)) {
+                        e.preventDefault(); // Prevent default if correction was made
+                        // Update the previous value to match the new corrected value
+                        // This prevents the input handler from double-correcting
+                        previousInputValue = inputArea.value;
+                    }
+                } catch (error) {
+                    console.error("Error in autocorrect keydown handler:", error);
                 }
-            } catch (error) {
-                console.error("Error in autocorrect keydown handler:", error);
             }
-        }
-    });
+        });
+    }
+
+    // Function to detect mobile or VR browsers
+    function isMobileOrVRBrowser() {
+        // Check for Oculus browser
+        const isOculus = /OculusBrowser/i.test(navigator.userAgent);
+
+        // Check for mobile devices
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        // Check for VR headsets
+        const isVR = /VR|XR|Oculus|HTC_VIVE|SamsungGear|Windows Mixed Reality|HoloLens/i.test(navigator.userAgent);
+
+        debugLog("Browser detection", { isOculus, isMobile, isVR, userAgent: navigator.userAgent });
+
+        return isOculus || isMobile || isVR;
+    }
 
     // Reset button functionality
     startButton.addEventListener('click', function() {
