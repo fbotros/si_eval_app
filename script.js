@@ -129,19 +129,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Use the window property as our dictionary
     let dictionary = window.typingTestDictionary;
 
-    // Add some test misspellings for debugging
-    const testMisspellings = {
-        'natoin': 'nation',
-        'rectanglar': 'rectangular',
-        'questons': 'questions',
-        'lern': 'learn',
-        'importent': 'important',
-        'alwyas': 'always',
-        'quck': 'quick',
-        'bown': 'brown',
-        'lazzy': 'lazy',
-        'comunicate': 'communicate'
-    };
 
     // Function to extract words from a string
     function extractWords(text) {
@@ -223,12 +210,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Find the closest word in the dictionary
     function findClosestWord(word) {
-        // First check our test misspellings for debugging
-        if (testMisspellings[word]) {
-            debugLog("Test misspelling found", { word, correction: testMisspellings[word] });
-            return testMisspellings[word];
-        }
-
         // If the word is already in the dictionary, return it
         if (dictionary.includes(word)) {
             debugLog("Word found in dictionary", word);
