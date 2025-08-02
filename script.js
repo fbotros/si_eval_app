@@ -241,7 +241,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Find words with edit distance of up to 2
         for (const dictWord of dictionary) {
-            debugLog("Checking word", { dictWord })
             const distance = levenshteinDistance(word, dictWord);
 
             // Track all close matches for debugging
@@ -273,61 +272,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return closestWord || word;
     }
 
-    // Function to position the autocorrect indicator
-    function positionAutocorrectIndicator() {
-        if (!testActive) return;
-
-        const text = inputArea.value;
-        const cursorPosition = inputArea.selectionStart;
-
-        // Find the start of the current word
-        let wordStart = cursorPosition;
-        while (wordStart > 0 && !/[\s.,!?;:"'()]/.test(text.charAt(wordStart - 1))) {
-            wordStart--;
-        }
-
-        // Extract the current word
-        const currentWord = text.substring(wordStart, cursorPosition).toLowerCase();
-
-        // Skip very short words (1-2 characters)
-        if (currentWord.length <= 2) {
-            hideAutocorrectIndicator();
-            lastTypedWord = currentWord;
-            return;
-        }
-
-        // Check if the word has changed
-        if (currentWord === lastTypedWord) {
-            return;
-        }
-
-        lastTypedWord = currentWord;
-
-        // Find the closest word in the dictionary
-        const correctedWord = findClosestWord(currentWord);
-
-        // If a correction was found and it's different from the original word
-        if (correctedWord !== currentWord) {
-            // Show the autocorrect indicator with the suggested word
-            showAutocorrectIndicator(correctedWord, wordStart);
-            lastSuggestion = correctedWord;
-        } else {
-            hideAutocorrectIndicator();
-        }
-    }
-
-    // Function to show the autocorrect indicator
-    function showAutocorrectIndicator(suggestion, wordStart) {
-        // Get the current word being typed
-        const currentWord = inputArea.value.substring(wordStart, inputArea.selectionStart);
-
-        // Set the indicator text
-        document.getElementById('autocorrect-current-word').textContent = currentWord + ' →';
-        document.getElementById('autocorrect-suggestion').textContent = suggestion;
-
-        // Show the indicator - using display property instead of opacity
-        autocorrectIndicator.style.display = 'flex';
-    }
 
     // Function to hide the autocorrect indicator
     function hideAutocorrectIndicator() {
@@ -372,7 +316,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize the app with a message to show it's working
     debugLog("App initialized", {
-        mobile: isMobileOrVRBrowser(),
         userAgent: navigator.userAgent,
         dictionarySize: dictionary.length
     });
@@ -411,7 +354,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (/[\s.,!?;:"'()]/.test(lastChar)) {
                 debugLog("Punctuation detected", lastChar);
-                // Try to perform autocorrect
                 performAutocorrect(lastChar);
             }
         }
@@ -449,9 +391,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function performAutocorrect(appendChar) {
         try {
             const text = inputArea.value;
+            debugLog("Autocorrect triggered", { text, appendChar });
             if (text.length > 0) {
+                debugLog("Text length", text.length);
                 // Get the last word - more robust splitting
-                const words = text.trim().split(/[\s.,!?;:"'()]/);
+                let words = text.trim().split(/[\s.,!?;:"'()]/);
+                debugLog("Words", words);
+                // filter out empty strings
+                words = words.filter(word => word.length > 0);
                 if (words.length === 0) return false;
 
                 const lastWord = words[words.length - 1].toLowerCase();
@@ -460,6 +407,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (lastWord.length > 2) {
                     // Find the closest word in the dictionary
                     const correctedWord = findClosestWord(lastWord);
+                    debugLog("Closest word", correctedWord);
 
                     // If a correction was found and it's different from the original word
                     if (correctedWord !== lastWord) {
@@ -493,46 +441,6 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error("Autocorrect error:", error);
             return false; // Error occurred, don't attempt correction
         }
-    }
-
-    // // Add keydown event for all browsers
-    // inputArea.addEventListener('keydown', function(e) {
-    //     if (!testActive) return;
-
-    //     // Check for space or punctuation
-    //     const punctuation = [' ', '.', ',', '!', '?', ';', ':', '"', "'", '(', ')'];
-    //     const key = e.key || String.fromCharCode(e.keyCode || e.which);
-
-    //     if (punctuation.includes(key)) {
-    //         // Perform autocorrect and append the pressed character
-    //         try {
-    //             if (performAutocorrect(key)) {
-    //                 e.preventDefault(); // Prevent default if correction was made
-    //                 // Update the previous value to match the new corrected value
-    //                 // This prevents the input handler from double-correcting
-    //                 previousInputValue = inputArea.value;
-    //             }
-    //         } catch (error) {
-    //             console.error("Error in autocorrect keydown handler:", error);
-    //         }
-    //     }
-    // });
-
-    // Function to detect mobile or VR browsers
-    function isMobileOrVRBrowser() {
-        // Check for Oculus browser
-        const isOculus = /OculusBrowser/i.test(navigator.userAgent);
-
-        // Check for mobile devices
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-        // Check for VR headsets
-        const isVR = /VR|XR|Oculus|HTC_VIVE|SamsungGear|Windows Mixed Reality|HoloLens/i.test(navigator.userAgent);
-
-        // Also check for touch support as a fallback
-        const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
-        return isOculus || isMobile || isVR || hasTouch;
     }
 
 
@@ -600,29 +508,7 @@ document.addEventListener('DOMContentLoaded', function() {
         previousInputValue = '';
         lastWordCorrected = false;
 
-        debugLog("Test reset", { mobile: isMobileOrVRBrowser() });
-    }
-
-    // Function to add a new prompt to the test
-    function addNewPrompt(promptText) {
-        // Add the new prompt to the original prompts array
-        originalPrompts.push(promptText);
-
-        // Update the dictionary with words from the new prompt
-        const words = extractWords(promptText);
-        words.forEach(word => {
-            if (!dictionary.includes(word)) {
-                dictionary.push(word);
-            }
-        });
-
-        // Update the total prompts count
-        totalPromptsElement.textContent = originalPrompts.length;
-
-        console.log("Added new prompt and updated dictionary. Dictionary now has", dictionary.length, "words");
-
-        // Reshuffle prompts to include the new one
-        shufflePrompts();
+        debugLog("Test reset");
     }
 
     // Calculate results for the current prompt
