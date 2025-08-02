@@ -66,10 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const startButton = document.getElementById('start-button');
     const results = document.getElementById('results');
     const wpmElement = document.getElementById('wpm');
-    const cpmElement = document.getElementById('cpm');
     const accuracyElement = document.getElementById('accuracy');
-    const correctCharsElement = document.getElementById('correct-chars');
-    const incorrectCharsElement = document.getElementById('incorrect-chars');
     const autocorrectIndicator = document.getElementById('autocorrect-indicator');
 
     let timeLeft = 30;
@@ -507,27 +504,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const normalizedDistance = maxDistance > 0 ? editDistance / maxDistance : 0;
         const accuracy = Math.floor((1 - normalizedDistance) * 100);
 
-        // Calculate correct and incorrect characters
-        let correctChars = 0;
-        let incorrectChars = 0;
-
-        for (let i = 0; i < typedLength; i++) {
-            if (i < promptLength && typedText[i] === promptText[i]) {
-                correctChars++;
-            } else {
-                incorrectChars++;
-            }
-        }
 
         // Calculate time spent on this prompt in minutes
         const endTime = Date.now();
         const timeSpentMs = endTime - startTime;
         const minutes = timeSpentMs / 60000; // Convert ms to minutes
 
-        // Calculate WPM and CPM
+        // Calculate WPM
         const words = typedLength / 5; // Assume average word is 5 characters
         const wpm = minutes > 0 ? Math.floor(words / minutes) : 0;
-        const cpm = minutes > 0 ? Math.floor(typedLength / minutes) : 0;
 
         return {
             promptIndex: currentPromptIndex,
@@ -535,11 +520,8 @@ document.addEventListener('DOMContentLoaded', function() {
             promptText: promptText,
             typedText: typedText,
             wpm: wpm,
-            cpm: cpm,
             accuracy: accuracy,
             editDistance: editDistance,
-            correctChars: correctChars,
-            incorrectChars: incorrectChars,
             totalChars: typedLength,
             timeSpentMs: timeSpentMs
         };
@@ -553,31 +535,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Calculate averages
         let totalWpm = 0;
-        let totalCpm = 0;
         let totalAccuracy = 0;
-        let totalCorrectChars = 0;
-        let totalIncorrectChars = 0;
         let totalChars = 0;
 
         promptResults.forEach(result => {
             totalWpm += result.wpm;
-            totalCpm += result.cpm;
             totalAccuracy += result.accuracy;
-            totalCorrectChars += result.correctChars;
-            totalIncorrectChars += result.incorrectChars;
             totalChars += result.totalChars;
         });
 
         const avgWpm = Math.floor(totalWpm / promptResults.length);
-        const avgCpm = Math.floor(totalCpm / promptResults.length);
         const avgAccuracy = Math.floor(totalAccuracy / promptResults.length);
 
         // Update results display
         wpmElement.textContent = avgWpm;
-        cpmElement.textContent = avgCpm;
         accuracyElement.textContent = `${avgAccuracy}%`;
-        correctCharsElement.textContent = totalCorrectChars;
-        incorrectCharsElement.textContent = totalIncorrectChars;
         document.getElementById('prompts-completed').textContent = promptResults.length;
         document.getElementById('total-prompts-results').textContent = prompts.length;
 
@@ -585,10 +557,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const resultsData = {
             date: new Date().toISOString(),
             averageWpm: avgWpm,
-            averageCpm: avgCpm,
             averageAccuracy: avgAccuracy,
-            totalCorrectChars: totalCorrectChars,
-            totalIncorrectChars: totalIncorrectChars,
             totalChars: totalChars,
             promptsCompleted: promptResults.length,
             totalPrompts: prompts.length,
