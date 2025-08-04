@@ -67,7 +67,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const results = document.getElementById('results');
     const wpmElement = document.getElementById('wpm');
     const accuracyElement = document.getElementById('accuracy');
-    const autocorrectIndicator = document.getElementById('autocorrect-indicator');
 
     let timeLeft = 30;
     let timerInterval;
@@ -251,11 +250,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
-    // Function to hide the autocorrect indicator
-    function hideAutocorrectIndicator() {
-        autocorrectIndicator.style.display = 'none';
-    }
-
     // Track the previous input value to detect changes
     let previousInputValue = '';
     let lastWordCorrected = false;
@@ -406,9 +400,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                 console.log("Selection adjustment not supported");
                             }
 
-                            // Hide the indicator after correction
-                            hideAutocorrectIndicator();
-
                             return true; // Correction was made
                         }
                     }
@@ -441,9 +432,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Change button text
         startButton.textContent = 'Start New Test';
 
-        // Hide the autocorrect indicator
-        hideAutocorrectIndicator();
-
         // Calculate results for the current prompt if not already done
         if (inputArea.value.trim().length > 0) {
             const promptResult = calculatePromptResult();
@@ -469,7 +457,6 @@ document.addEventListener('DOMContentLoaded', function() {
         inputArea.disabled = false;
         startButton.textContent = 'Reset Test';
         results.style.display = 'none';
-        hideAutocorrectIndicator();
 
         // Update dictionary with any new prompt words
         addPromptWordsToDictionary();

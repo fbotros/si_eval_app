@@ -42,6 +42,7 @@ h1 {
     resize: none;
     margin-bottom: 1rem;
     transition: border-color 0.3s;
+    box-sizing: border-box;
 }
 .input-area:focus {
     outline: none;
@@ -106,6 +107,7 @@ h1 {
 .autocorrect-container {
     position: relative;
     margin-bottom: 1rem;
+    width: 100%;
 }
 .input-area {
     margin-bottom: 0 !important;
