@@ -72,6 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastTypedWord = '';
     let lastSuggestion = '';
     let startTime = 0; // Track when the current prompt started
+    let promptTimingStarted = false; // Track if timing has started for current prompt
 
     // Function to start the test
     function startTest() {
@@ -81,7 +82,7 @@ document.addEventListener('DOMContentLoaded', function() {
         testActive = true;
         results.style.display = 'none';
         promptResults = []; // Clear previous results
-        startTime = Date.now(); // Record start time
+        promptTimingStarted = false; // Reset timing flag
 
     }
 
@@ -285,6 +286,12 @@ document.addEventListener('DOMContentLoaded', function() {
             startTest();
         }
 
+        // Start timing for current prompt on first keystroke
+        if (!promptTimingStarted) {
+            startTime = Date.now();
+            promptTimingStarted = true;
+        }
+
         // Get the current input value
         const currentValue = inputArea.value;
 
@@ -338,7 +345,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentPromptIndex++;
                 updateCurrentPrompt();
                 inputArea.value = '';
-                startTime = Date.now(); // Reset start time for the new prompt
+                promptTimingStarted = false; // Reset timing flag for new prompt
             } else {
                 // End the test if all 4 prompts are completed
                 endTest();
@@ -453,6 +460,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reset tracking variables
         previousInputValue = '';
         lastWordCorrected = false;
+        promptTimingStarted = false;
 
         debugLog("Test reset");
     }
@@ -518,8 +526,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update results display
         wpmElement.textContent = avgWpm;
         accuracyElement.textContent = `${avgAccuracy}%`;
-        document.getElementById('prompts-completed').textContent = promptResults.length;
-        document.getElementById('total-prompts-results').textContent = prompts.length;
 
         // Create results object with both individual prompt results and averages
         const resultsData = {
