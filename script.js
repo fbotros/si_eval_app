@@ -42,8 +42,9 @@ document.addEventListener('DOMContentLoaded', function() {
         shuffleArray(prompts);
     }
 
-    // Initialize with shuffled prompts
+    // Initialize with shuffled prompts - limit to 4 phrases
     shufflePrompts();
+    prompts = prompts.slice(0, 4); // Only use first 4 prompts
     totalPromptsElement.textContent = prompts.length;
     updateCurrentPrompt();
 
@@ -62,14 +63,11 @@ document.addEventListener('DOMContentLoaded', function() {
         return prompts[currentPromptIndex].originalIndex;
     }
     const inputArea = document.getElementById('input-area');
-    const timer = document.getElementById('timer');
     const startButton = document.getElementById('start-button');
     const results = document.getElementById('results');
     const wpmElement = document.getElementById('wpm');
     const accuracyElement = document.getElementById('accuracy');
 
-    let timeLeft = 30;
-    let timerInterval;
     let testActive = false;
     let lastTypedWord = '';
     let lastSuggestion = '';
@@ -85,17 +83,6 @@ document.addEventListener('DOMContentLoaded', function() {
         promptResults = []; // Clear previous results
         startTime = Date.now(); // Record start time
 
-        // Start the timer
-        timeLeft = 30;
-        updateTimerDisplay();
-        timerInterval = setInterval(function() {
-            timeLeft--;
-            updateTimerDisplay();
-
-            if (timeLeft <= 0) {
-                endTest();
-            }
-        }, 1000);
     }
 
     // Base dictionary of common words - make it a global window property for debugging
@@ -353,7 +340,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 inputArea.value = '';
                 startTime = Date.now(); // Reset start time for the new prompt
             } else {
-                // End the test if all prompts are completed
+                // End the test if all 4 prompts are completed
                 endTest();
             }
         }
@@ -418,12 +405,8 @@ document.addEventListener('DOMContentLoaded', function() {
         resetTest();
     });
 
-    function updateTimerDisplay() {
-        timer.textContent = `Time: ${timeLeft}s`;
-    }
 
     function endTest() {
-        clearInterval(timerInterval);
         testActive = false;
 
         // Disable the input area so users can't type anymore
@@ -448,11 +431,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function resetTest() {
-        clearInterval(timerInterval);
         testActive = false;
 
-        timeLeft = 30;
-        updateTimerDisplay();
         inputArea.value = '';
         inputArea.disabled = false;
         startButton.textContent = 'Reset Test';
@@ -461,8 +441,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update dictionary with any new prompt words
         addPromptWordsToDictionary();
 
-        // Shuffle prompts for a new test
+        // Shuffle prompts for a new test and limit to 4
         shufflePrompts();
+        prompts = prompts.slice(0, 4); // Only use first 4 prompts
 
         // Reset prompt index and update display
         currentPromptIndex = 0;
