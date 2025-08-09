@@ -465,6 +465,9 @@ document.addEventListener('DOMContentLoaded', function() {
         lastWordCorrected = false;
         promptTimingStarted = false;
 
+        // Focus the input area after reset
+        inputArea.focus();
+
         debugLog("Test reset");
     }
 
