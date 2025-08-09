@@ -280,6 +280,9 @@ document.addEventListener('DOMContentLoaded', function() {
         dictionarySize: dictionary.length
     });
 
+    // Focus the input area when the page loads
+    inputArea.focus();
+
     // Start test when user starts typing
     inputArea.addEventListener('input', function(e) {
         if (!testActive) {
