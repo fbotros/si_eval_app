@@ -52,6 +52,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
+    // Function to initialize prompts for testing (shuffle, limit, and update UI)
+    function initializePromptsForTest() {
+        // Create a fresh copy with index tracking
+        prompts = originalPrompts.map((text, index) => ({
+            text: text,
+            originalIndex: index
+        }));
+        shuffleArray(prompts);
+
+        // Limit to 4 prompts
+        prompts = prompts.slice(0, 4);
+
+        // Update UI
+        totalPromptsElement.textContent = prompts.length;
+        currentPromptIndex = 0;
+        updateCurrentPrompt();
+    }
+
     // Function to reload prompts when dataset changes
     async function reloadPromptsForNewDataset() {
         // Reset test state
@@ -67,14 +85,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Update dictionary with new prompt words
         addPromptWordsToDictionary();
 
-        // Shuffle prompts for the new dataset and limit to 4
-        shufflePrompts();
-        prompts = prompts.slice(0, 4); // Only use first 4 prompts
-
-        // Reset prompt index and update display
-        currentPromptIndex = 0;
-        totalPromptsElement.textContent = prompts.length;
-        updateCurrentPrompt();
+        // Initialize prompts for testing
+        initializePromptsForTest();
         promptResults = [];
 
         // Reset tracking variables
@@ -105,16 +117,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             [array[i], array[j]] = [array[j], array[i]]; // Swap elements
         }
         return array;
-    }
-
-    // Function to shuffle prompts
-    function shufflePrompts() {
-        // Create a fresh copy with index tracking
-        prompts = originalPrompts.map((text, index) => ({
-            text: text,
-            originalIndex: index
-        }));
-        shuffleArray(prompts);
     }
 
     function updateCurrentPrompt() {
@@ -349,11 +351,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Add prompt words to dictionary after loading prompts
     addPromptWordsToDictionary();
 
-    // Initialize with shuffled prompts - limit to 4 phrases
-    shufflePrompts();
-    prompts = prompts.slice(0, 4); // Only use first 4 prompts
-    totalPromptsElement.textContent = prompts.length;
-    updateCurrentPrompt();
+    // Initialize prompts for testing
+    initializePromptsForTest();
 
     // Add event listeners for dataset radio buttons
     const datasetRadios = document.querySelectorAll('input[name="dataset"]');
@@ -543,13 +542,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Update dictionary with any new prompt words
         addPromptWordsToDictionary();
 
-        // Shuffle prompts for a new test and limit to 4
-        shufflePrompts();
-        prompts = prompts.slice(0, 4); // Only use first 4 prompts
-
-        // Reset prompt index and update display
-        currentPromptIndex = 0;
-        updateCurrentPrompt();
+        // Initialize prompts for testing
+        initializePromptsForTest();
         promptResults = [];
 
         // Reset tracking variables
