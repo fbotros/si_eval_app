@@ -2,25 +2,51 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Array of prompts for the typing test - loaded from prompts.txt
     let originalPrompts = [];
 
+    // Configuration for dataset-specific settings
+    const datasetConfig = {
+        'practice': {
+            file: 'prompts/practice.txt',
+            autocorrect: true
+        },
+        'natural-language': {
+            file: 'prompts/nat_lang_no_punc.txt',
+            autocorrect: true
+        },
+        'natural-language-punct': {
+            file: 'prompts/nat_lang_with_cap_punc.txt',
+            autocorrect: true
+        },
+        'emails-passwords': {
+            file: 'prompts/emails_passwords.txt',
+            autocorrect: false
+        }
+    };
+
     // Function to get the selected dataset filename
     function getSelectedDatasetFile() {
         const selectedDataset = document.querySelector('input[name="dataset"]:checked');
         if (!selectedDataset) {
-            return 'prompts/practice.txt'; // Default fallback
+            return datasetConfig['practice'].file; // Default fallback
         }
 
-        switch (selectedDataset.value) {
-            case 'practice':
-                return 'prompts/practice.txt';
-            case 'natural-language':
-                return 'prompts/nat_lang_no_punc.txt';
-            case 'natural-language-punct':
-                return 'prompts/nat_lang_with_cap_punc.txt';
-            case 'emails-passwords':
-                return 'prompts/emails_passwords.txt';
-            default:
-                return 'prompts/practice.txt';
+        const config = datasetConfig[selectedDataset.value];
+        return config ? config.file : datasetConfig['practice'].file; // Default fallback
+    }
+
+    // Function to check if autocorrect is enabled for the current dataset
+    function isAutocorrectEnabled() {
+        const selectedDataset = document.querySelector('input[name="dataset"]:checked');
+        if (!selectedDataset) {
+            return true; // Default to autocorrect enabled
         }
+
+        const config = datasetConfig[selectedDataset.value];
+        return config ? config.autocorrect : true; // Default to autocorrect enabled if config not found
+    }
+
+    // Helper function to get dataset configuration
+    function getDatasetConfig(datasetName) {
+        return datasetConfig[datasetName] || { file: 'prompts/practice.txt', autocorrect: true }; // Default config
     }
 
     // Function to load prompts from the selected dataset file
@@ -362,8 +388,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             lastWordCorrected = false;
         }
 
-        // Check if a space or punctuation was added
-        if (currentValue.length > previousInputValue.length && !lastWordCorrected) {
+        // Check if a space or punctuation was added and autocorrect is enabled
+        if (currentValue.length > previousInputValue.length && !lastWordCorrected && isAutocorrectEnabled()) {
             const lastChar = currentValue.slice(-1);
 
             if (/[\s.,!?;:"'()]/.test(lastChar)) {
