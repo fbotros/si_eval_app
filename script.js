@@ -1,20 +1,36 @@
-document.addEventListener('DOMContentLoaded', function() {
-    // Array of prompts for the typing test
-    const originalPrompts = [
-        "Stability of the nation.",
-        "Rectangular objects have four sides.",
-        "Why do you ask silly questions?",
-        "Learn to walk before you run.",
-        "Important news always seems to be late.",
-        "The quick brown fox jumps over the lazy dog.",
-        "A steep learning curve in riding a unicycle.",
-        "Be discreet about your meeting.",
-        "Raindrops keep falling on my head.",
-        "An excellent way to communicate."
-    ];
+document.addEventListener('DOMContentLoaded', async function() {
+    // Array of prompts for the typing test - loaded from prompts.txt
+    let originalPrompts = [];
+
+    // Function to load prompts from prompts.txt file
+    async function loadPromptsFromFile() {
+        try {
+            const response = await fetch('prompts.txt');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const text = await response.text();
+            // Split by lines and filter out empty lines
+            originalPrompts = text.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+
+            debugLog("Prompts loaded from file", {
+                count: originalPrompts.length,
+                sample: originalPrompts.slice(0, 3)
+            });
+
+            return originalPrompts;
+        } catch (error) {
+            console.error('Error loading prompts from file:', error);
+            // throw dialog box with error message
+            alert(`Error loading prompts from file: ${error.message}`);
+            return [];
+        }
+    }
 
     // Create a copy of the prompts that we'll shuffle
-    let prompts = [...originalPrompts];
+    let prompts = [];
 
     const sampleTextElement = document.getElementById('sample-text');
     const currentPromptElement = document.getElementById('current-prompt');
@@ -41,12 +57,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }));
         shuffleArray(prompts);
     }
-
-    // Initialize with shuffled prompts - limit to 4 phrases
-    shufflePrompts();
-    prompts = prompts.slice(0, 4); // Only use first 4 prompts
-    totalPromptsElement.textContent = prompts.length;
-    updateCurrentPrompt();
 
     function updateCurrentPrompt() {
         currentPromptElement.textContent = currentPromptIndex + 1;
@@ -154,9 +164,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return corrected;
         };
     }
-
-    // Add prompt words to dictionary on page load
-    addPromptWordsToDictionary();
 
     // Calculate Levenshtein distance between two strings
     function levenshteinDistance(a, b) {
@@ -274,10 +281,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Load prompts from file and initialize the app
+    await loadPromptsFromFile();
+
+    // Add prompt words to dictionary after loading prompts
+    addPromptWordsToDictionary();
+
+    // Initialize with shuffled prompts - limit to 4 phrases
+    shufflePrompts();
+    prompts = prompts.slice(0, 4); // Only use first 4 prompts
+    totalPromptsElement.textContent = prompts.length;
+    updateCurrentPrompt();
+
     // Initialize the app with a message to show it's working
     debugLog("App initialized", {
         userAgent: navigator.userAgent,
-        dictionarySize: dictionary.length
+        dictionarySize: dictionary.length,
+        promptsLoaded: originalPrompts.length
     });
 
     // Focus the input area when the page loads
