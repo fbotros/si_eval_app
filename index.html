@@ -7,29 +7,61 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Typing Test App</h1>
-        <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next one.</p>
-
-        <div class="test-container">
-            <div class="sample-text" id="sample-text"></div>
-            <div class="progress-indicator" style="text-align: center; margin-bottom: 10px; color: #7f8c8d;">
-                Prompt <span id="current-prompt">1</span> of <span id="total-prompts">0</span>
+    <div class="app-wrapper">
+        <div class="settings-panel">
+            <h2>Settings</h2>
+            <div class="settings-group">
+                <label for="user-id">User ID (numbers only):</label>
+                <input type="number" id="user-id" class="user-id-input" placeholder="Enter your user ID">
             </div>
 
-            <div class="autocorrect-container">
-                <textarea class="input-area" id="input-area" placeholder="Start typing here..."
-                    autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
-                <!-- <div id="debug-info" style="font-size: 10px; color: #999; margin-top: 5px;"></div> -->
+            <div class="settings-group">
+                <label class="settings-label">Select Dataset:</label>
+                <div class="radio-group">
+                    <div class="radio-option">
+                        <input type="radio" id="practice" name="dataset" value="practice" checked>
+                        <label for="practice">Practice</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="natural-language" name="dataset" value="natural-language">
+                        <label for="natural-language">Natural Language</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="natural-language-punct" name="dataset" value="natural-language-punct">
+                        <label for="natural-language-punct">Natural Language with Punctuation</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="emails-passwords" name="dataset" value="emails-passwords">
+                        <label for="emails-passwords">Emails/Passwords</label>
+                    </div>
+                </div>
             </div>
-
-            <button class="button" id="start-button">Reset Test</button>
         </div>
 
-        <div class="results" id="results">
-            <h2>Your Average Results</h2>
-            <div class="metric">Words per minute: <span id="wpm">0</span></div>
-            <div class="metric">Accuracy: <span id="accuracy">0%</span></div>
+        <div class="container">
+            <h1>Typing Test App</h1>
+            <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next one.</p>
+
+            <div class="test-container">
+                <div class="sample-text" id="sample-text"></div>
+                <div class="progress-indicator" style="text-align: center; margin-bottom: 10px; color: #7f8c8d;">
+                    Prompt <span id="current-prompt">1</span> of <span id="total-prompts">0</span>
+                </div>
+
+                <div class="autocorrect-container">
+                    <textarea class="input-area" id="input-area" placeholder="Start typing here..."
+                        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+                    <!-- <div id="debug-info" style="font-size: 10px; color: #999; margin-top: 5px;"></div> -->
+                </div>
+
+                <button class="button" id="start-button">Reset Test</button>
+            </div>
+
+            <div class="results" id="results">
+                <h2>Your Average Results</h2>
+                <div class="metric">Words per minute: <span id="wpm">0</span></div>
+                <div class="metric">Accuracy: <span id="accuracy">0%</span></div>
+            </div>
         </div>
     </div>
 
