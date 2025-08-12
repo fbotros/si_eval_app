@@ -37,12 +37,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 .map(line => line.trim())
                 .filter(line => line.length > 0);
 
-            debugLog("Prompts loaded from file", {
-                filename: filename,
-                count: originalPrompts.length,
-                sample: originalPrompts.slice(0, 3)
-            });
-
             return originalPrompts;
         } catch (error) {
             console.error('Error loading prompts from file:', error);
@@ -96,8 +90,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // Focus the input area after reload
         inputArea.focus();
-
-        debugLog("Dataset changed and prompts reloaded");
     }
 
     // Create a copy of the prompts that we'll shuffle
@@ -183,7 +175,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Use the window property as our dictionary
     let dictionary = window.typingTestDictionary;
-
+    // Performance optimization: Convert dictionary to Set for faster lookups
+    let dictionarySet = new Set(dictionary);
 
     // Function to extract words from a string
     function extractWords(text) {
@@ -198,22 +191,18 @@ document.addEventListener('DOMContentLoaded', async function() {
     function addPromptWordsToDictionary() {
         // Reset dictionary to base dictionary
         dictionary = [...window.typingTestDictionary];
+        dictionarySet = new Set(dictionary);
 
         // Extract all words from all prompts
         originalPrompts.forEach(prompt => {
             const words = extractWords(prompt);
             words.forEach(word => {
                 // Add word to dictionary if it's not already there
-                if (!dictionary.includes(word)) {
+                if (!dictionarySet.has(word)) {
                     dictionary.push(word);
+                    dictionarySet.add(word);
                 }
             });
-        });
-
-        // Log the dictionary contents for debugging
-        debugLog("Dictionary initialized", {
-            size: dictionary.length,
-            sample: dictionary.slice(0, 10).join(', ') + '...'
         });
 
         // Make the dictionary accessible for debugging
@@ -265,24 +254,17 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Find the closest word in the dictionary
     function findClosestWord(word) {
-        // If the word is already in the dictionary, return it
-        if (dictionary.includes(word)) {
-            debugLog("Word found in dictionary", word);
+        // If the word is already in the dictionary, return it (using Set for O(1) lookup)
+        if (dictionarySet.has(word)) {
             return word;
         }
 
         let closestWord = null;
         let minDistance = Infinity;
-        let matchedWords = [];
 
         // Find words with edit distance of up to 2
         for (const dictWord of dictionary) {
             const distance = levenshteinDistance(word, dictWord);
-
-            // Track all close matches for debugging
-            if (distance <= 2) {
-                matchedWords.push({ word: dictWord, distance });
-            }
 
             // Consider words with edit distance of 1 or 2
             if (distance <= 2 && distance < minDistance) {
@@ -290,59 +272,46 @@ document.addEventListener('DOMContentLoaded', async function() {
                 closestWord = dictWord;
             }
         }
-        debugLog("Num of words checked", { total: dictionary.length, matched: matchedWords.length });
-
-        // Log all potential matches for debugging
-        if (matchedWords.length > 0) {
-            debugLog("Potential matches", {
-                word,
-                matches: matchedWords.slice(0, 5), // Show up to 5 matches
-                totalMatches: matchedWords.length,
-                selected: closestWord
-            });
-        } else {
-            debugLog("No matches found", { word, dictionarySize: dictionary.length });
-        }
 
         // Return the closest word if found, otherwise return the original word
         return closestWord || word;
     }
 
-
     // Track the previous input value to detect changes
     let previousInputValue = '';
     let lastWordCorrected = false;
 
-    // Debug function to log to console and to the page - useful for debugging on mobile devices
+    // Debug function - kept for future use but currently disabled
     function debugLog(message, data) {
-        console.log(`[DEBUG] ${message}`, data);
+        // Disabled for performance - can be re-enabled for debugging
+        // console.log(`[DEBUG] ${message}`, data);
 
         // Also show debug info on the page for mobile devices
-        const debugElement = document.getElementById('debug-info');
-        if (debugElement) {
-            const timestamp = new Date().toISOString().substr(11, 8); // HH:MM:SS
-            let debugText = `${timestamp} - ${message}: `;
+        // const debugElement = document.getElementById('debug-info');
+        // if (debugElement) {
+        //     const timestamp = new Date().toISOString().substr(11, 8); // HH:MM:SS
+        //     let debugText = `${timestamp} - ${message}: `;
 
-            if (typeof data === 'object') {
-                try {
-                    debugText += JSON.stringify(data).substring(0, 100); // Limit length
-                } catch (e) {
-                    debugText += "[Object]";
-                }
-            } else {
-                debugText += data;
-            }
+        //     if (typeof data === 'object') {
+        //         try {
+        //             debugText += JSON.stringify(data).substring(0, 100); // Limit length
+        //         } catch (e) {
+        //             debugText += "[Object]";
+        //         }
+        //     } else {
+        //         debugText += data;
+        //     }
 
-            // Keep only the last 5 debug messages
-            const currentText = debugElement.innerHTML;
-            const lines = currentText.split('<br>');
-            if (lines.length > 4) {
-                lines.shift(); // Remove oldest line
-            }
-            lines.push(debugText);
+        //     // Keep only the last 5 debug messages
+        //     const currentText = debugElement.innerHTML;
+        //     const lines = currentText.split('<br>');
+        //     if (lines.length > 4) {
+        //         lines.shift(); // Remove oldest line
+        //     }
+        //     lines.push(debugText);
 
-            debugElement.innerHTML = lines.join('<br>');
-        }
+        //     debugElement.innerHTML = lines.join('<br>');
+        // }
     }
 
     // Load prompts from file and initialize the app
@@ -364,17 +333,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     });
 
-    // Initialize the app with a message to show it's working
-    debugLog("App initialized", {
-        userAgent: navigator.userAgent,
-        dictionarySize: dictionary.length,
-        promptsLoaded: originalPrompts.length
-    });
-
     // Focus the input area when the page loads
     inputArea.focus();
 
-    // Start test when user starts typing
+    // Optimized input event handler
     inputArea.addEventListener('input', function(e) {
         if (!testActive) {
             startTest();
@@ -388,14 +350,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // Get the current input value
         const currentValue = inputArea.value;
-
-        // Debug
-        debugLog("Input event", {
-            current: currentValue.slice(-10), // Show just the last 10 chars for brevity
-            previous: previousInputValue ? previousInputValue.slice(-10) : '',
-            length: currentValue.length,
-            prevLength: previousInputValue ? previousInputValue.length : 0
-        });
 
         // If there's no previous value, just update and return
         if (!previousInputValue) {
@@ -413,7 +367,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             const lastChar = currentValue.slice(-1);
 
             if (/[\s.,!?;:"'()]/.test(lastChar)) {
-                debugLog("Punctuation detected", lastChar);
                 performAutocorrect(lastChar);
             }
         }
@@ -421,7 +374,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Update the previous value
         previousInputValue = currentValue;
     });
-
 
     // Handle Enter key to move to next prompt
     inputArea.addEventListener('keydown', function(e) {
@@ -447,16 +399,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     });
 
-    // Function to perform autocorrect - improved for cross-browser compatibility
+    // Optimized autocorrect function
     function performAutocorrect(appendChar) {
         try {
             const text = inputArea.value;
-            debugLog("Autocorrect triggered", { text, appendChar });
             if (text.length > 0) {
-                debugLog("Text length", text.length);
                 // Get the last word - more robust splitting
                 let words = text.trim().split(/[\s.,!?;:"'()]/);
-                debugLog("Words", words);
                 // filter out empty strings
                 words = words.filter(word => word.length > 0);
                 if (words.length === 0) return false;
@@ -467,7 +416,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (lastWord.length > 2) {
                     // Find the closest word in the dictionary
                     const correctedWord = findClosestWord(lastWord);
-                    debugLog("Closest word", correctedWord);
 
                     // If a correction was found and it's different from the original word
                     if (correctedWord !== lastWord) {
@@ -500,12 +448,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-
     // Reset button functionality
     startButton.addEventListener('click', function() {
         resetTest();
     });
-
 
     function endTest() {
         testActive = false;
@@ -527,8 +473,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // Display results
         results.style.display = 'block';
-
-        debugLog("Test ended", { promptsCompleted: promptResults.length });
     }
 
     function resetTest() {
@@ -553,8 +497,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // Focus the input area after reset
         inputArea.focus();
-
-        debugLog("Test reset");
     }
 
     // Calculate results for the current prompt
@@ -571,7 +513,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         const maxDistance = Math.max(typedLength, promptLength);
         const normalizedDistance = maxDistance > 0 ? editDistance / maxDistance : 0;
         const accuracy = Math.floor((1 - normalizedDistance) * 100);
-
 
         // Calculate time spent on this prompt in minutes
         const endTime = Date.now();
