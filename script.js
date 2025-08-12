@@ -2,10 +2,32 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Array of prompts for the typing test - loaded from prompts.txt
     let originalPrompts = [];
 
-    // Function to load prompts from prompts.txt file
+    // Function to get the selected dataset filename
+    function getSelectedDatasetFile() {
+        const selectedDataset = document.querySelector('input[name="dataset"]:checked');
+        if (!selectedDataset) {
+            return 'prompts/practice.txt'; // Default fallback
+        }
+
+        switch (selectedDataset.value) {
+            case 'practice':
+                return 'prompts/practice.txt';
+            case 'natural-language':
+                return 'prompts/nat_lang_no_punc.txt';
+            case 'natural-language-punct':
+                return 'prompts/nat_lang_with_cap_punc.txt';
+            case 'emails-passwords':
+                return 'prompts/emails_passwords.txt';
+            default:
+                return 'prompts/practice.txt';
+        }
+    }
+
+    // Function to load prompts from the selected dataset file
     async function loadPromptsFromFile() {
         try {
-            const response = await fetch('prompts.txt');
+            const filename = getSelectedDatasetFile();
+            const response = await fetch(filename);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -16,6 +38,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 .filter(line => line.length > 0);
 
             debugLog("Prompts loaded from file", {
+                filename: filename,
                 count: originalPrompts.length,
                 sample: originalPrompts.slice(0, 3)
             });
@@ -27,6 +50,42 @@ document.addEventListener('DOMContentLoaded', async function() {
             alert(`Error loading prompts from file: ${error.message}`);
             return [];
         }
+    }
+
+    // Function to reload prompts when dataset changes
+    async function reloadPromptsForNewDataset() {
+        // Reset test state
+        testActive = false;
+        inputArea.value = '';
+        inputArea.disabled = false;
+        startButton.textContent = 'Reset Test';
+        results.style.display = 'none';
+
+        // Load new prompts
+        await loadPromptsFromFile();
+
+        // Update dictionary with new prompt words
+        addPromptWordsToDictionary();
+
+        // Shuffle prompts for the new dataset and limit to 4
+        shufflePrompts();
+        prompts = prompts.slice(0, 4); // Only use first 4 prompts
+
+        // Reset prompt index and update display
+        currentPromptIndex = 0;
+        totalPromptsElement.textContent = prompts.length;
+        updateCurrentPrompt();
+        promptResults = [];
+
+        // Reset tracking variables
+        previousInputValue = '';
+        lastWordCorrected = false;
+        promptTimingStarted = false;
+
+        // Focus the input area after reload
+        inputArea.focus();
+
+        debugLog("Dataset changed and prompts reloaded");
     }
 
     // Create a copy of the prompts that we'll shuffle
@@ -135,6 +194,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Function to add all words from prompts to the dictionary
     function addPromptWordsToDictionary() {
+        // Reset dictionary to base dictionary
+        dictionary = [...window.typingTestDictionary];
+
         // Extract all words from all prompts
         originalPrompts.forEach(prompt => {
             const words = extractWords(prompt);
@@ -292,6 +354,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     prompts = prompts.slice(0, 4); // Only use first 4 prompts
     totalPromptsElement.textContent = prompts.length;
     updateCurrentPrompt();
+
+    // Add event listeners for dataset radio buttons
+    const datasetRadios = document.querySelectorAll('input[name="dataset"]');
+    datasetRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.checked) {
+                reloadPromptsForNewDataset();
+            }
+        });
+    });
 
     // Initialize the app with a message to show it's working
     debugLog("App initialized", {
