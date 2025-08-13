@@ -5,8 +5,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Counters for tracking during a prompt
     let keyPressCount = 0;
     let correctedErrorCount = 0;
-    const keyPressCounterElement = document.getElementById('key-press-counter');
-    const correctedErrorCounterElement = document.getElementById('corrected-error-counter');
 
     // Autocorrect modes enum
     const AUTOCORRECT_MODE = {
@@ -491,7 +489,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Count the difference as key presses (not backspace)
             const charsAdded = currentLength - previousInputLength;
             keyPressCount += charsAdded;
-            keyPressCounterElement.textContent = keyPressCount;
 
             // Check if a space or punctuation was added for autocorrect
             const lastChar = currentValue.slice(-1);
@@ -504,7 +501,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Count the difference as corrected errors
             const charsDeleted = previousInputLength - currentLength;
             correctedErrorCount += charsDeleted;
-            correctedErrorCounterElement.textContent = correctedErrorCount;
         }
 
         // Update previous values for next comparison
@@ -533,8 +529,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // Reset counters for new prompt
                 keyPressCount = 0;
                 correctedErrorCount = 0;
-                keyPressCounterElement.textContent = keyPressCount;
-                correctedErrorCounterElement.textContent = correctedErrorCount;
             } else {
                 // End the test if all 4 prompts are completed
                 endTest();
@@ -641,8 +635,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Reset counters
         keyPressCount = 0;
         correctedErrorCount = 0;
-        keyPressCounterElement.textContent = keyPressCount;
-        correctedErrorCounterElement.textContent = correctedErrorCount;
 
         // Focus the input area after reset
         inputArea.focus();
