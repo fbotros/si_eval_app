@@ -457,9 +457,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Configure input area on page load
     configureInputArea();
 
-    inputArea.addEventListener('input', function(e) {
+    // Track input value changes for cross-browser compatibility
+    let previousInputLength = 0;
+
+    // Handle all input events in a single handler for better cross-browser compatibility
+    inputArea.addEventListener('input', function() {
         if (!testActive) {
             startTest();
+            previousInputLength = 0;
         }
 
         // Start timing for current prompt on first keystroke
@@ -468,54 +473,48 @@ document.addEventListener('DOMContentLoaded', async function() {
             promptTimingStarted = true;
         }
 
-        // Get the current input value
+        // Get the current input value and length
         const currentValue = inputArea.value;
+        const currentLength = currentValue.length;
 
         // If there's no previous value, just update and return
         if (!previousInputValue) {
             previousInputValue = currentValue;
+            previousInputLength = currentLength;
             return;
         }
 
         // Reset the correction flag if the user is typing a new character
-        if (currentValue.length > previousInputValue.length) {
+        if (currentLength > previousInputLength) {
             lastWordCorrected = false;
-        }
 
-        // Check if a space or punctuation was added
-        if (currentValue.length > previousInputValue.length && !lastWordCorrected) {
+            // Count the difference as key presses (not backspace)
+            const charsAdded = currentLength - previousInputLength;
+            keyPressCount += charsAdded;
+            keyPressCounterElement.textContent = keyPressCount;
+
+            // Check if a space or punctuation was added for autocorrect
             const lastChar = currentValue.slice(-1);
-
-            // Only perform custom autocorrect if that mode is enabled
-            if (/[\s.,.!?;:"()]/.test(lastChar) && isCustomAutocorrectEnabled()) {
+            if (/[\s.,.!?;:"()]/.test(lastChar) && isCustomAutocorrectEnabled() && !lastWordCorrected) {
                 performAutocorrect(lastChar);
             }
         }
-
-        // Update the previous value
-        previousInputValue = currentValue;
-    });
-
-    // Handle key presses to count and handle Enter key
-    inputArea.addEventListener('keydown', function(e) {
-        if (!testActive) return;
-
-        // Only count alphanumeric and symbol keys (not backspace)
-        if (
-            // Alphanumeric keys (letters and numbers)
-            /^[a-zA-Z0-9]$/.test(e.key) ||
-            // Symbol keys (punctuation, special characters)
-            /^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~\s]$/.test(e.key)
-        ) {
-            keyPressCount++;
-            keyPressCounterElement.textContent = keyPressCount;
-        }
-
-        // Count backspace over character as a corrected error
-        if (e.key === 'Backspace' && inputArea.value.length > 0) {
-            correctedErrorCount++;
+        // If length decreased, count as corrected error (backspace)
+        else if (currentLength < previousInputLength) {
+            // Count the difference as corrected errors
+            const charsDeleted = previousInputLength - currentLength;
+            correctedErrorCount += charsDeleted;
             correctedErrorCounterElement.textContent = correctedErrorCount;
         }
+
+        // Update previous values for next comparison
+        previousInputValue = currentValue;
+        previousInputLength = currentLength;
+    });
+
+    // Handle key presses for Enter key
+    inputArea.addEventListener('keydown', function(e) {
+        if (!testActive) return;
 
         if (e.key === 'Enter') {
             e.preventDefault(); // Prevent default Enter behavior
