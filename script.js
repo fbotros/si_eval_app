@@ -439,10 +439,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (mode === AUTOCORRECT_MODE.SYSTEM) {
             inputArea.setAttribute('spellcheck', 'true');
             inputArea.setAttribute('autocorrect', 'on');
+            inputArea.setAttribute('autocomplete', 'on');
         } else {
             // For both OFF and CUSTOM modes, disable browser's built-in features
             inputArea.setAttribute('spellcheck', 'false');
             inputArea.setAttribute('autocorrect', 'off');
+            inputArea.setAttribute('autocomplete', 'off');
         }
     }
 
