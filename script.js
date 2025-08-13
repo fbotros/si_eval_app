@@ -2,23 +2,30 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Array of prompts for the typing test - loaded from prompts.txt
     let originalPrompts = [];
 
+    // Autocorrect modes enum
+    const AUTOCORRECT_MODE = {
+        OFF: 'OFF',       // Turn off autocorrect completely
+        SYSTEM: 'SYSTEM', // Use OS/browser autocorrect
+        CUSTOM: 'CUSTOM'  // Use our custom autocorrect implementation
+    };
+
     // Configuration for dataset-specific settings
     const datasetConfig = {
         'practice': {
             file: 'prompts/practice.txt',
-            autocorrect: true
+            autocorrect: AUTOCORRECT_MODE.CUSTOM
         },
         'natural-language': {
             file: 'prompts/nat_lang_no_punc.txt',
-            autocorrect: true
+            autocorrect: AUTOCORRECT_MODE.CUSTOM
         },
         'natural-language-punct': {
             file: 'prompts/nat_lang_with_cap_punc.txt',
-            autocorrect: true
+            autocorrect: AUTOCORRECT_MODE.CUSTOM
         },
         'emails-passwords': {
             file: 'prompts/emails_passwords.txt',
-            autocorrect: false
+            autocorrect: AUTOCORRECT_MODE.OFF
         }
     };
 
@@ -33,15 +40,39 @@ document.addEventListener('DOMContentLoaded', async function() {
         return config ? config.file : datasetConfig['practice'].file; // Default fallback
     }
 
-    // Function to check if autocorrect is enabled for the current dataset
-    function isAutocorrectEnabled() {
-        const selectedDataset = document.querySelector('input[name="dataset"]:checked');
-        if (!selectedDataset) {
-            return true; // Default to autocorrect enabled
+    // Track user-selected autocorrect mode (initialize with CUSTOM as default)
+    let userSelectedAutocorrectMode = AUTOCORRECT_MODE.CUSTOM;
+
+    // Function to get the autocorrect mode for the current dataset
+    function getAutocorrectMode() {
+        // Always use the user-selected mode
+        return userSelectedAutocorrectMode;
+    }
+
+    // Function to update the autocorrect radio buttons to match the given mode
+    function updateAutocorrectRadioButtons(mode) {
+        // Find the radio button that corresponds to the mode
+        let radioId;
+        switch (mode) {
+            case AUTOCORRECT_MODE.OFF:
+                radioId = 'autocorrect-off';
+                break;
+            case AUTOCORRECT_MODE.SYSTEM:
+                radioId = 'autocorrect-system';
+                break;
+            case AUTOCORRECT_MODE.CUSTOM:
+            default:
+                radioId = 'autocorrect-custom';
+                break;
         }
 
-        const config = datasetConfig[selectedDataset.value];
-        return config ? config.autocorrect : true; // Default to autocorrect enabled if config not found
+        // Set the corresponding radio button as checked
+        document.getElementById(radioId).checked = true;
+    }
+
+    // Function to check if custom autocorrect is enabled for the current dataset
+    function isCustomAutocorrectEnabled() {
+        return getAutocorrectMode() === AUTOCORRECT_MODE.CUSTOM;
     }
 
     // Helper function to get dataset configuration
@@ -190,13 +221,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         'quick', 'brown', 'fox', 'jumps', 'lazy', 'dog', 'steep', 'learning',
         'curve', 'riding', 'unicycle', 'discreet', 'meeting', 'raindrops', 'falling',
         'head', 'excellent', 'communicate',
-
-        // Programming related words
-        'function', 'variable', 'code', 'program', 'class', 'object', 'method',
-        'array', 'string', 'number', 'boolean', 'null', 'undefined', 'syntax',
-        'error', 'debug', 'compile', 'runtime', 'framework', 'library', 'api',
-        'interface', 'module', 'component', 'server', 'client', 'database', 'data',
-        'file', 'system', 'network', 'web', 'app', 'application', 'development'
     ];
 
     // Use the window property as our dictionary
@@ -206,10 +230,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Function to extract words from a string
     function extractWords(text) {
-        // Remove punctuation and split by spaces
+        // Split by punctuation and spaces
         return text.toLowerCase()
-            .replace(/[.,!?;:"()]/g, '')
-            .split(/\s+/)
+            .split(/[\s.,!?;:"()]+/)
             .filter(word => word.length > 0);
     }
 
@@ -239,7 +262,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Add a function to test the autocorrect
         window.testAutocorrect = function(word) {
             const corrected = findClosestWord(word);
-            console.log(`Testing autocorrect: "${word}" → "${corrected}"`);
             return corrected;
         };
     }
@@ -354,7 +376,53 @@ document.addEventListener('DOMContentLoaded', async function() {
     datasetRadios.forEach(radio => {
         radio.addEventListener('change', function() {
             if (this.checked) {
+                // Get the dataset's default autocorrect mode
+                const datasetValue = this.value;
+                const config = datasetConfig[datasetValue];
+                const datasetAutocorrectMode = config ? config.autocorrect : AUTOCORRECT_MODE.CUSTOM;
+
+                // Update the user-selected mode to match the dataset's default
+                userSelectedAutocorrectMode = datasetAutocorrectMode;
+
+                // Update the radio buttons to reflect the dataset's default mode
+                updateAutocorrectRadioButtons(datasetAutocorrectMode);
+
+                // Update input area configuration when dataset changes
+                configureInputArea();
                 reloadPromptsForNewDataset();
+            }
+        });
+    });
+
+    // Add event listeners for autocorrect mode radio buttons
+    const autocorrectRadios = document.querySelectorAll('input[name="autocorrect-mode"]');
+    autocorrectRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.checked) {
+                // Set the user-selected autocorrect mode based on the radio value
+                switch (this.value) {
+                    case 'off':
+                        userSelectedAutocorrectMode = AUTOCORRECT_MODE.OFF;
+                        break;
+                    case 'system':
+                        userSelectedAutocorrectMode = AUTOCORRECT_MODE.SYSTEM;
+                        break;
+                    case 'custom':
+                    default:
+                        userSelectedAutocorrectMode = AUTOCORRECT_MODE.CUSTOM;
+                        break;
+                }
+
+                // Update input area configuration when autocorrect mode changes
+                configureInputArea();
+
+                // Reset the test when autocorrect mode changes
+                resetTest();
+
+                // If switching to custom mode, ensure dictionary is updated with prompt words
+                if (userSelectedAutocorrectMode === AUTOCORRECT_MODE.CUSTOM) {
+                    addPromptWordsToDictionary();
+                }
             }
         });
     });
@@ -363,6 +431,24 @@ document.addEventListener('DOMContentLoaded', async function() {
     inputArea.focus();
 
     // Optimized input event handler
+    // Configure input area based on autocorrect mode
+    function configureInputArea() {
+        const mode = getAutocorrectMode();
+
+        // Configure spellcheck attribute based on autocorrect mode
+        if (mode === AUTOCORRECT_MODE.SYSTEM) {
+            inputArea.setAttribute('spellcheck', 'true');
+            inputArea.setAttribute('autocorrect', 'on');
+        } else {
+            // For both OFF and CUSTOM modes, disable browser's built-in features
+            inputArea.setAttribute('spellcheck', 'false');
+            inputArea.setAttribute('autocorrect', 'off');
+        }
+    }
+
+    // Configure input area on page load
+    configureInputArea();
+
     inputArea.addEventListener('input', function(e) {
         if (!testActive) {
             startTest();
@@ -388,11 +474,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             lastWordCorrected = false;
         }
 
-        // Check if a space or punctuation was added and autocorrect is enabled
-        if (currentValue.length > previousInputValue.length && !lastWordCorrected && isAutocorrectEnabled()) {
+        // Check if a space or punctuation was added
+        if (currentValue.length > previousInputValue.length && !lastWordCorrected) {
             const lastChar = currentValue.slice(-1);
 
-            if (/[\s.,!?;:"()]/.test(lastChar)) {
+            // Only perform custom autocorrect if that mode is enabled
+            if (/[\s.,.!?;:"()]/.test(lastChar) && isCustomAutocorrectEnabled()) {
                 performAutocorrect(lastChar);
             }
         }
@@ -431,7 +518,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             const text = inputArea.value;
             if (text.length > 0) {
                 // Get the last word - more robust splitting
-                let words = text.trim().split(/[\s.,!?;:"'()]/);
+                let words = text.trim().split(/[\s.,.!?;:"'()]/);
                 // filter out empty strings
                 words = words.filter(word => word.length > 0);
                 if (words.length === 0) return false;

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Typing Test App</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -75,6 +74,24 @@
                     <div class="radio-option">
                         <input type="radio" id="skb" name="input-type" value="skb">
                         <label for="skb">SKB</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <label class="settings-label">Autocorrect Mode:</label>
+                <div class="radio-group">
+                    <div class="radio-option">
+                        <input type="radio" id="autocorrect-off" name="autocorrect-mode" value="off">
+                        <label for="autocorrect-off">Off</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="autocorrect-system" name="autocorrect-mode" value="system">
+                        <label for="autocorrect-system">System</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="autocorrect-custom" name="autocorrect-mode" value="custom" checked>
+                        <label for="autocorrect-custom">Custom</label>
                     </div>
                 </div>
             </div>
