@@ -16,6 +16,10 @@
                 <div class="sample-text" id="sample-text"></div>
                 <div class="progress-indicator" style="text-align: center; margin-bottom: 10px; color: #7f8c8d;">
                     Prompt <span id="current-prompt">1</span> of <span id="total-prompts">0</span>
+                    <span style="margin-left: 15px;">|</span>
+                    Keys pressed: <span id="key-press-counter">0</span>
+                    <span style="margin-left: 15px;">|</span>
+                    Errors corrected: <span id="corrected-error-counter">0</span>
                 </div>
 
                 <textarea class="input-area" id="input-area" placeholder="Start typing here..."
@@ -26,8 +30,14 @@
 
             <div class="results" id="results">
                 <h2>Your Average Results</h2>
-                <div class="metric">Words per minute: <span id="wpm">0</span></div>
+                <div class="primary-metric-container">
+                    <div class="metric primary-metric">Adjusted WPM (AWPM): <span id="awpm">0</span></div>
+                </div>
+                <div class="metric">Words per minute (WPM): <span id="wpm">0</span></div>
                 <div class="metric">Accuracy: <span id="accuracy">0%</span></div>
+                <div class="metric">Uncorrected Error Rate (UER): <span id="uer">0%</span></div>
+                <div class="metric">Corrected Error Rate (CER): <span id="cer">0%</span></div>
+                <div class="metric">Total Error Rate (TER): <span id="ter">0%</span></div>
             </div>
         </div>
 

@@ -2,6 +2,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Array of prompts for the typing test - loaded from prompts.txt
     let originalPrompts = [];
 
+    // Counters for tracking during a prompt
+    let keyPressCount = 0;
+    let correctedErrorCount = 0;
+    const keyPressCounterElement = document.getElementById('key-press-counter');
+    const correctedErrorCounterElement = document.getElementById('corrected-error-counter');
+
     // Autocorrect modes enum
     const AUTOCORRECT_MODE = {
         OFF: 'OFF',       // Turn off autocorrect completely
@@ -490,9 +496,26 @@ document.addEventListener('DOMContentLoaded', async function() {
         previousInputValue = currentValue;
     });
 
-    // Handle Enter key to move to next prompt
+    // Handle key presses to count and handle Enter key
     inputArea.addEventListener('keydown', function(e) {
         if (!testActive) return;
+
+        // Only count alphanumeric and symbol keys (not backspace)
+        if (
+            // Alphanumeric keys (letters and numbers)
+            /^[a-zA-Z0-9]$/.test(e.key) ||
+            // Symbol keys (punctuation, special characters)
+            /^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~\s]$/.test(e.key)
+        ) {
+            keyPressCount++;
+            keyPressCounterElement.textContent = keyPressCount;
+        }
+
+        // Count backspace over character as a corrected error
+        if (e.key === 'Backspace' && inputArea.value.length > 0) {
+            correctedErrorCount++;
+            correctedErrorCounterElement.textContent = correctedErrorCount;
+        }
 
         if (e.key === 'Enter') {
             e.preventDefault(); // Prevent default Enter behavior
@@ -507,6 +530,12 @@ document.addEventListener('DOMContentLoaded', async function() {
                 updateCurrentPrompt();
                 inputArea.value = '';
                 promptTimingStarted = false; // Reset timing flag for new prompt
+
+                // Reset counters for new prompt
+                keyPressCount = 0;
+                correctedErrorCount = 0;
+                keyPressCounterElement.textContent = keyPressCount;
+                correctedErrorCounterElement.textContent = correctedErrorCount;
             } else {
                 // End the test if all 4 prompts are completed
                 endTest();
@@ -610,6 +639,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         lastWordCorrected = false;
         promptTimingStarted = false;
 
+        // Reset counters
+        keyPressCount = 0;
+        correctedErrorCount = 0;
+        keyPressCounterElement.textContent = keyPressCount;
+        correctedErrorCounterElement.textContent = correctedErrorCount;
+
         // Focus the input area after reset
         inputArea.focus();
     }
@@ -634,9 +669,19 @@ document.addEventListener('DOMContentLoaded', async function() {
         const timeSpentMs = endTime - startTime;
         const minutes = timeSpentMs / 60000; // Convert ms to minutes
 
+        // Calculate error metrics
+        const correct = keyPressCount - correctedErrorCount;
+        const incorrect_fixed = correctedErrorCount;
+        const incorrect_not_fixed = editDistance;
+        const denominator = correct + incorrect_fixed + incorrect_not_fixed;
+        const ter = denominator > 0 ? (incorrect_fixed + incorrect_not_fixed) / denominator : 0;
+        const uer = denominator > 0 ? incorrect_not_fixed / denominator : 0;
+        const cer = denominator > 0 ? incorrect_fixed / denominator : 0;
+
         // Calculate WPM
         const words = typedLength / 5; // Assume average word is 5 characters
         const wpm = minutes > 0 ? Math.floor(words / minutes) : 0;
+        const awpm = Math.floor(wpm * (1 - uer)); // Adjusted WPM based on uncorrected errors
 
         return {
             promptIndex: currentPromptIndex,
@@ -644,10 +689,17 @@ document.addEventListener('DOMContentLoaded', async function() {
             promptText: promptText,
             typedText: typedText,
             wpm: wpm,
+            awpm: awpm,
             accuracy: accuracy,
             editDistance: editDistance,
             totalChars: typedLength,
-            timeSpentMs: timeSpentMs
+            timeSpentMs: timeSpentMs,
+            keyPresses: keyPressCount,
+            correctedErrors: correctedErrorCount,
+            uncorrectedErrors: editDistance,
+            ter: ter,
+            uer: uer,
+            cer: cer
         };
     }
 
@@ -661,26 +713,57 @@ document.addEventListener('DOMContentLoaded', async function() {
         let totalWpm = 0;
         let totalAccuracy = 0;
         let totalChars = 0;
+        let totalUncorrectedErrors = 0;
+        let totalCorrectedErrors = 0;
+        let totalKeyPresses = 0;
 
         promptResults.forEach(result => {
             totalWpm += result.wpm;
             totalAccuracy += result.accuracy;
             totalChars += result.totalChars;
+            totalUncorrectedErrors += result.uncorrectedErrors;
+            totalCorrectedErrors += result.correctedErrors;
+            totalKeyPresses += result.keyPresses;
         });
 
         const avgWpm = Math.floor(totalWpm / promptResults.length);
         const avgAccuracy = Math.floor(totalAccuracy / promptResults.length);
 
+        // Calculate additional metrics
+        const avgAwpm = Math.floor(avgWpm * (avgAccuracy / 100)); // Adjusted WPM based on accuracy
+
+        // Calculate error rates
+        const totalTypedChars = totalKeyPresses;
+        const uerValue = totalTypedChars > 0 ? (totalUncorrectedErrors / totalTypedChars) * 100 : 0;
+        const cerValue = totalTypedChars > 0 ? (totalCorrectedErrors / totalTypedChars) * 100 : 0;
+        const terValue = totalTypedChars > 0 ? ((totalUncorrectedErrors + totalCorrectedErrors) / totalTypedChars) * 100 : 0;
+
+        // Format error rates to 2 decimal places
+        const uer = uerValue.toFixed(2);
+        const cer = cerValue.toFixed(2);
+        const ter = terValue.toFixed(2);
+
         // Update results display
         wpmElement.textContent = avgWpm;
+        document.getElementById('awpm').textContent = avgAwpm;
         accuracyElement.textContent = `${avgAccuracy}%`;
+        document.getElementById('uer').textContent = `${uer}%`;
+        document.getElementById('cer').textContent = `${cer}%`;
+        document.getElementById('ter').textContent = `${ter}%`;
 
         // Create results object with both individual prompt results and averages
         const resultsData = {
             date: new Date().toISOString(),
             averageWpm: avgWpm,
+            averageAwpm: avgAwpm,
             averageAccuracy: avgAccuracy,
+            uer: parseFloat(uer),
+            cer: parseFloat(cer),
+            ter: parseFloat(ter),
             totalChars: totalChars,
+            totalKeyPresses: totalKeyPresses,
+            totalCorrectedErrors: totalCorrectedErrors,
+            totalUncorrectedErrors: totalUncorrectedErrors,
             promptsCompleted: promptResults.length,
             totalPrompts: prompts.length,
             promptOrder: prompts.map(p => p.originalIndex), // Include the order of prompts in this test
