@@ -208,7 +208,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     function extractWords(text) {
         // Remove punctuation and split by spaces
         return text.toLowerCase()
-            .replace(/[.,!?;:"'()]/g, '')
+            .replace(/[.,!?;:"()]/g, '')
             .split(/\s+/)
             .filter(word => word.length > 0);
     }
@@ -392,7 +392,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (currentValue.length > previousInputValue.length && !lastWordCorrected && isAutocorrectEnabled()) {
             const lastChar = currentValue.slice(-1);
 
-            if (/[\s.,!?;:"'()]/.test(lastChar)) {
+            if (/[\s.,!?;:"()]/.test(lastChar)) {
                 performAutocorrect(lastChar);
             }
         }
