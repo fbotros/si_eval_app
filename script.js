@@ -498,9 +498,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         // If length decreased, count as corrected error (backspace)
         else if (currentLength < previousInputLength) {
-            // Count the difference as corrected errors
-            const charsDeleted = previousInputLength - currentLength;
-            correctedErrorCount += charsDeleted;
+            // Count as one corrected error regardless of how many characters were deleted
+            correctedErrorCount += 1;
         }
 
         // Update previous values for next comparison
