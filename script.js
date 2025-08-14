@@ -13,8 +13,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         CUSTOM: 'CUSTOM'  // Use our custom autocorrect implementation
     };
 
-    // Maximum number of prompts to use per test
-    const MAX_PROMPTS_PER_TEST = 5;
+    // Number of prompts to use per test (default: 5)
+    let maxPromptsPerTest = 5;
 
     // Configuration for dataset-specific settings
     const datasetConfig = {
@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         shuffleArray(prompts);
 
         // Limit to MAX_PROMPTS_PER_TEST prompts
-        prompts = prompts.slice(0, MAX_PROMPTS_PER_TEST);
+        prompts = prompts.slice(0, maxPromptsPerTest);
 
         // Update UI
         totalPromptsElement.textContent = prompts.length;
@@ -377,7 +377,33 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Initialize prompts for testing
     initializePromptsForTest();
+    
+    // Initialize prompt count input with default value
+    document.getElementById('prompt-count').value = maxPromptsPerTest;
 
+    // Add event listener for prompt count input
+    const promptCountInput = document.getElementById('prompt-count');
+    
+    // Function to update the prompt count
+    function updatePromptCount(newCount) {
+        // Ensure the count is within valid range (1-20)
+        newCount = Math.max(1, Math.min(20, newCount));
+        
+        // Update the input value
+        promptCountInput.value = newCount;
+        
+        // Update the maxPromptsPerTest variable
+        maxPromptsPerTest = newCount;
+        
+        // Reset the test to apply the new prompt count
+        resetTest();
+    }
+    
+    // Event listener for direct input changes
+    promptCountInput.addEventListener('change', function() {
+        updatePromptCount(parseInt(this.value));
+    });
+    
     // Add event listeners for dataset radio buttons
     const datasetRadios = document.querySelectorAll('input[name="dataset"]');
     datasetRadios.forEach(radio => {

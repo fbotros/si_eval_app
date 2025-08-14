@@ -96,6 +96,33 @@ h1 {
     cursor: not-allowed;
 }
 
+/* Debug Info Styles */
+.debug-info {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background-color: #fff3cd;
+    border-radius: 5px;
+    border-left: 4px solid #ffc107;
+    margin-bottom: 1.5rem;
+}
+
+.debug-info h3 {
+    margin-top: 0;
+    color: #856404;
+    font-size: 1.1rem;
+}
+
+.debug-metric {
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+    color: #856404;
+}
+
+.debug-metric span {
+    font-weight: bold;
+    color: #856404;
+}
+
 .results {
     margin-top: 1.5rem;
     padding: 1rem;
@@ -232,6 +259,27 @@ h1 {
 
 .radio-option label:hover {
     color: #3498db;
+}
+
+/* Prompt count control styles */
+.prompt-count-control {
+    display: flex;
+    align-items: center;
+}
+
+#prompt-count {
+    width: 60px;
+    padding: 0.5rem;
+    font-size: 1rem;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    text-align: center;
+    transition: border-color 0.3s;
+}
+
+#prompt-count:focus {
+    outline: none;
+    border-color: #3498db;
 }
 
 /* Responsive design */
