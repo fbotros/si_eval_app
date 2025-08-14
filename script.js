@@ -13,6 +13,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         CUSTOM: 'CUSTOM'  // Use our custom autocorrect implementation
     };
 
+    // Maximum number of prompts to use per test
+    const MAX_PROMPTS_PER_TEST = 5;
+
     // Configuration for dataset-specific settings
     const datasetConfig = {
         'practice': {
@@ -116,8 +119,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         }));
         shuffleArray(prompts);
 
-        // Limit to 4 prompts
-        prompts = prompts.slice(0, 4);
+        // Limit to MAX_PROMPTS_PER_TEST prompts
+        prompts = prompts.slice(0, MAX_PROMPTS_PER_TEST);
 
         // Update UI
         totalPromptsElement.textContent = prompts.length;
