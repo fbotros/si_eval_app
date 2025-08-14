@@ -385,32 +385,46 @@ document.addEventListener('DOMContentLoaded', async function() {
     const promptCountInput = document.getElementById('prompt-count');
     const decreasePromptsButton = document.getElementById('decrease-prompts');
     const increasePromptsButton = document.getElementById('increase-prompts');
-    
+
     // Function to update the prompt count
     function updatePromptCount(newCount) {
         // Ensure the count is within valid range (1-20)
         newCount = Math.max(1, Math.min(20, newCount));
-        
+
         // Update the input value
         promptCountInput.value = newCount;
-        
+
         // Update the maxPromptsPerTest variable
         maxPromptsPerTest = newCount;
-        
+
         // Reset the test to apply the new prompt count
         resetTest();
     }
-    
-    // Event listener for the decrease button
-    decreasePromptsButton.addEventListener('click', function() {
+
+    // Function to handle decrease button action
+    function decreasePromptCount() {
         updatePromptCount(parseInt(promptCountInput.value) - 1);
-    });
-    
-    // Event listener for the increase button
-    increasePromptsButton.addEventListener('click', function() {
+    }
+
+    // Function to handle increase button action
+    function increasePromptCount() {
         updatePromptCount(parseInt(promptCountInput.value) + 1);
+    }
+
+    // Event listeners for the decrease button (both click and touch)
+    decreasePromptsButton.addEventListener('click', decreasePromptCount);
+    decreasePromptsButton.addEventListener('touchstart', function(e) {
+        e.preventDefault(); // Prevent default touch behavior
+        decreasePromptCount();
     });
-    
+
+    // Event listeners for the increase button (both click and touch)
+    increasePromptsButton.addEventListener('click', increasePromptCount);
+    increasePromptsButton.addEventListener('touchstart', function(e) {
+        e.preventDefault(); // Prevent default touch behavior
+        increasePromptCount();
+    });
+
     // Event listener for direct input changes
     promptCountInput.addEventListener('change', function() {
         updatePromptCount(parseInt(this.value));
