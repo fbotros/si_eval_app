@@ -265,6 +265,27 @@ h1 {
 .prompt-count-control {
     display: flex;
     align-items: center;
+    gap: 10px;
+}
+
+.prompt-count-button {
+    width: 30px;
+    height: 30px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s;
+}
+
+.prompt-count-button:hover {
+    background-color: #2980b9;
 }
 
 #prompt-count {

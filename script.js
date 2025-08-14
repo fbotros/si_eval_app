@@ -377,12 +377,14 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Initialize prompts for testing
     initializePromptsForTest();
-    
+
     // Initialize prompt count input with default value
     document.getElementById('prompt-count').value = maxPromptsPerTest;
 
-    // Add event listener for prompt count input
+    // Add event listeners for prompt count controls
     const promptCountInput = document.getElementById('prompt-count');
+    const decreasePromptsButton = document.getElementById('decrease-prompts');
+    const increasePromptsButton = document.getElementById('increase-prompts');
     
     // Function to update the prompt count
     function updatePromptCount(newCount) {
@@ -399,11 +401,21 @@ document.addEventListener('DOMContentLoaded', async function() {
         resetTest();
     }
     
+    // Event listener for the decrease button
+    decreasePromptsButton.addEventListener('click', function() {
+        updatePromptCount(parseInt(promptCountInput.value) - 1);
+    });
+    
+    // Event listener for the increase button
+    increasePromptsButton.addEventListener('click', function() {
+        updatePromptCount(parseInt(promptCountInput.value) + 1);
+    });
+    
     // Event listener for direct input changes
     promptCountInput.addEventListener('change', function() {
         updatePromptCount(parseInt(this.value));
     });
-    
+
     // Add event listeners for dataset radio buttons
     const datasetRadios = document.querySelectorAll('input[name="dataset"]');
     datasetRadios.forEach(radio => {
