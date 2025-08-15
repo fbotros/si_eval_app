@@ -413,39 +413,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     let previousInputValue = '';
     let lastWordCorrected = false;
 
-    // Debug function - kept for future use but currently disabled
-    function debugLog(message, data) {
-        // Disabled for performance - can be re-enabled for debugging
-        // console.log(`[DEBUG] ${message}`, data);
-
-        // Also show debug info on the page for mobile devices
-        // const debugElement = document.getElementById('debug-info');
-        // if (debugElement) {
-        //     const timestamp = new Date().toISOString().substr(11, 8); // HH:MM:SS
-        //     let debugText = `${timestamp} - ${message}: `;
-
-        //     if (typeof data === 'object') {
-        //         try {
-        //             debugText += JSON.stringify(data).substring(0, 100); // Limit length
-        //         } catch (e) {
-        //             debugText += "[Object]";
-        //         }
-        //     } else {
-        //         debugText += data;
-        //     }
-
-        //     // Keep only the last 5 debug messages
-        //     const currentText = debugElement.innerHTML;
-        //     const lines = currentText.split('<br>');
-        //     if (lines.length > 4) {
-        //         lines.shift(); // Remove oldest line
-        //     }
-        //     lines.push(debugText);
-
-        //     debugElement.innerHTML = lines.join('<br>');
-        // }
-    }
-
     // Load prompts from file and initialize the app
     await loadPromptsFromFile();
 
