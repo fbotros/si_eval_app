@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,20 +8,28 @@
     <link rel="icon" href="favicon-32x32.png" type="image/png">
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
     <div class="app-wrapper">
         <div class="container">
             <h1>Typing Test App</h1>
-            <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next one.</p>
+            <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next
+                one.</p>
 
             <div class="test-container">
                 <div class="sample-text" id="sample-text"></div>
+                <div class="sample-text-highlighted" id="sample-text-highlighted" style="display: none;"></div>
                 <div class="progress-indicator" style="text-align: center; margin-bottom: 10px; color: #7f8c8d;">
                     Prompt <span id="current-prompt">1</span> of <span id="total-prompts">0</span>
                 </div>
 
-                <textarea class="input-area" id="input-area" placeholder="Start typing here..."
-                    autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+                <div class="error-message" id="qa-error-message" style="display: none;">
+                    QA Mode Error: Your text must match the prompt exactly (100%). Please correct your input and try
+                    again.
+                </div>
+
+                <textarea class="input-area" id="input-area" placeholder="Start typing here..." autocomplete="off"
+                    autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
 
                 <button class="button" id="start-button">Reset Test</button>
             </div>
@@ -71,7 +80,7 @@
                 </div>
             </div>
 
-                        <div class="settings-group">
+            <div class="settings-group">
                 <label class="settings-label">Number of Prompts:</label>
                 <div class="prompt-count-control">
                     <input type="number" id="prompt-count" min="1" max="20" value="5">
@@ -115,9 +124,27 @@
                     </div>
                 </div>
             </div>
+
+            <div class="settings-group">
+                <label class="settings-label">
+                    QA Mode:
+                    <span class="info-icon" data-tooltip="QA Mode requires 100% accuracy to proceed. When enabled, autocorrect is disabled and you must type the prompt exactly as shown. Real-time highlighting shows correct (green) and incorrect (red) characters.">?</span>
+                </label>
+                <div class="radio-group">
+                    <div class="radio-option">
+                        <input type="radio" id="qa-mode-off" name="qa-mode" value="off" checked>
+                        <label for="qa-mode-off">Off</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="qa-mode-on" name="qa-mode" value="on">
+                        <label for="qa-mode-on">On</label>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script src="script.js"></script>
 </body>
+
 </html>

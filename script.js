@@ -54,6 +54,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Track user-selected autocorrect mode (initialize with CUSTOM as default)
     let userSelectedAutocorrectMode = AUTOCORRECT_MODE.CUSTOM;
 
+    // Track QA Mode state (initialize with false as default - off)
+    let qaMode = false;
+
     // Function to get the autocorrect mode for the current dataset
     function getAutocorrectMode() {
         // Always use the user-selected mode
@@ -79,6 +82,14 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // Set the corresponding radio button as checked
         document.getElementById(radioId).checked = true;
+    }
+
+    // Function to enable/disable autocorrect radio buttons
+    function setAutocorrectRadioButtonsEnabled(enabled) {
+        const autocorrectRadios = document.querySelectorAll('input[name="autocorrect-mode"]');
+        autocorrectRadios.forEach(radio => {
+            radio.disabled = !enabled;
+        });
     }
 
     // Function to check if custom autocorrect is enabled for the current dataset
@@ -182,6 +193,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     function updateCurrentPrompt() {
         currentPromptElement.textContent = currentPromptIndex + 1;
         sampleTextElement.innerText = prompts[currentPromptIndex].text;
+
+        // Update QA Mode display if enabled
+        updateQAModeDisplay();
     }
 
     // Get the current prompt text
@@ -192,6 +206,65 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Get the current prompt's original index
     function getCurrentPromptOriginalIndex() {
         return prompts[currentPromptIndex].originalIndex;
+    }
+
+    // Function to update QA Mode display
+    function updateQAModeDisplay() {
+        const sampleTextElement = document.getElementById('sample-text');
+        const sampleTextHighlighted = document.getElementById('sample-text-highlighted');
+
+        if (qaMode) {
+            // Hide normal sample text, show highlighted version
+            sampleTextElement.style.display = 'none';
+            sampleTextHighlighted.style.display = 'block';
+
+            // Initialize with the current prompt
+            updateQAHighlighting('');
+        } else {
+            // Show normal sample text, hide highlighted version
+            sampleTextElement.style.display = 'block';
+            sampleTextHighlighted.style.display = 'none';
+        }
+    }
+
+    // Function to update QA Mode highlighting based on typed text
+    function updateQAHighlighting(typedText) {
+        if (!qaMode) return;
+
+        const sampleTextHighlighted = document.getElementById('sample-text-highlighted');
+        const promptText = getCurrentPromptText();
+
+        let highlightedHtml = '';
+
+        for (let i = 0; i < promptText.length; i++) {
+            const promptChar = promptText[i];
+            let className = 'char-untyped';
+
+            if (i < typedText.length) {
+                const typedChar = typedText[i];
+                if (typedChar === promptChar) {
+                    className = 'char-correct';
+                } else {
+                    className = 'char-incorrect';
+                }
+            }
+
+            // Handle special characters for HTML
+            let displayChar = promptChar;
+            if (promptChar === ' ') {
+                displayChar = '&nbsp;';
+            } else if (promptChar === '<') {
+                displayChar = '&lt;';
+            } else if (promptChar === '>') {
+                displayChar = '&gt;';
+            } else if (promptChar === '&') {
+                displayChar = '&amp;';
+            }
+
+            highlightedHtml += `<span class="${className}">${displayChar}</span>`;
+        }
+
+        sampleTextHighlighted.innerHTML = highlightedHtml;
     }
     const inputArea = document.getElementById('input-area');
     const startButton = document.getElementById('start-button');
@@ -439,16 +512,19 @@ document.addEventListener('DOMContentLoaded', async function() {
     datasetRadios.forEach(radio => {
         radio.addEventListener('change', function() {
             if (this.checked) {
-                // Get the dataset's default autocorrect mode
-                const datasetValue = this.value;
-                const config = datasetConfig[datasetValue];
-                const datasetAutocorrectMode = config ? config.autocorrect : AUTOCORRECT_MODE.CUSTOM;
+                // Only change autocorrect settings if QA Mode is not enabled
+                if (!qaMode) {
+                    // Get the dataset's default autocorrect mode
+                    const datasetValue = this.value;
+                    const config = datasetConfig[datasetValue];
+                    const datasetAutocorrectMode = config ? config.autocorrect : AUTOCORRECT_MODE.CUSTOM;
 
-                // Update the user-selected mode to match the dataset's default
-                userSelectedAutocorrectMode = datasetAutocorrectMode;
+                    // Update the user-selected mode to match the dataset's default
+                    userSelectedAutocorrectMode = datasetAutocorrectMode;
 
-                // Update the radio buttons to reflect the dataset's default mode
-                updateAutocorrectRadioButtons(datasetAutocorrectMode);
+                    // Update the radio buttons to reflect the dataset's default mode
+                    updateAutocorrectRadioButtons(datasetAutocorrectMode);
+                }
 
                 // Update input area configuration when dataset changes
                 configureInputArea();
@@ -486,6 +562,33 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (userSelectedAutocorrectMode === AUTOCORRECT_MODE.CUSTOM) {
                     addPromptWordsToDictionary();
                 }
+            }
+        });
+    });
+
+    // Add event listeners for QA Mode radio buttons
+    const qaModeRadios = document.querySelectorAll('input[name="qa-mode"]');
+    qaModeRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.checked) {
+                qaMode = this.value === 'on';
+
+                if (qaMode) {
+                    // If QA Mode is enabled, set autocorrect to off and disable autocorrect selection
+                    userSelectedAutocorrectMode = AUTOCORRECT_MODE.OFF;
+                    updateAutocorrectRadioButtons(AUTOCORRECT_MODE.OFF);
+                    setAutocorrectRadioButtonsEnabled(false);
+                    configureInputArea();
+                } else {
+                    // If QA Mode is disabled, re-enable autocorrect selection
+                    setAutocorrectRadioButtonsEnabled(true);
+                }
+
+                // Update QA Mode display immediately
+                updateQAModeDisplay();
+
+                // Reset the test when QA Mode changes
+                resetTest();
             }
         });
     });
@@ -564,6 +667,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Update previous values for next comparison
         previousInputValue = currentValue;
         previousInputLength = currentLength;
+
+        // Update QA Mode highlighting if enabled
+        if (qaMode) {
+            updateQAHighlighting(currentValue);
+        }
     });
 
     // Handle key presses for Enter key
@@ -572,6 +680,23 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         if (e.key === 'Enter') {
             e.preventDefault(); // Prevent default Enter behavior
+
+            // Check QA Mode - if enabled, require 100% match
+            if (qaMode) {
+                const typedText = inputArea.value;
+                const promptText = getCurrentPromptText();
+
+                if (typedText !== promptText) {
+                    // Show error message for QA Mode mismatch
+                    const errorElement = document.getElementById('qa-error-message');
+                    errorElement.style.display = 'block';
+                    return; // Don't proceed to next prompt
+                }
+            }
+
+            // Hide error message if we get here (text matches or QA mode is off)
+            const errorElement = document.getElementById('qa-error-message');
+            errorElement.style.display = 'none';
 
             // Calculate results for the current prompt
             const promptResult = calculatePromptResult();
@@ -588,7 +713,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 keyPressCount = 0;
                 correctedErrorCount = 0;
             } else {
-                // End the test if all 4 prompts are completed
+                // End the test if all prompts are completed
                 endTest();
             }
         }
