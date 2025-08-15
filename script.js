@@ -33,6 +33,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         'emails-passwords': {
             file: 'prompts/emails_passwords.txt',
             autocorrect: AUTOCORRECT_MODE.OFF
+        },
+        'metal-keys': {
+            file: 'prompts/metal_keys.txt',
+            autocorrect: AUTOCORRECT_MODE.OFF
         }
     };
 
