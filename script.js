@@ -433,7 +433,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Function to update the prompt count
     function updatePromptCount(newCount) {
         // Ensure the count is within valid range (1-20)
-        newCount = Math.max(1, Math.min(20, newCount));
+        newCount = Math.max(1, Math.min(100, newCount));
 
         // Update the input value
         promptCountInput.value = newCount;
