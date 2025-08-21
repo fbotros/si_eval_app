@@ -506,6 +506,17 @@ document.addEventListener('DOMContentLoaded', async function () {
         });
     });
 
+    let inputType = 'physical-keyboard';
+    // Add event listeners for dataset radio buttons
+    const inputTypeRadios = document.querySelectorAll('input[name="input-type"]');
+    inputTypeRadios.forEach(radio => {
+        radio.addEventListener('change', function () {
+            if (this.checked) {
+                inputType = this.value;
+            }
+        });
+    });
+
     // Add event listeners for autocorrect mode radio buttons
     const autocorrectRadios = document.querySelectorAll('input[name="autocorrect-mode"]');
     autocorrectRadios.forEach(radio => {
@@ -569,7 +580,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         });
     });
 
-
     function checkSettingPresetInUrlParameter() {
         let value = getURLParameter('setting_preset')
         if (value == null) {
@@ -581,6 +591,25 @@ document.addEventListener('DOMContentLoaded', async function () {
             document.getElementById("qa-mode-on").checked = true;
             qaMode = true;
             qaModeChanged(qaMode);
+        }
+        else if (value === 'uxr_pc') {
+            document.getElementById("physical-keyboard").checked = true;
+            inputType = "physical-keyboard";
+
+            document.addEventListener('testFinishedEvent', function (e) {
+                downloadResultsAsJson(e.detail.message);
+            });
+        }
+        else if (value === 'uxr_webview') {
+            document.getElementById("skb").checked = true;
+            inputType = "skb";
+
+            document.addEventListener('testFinishedEvent', function (e) {
+                console.log(JSON.stringify(e.detail.message, null, 2));
+                if (window.vuplex) {
+                    window.vuplex.postMessage(e.detail.message);
+                }
+            });
         }
     }
 
@@ -934,11 +963,15 @@ document.addEventListener('DOMContentLoaded', async function () {
             promptsCompleted: promptResults.length,
             totalPrompts: prompts.length,
             promptOrder: prompts.map(p => p.originalIndex), // Include the order of prompts in this test
-            promptResults: promptResults
+            promptResults: promptResults,
+            inputType: inputType,
+            userId: document.getElementById('user-id').value,
         };
 
-        // Download results as JSON
-        // downloadResultsAsJson(resultsData);
+        const testFinishedEvent = new CustomEvent('testFinishedEvent', {
+            detail: { message: resultsData },
+        });
+        document.dispatchEvent(testFinishedEvent);
     }
 
     function downloadResultsAsJson(data) {
