@@ -507,6 +507,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
 
     let inputType = 'physical-keyboard';
+
+    // Function to enable/disable autocorrect radio buttons
+    function setInputTypeRadioButtonsEnabled(enabled) {
+        const inputTypeRadios = document.querySelectorAll('input[name="input-type"]');
+        inputTypeRadios.forEach(radio => {
+            radio.disabled = !enabled;
+        });
+    }
+
     // Add event listeners for dataset radio buttons
     const inputTypeRadios = document.querySelectorAll('input[name="input-type"]');
     inputTypeRadios.forEach(radio => {
@@ -593,16 +602,18 @@ document.addEventListener('DOMContentLoaded', async function () {
             qaModeChanged(qaMode);
         }
         else if (value === 'uxr_pc') {
-            document.getElementById("physical-keyboard").checked = true;
             inputType = "physical-keyboard";
+            document.getElementById("physical-keyboard").checked = true;
+            setInputTypeRadioButtonsEnabled(false);
 
             document.addEventListener('testFinishedEvent', function (e) {
                 downloadResultsAsJson(e.detail.message);
             });
         }
         else if (value === 'uxr_webview') {
-            document.getElementById("skb").checked = true;
             inputType = "skb";
+            document.getElementById("skb").checked = true;
+            setInputTypeRadioButtonsEnabled(false);
 
             document.addEventListener('testFinishedEvent', function (e) {
                 console.log(JSON.stringify(e.detail.message, null, 2));
