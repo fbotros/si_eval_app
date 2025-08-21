@@ -1,4 +1,9 @@
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async function () {
+    function getURLParameter(name) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(name);
+    }
+
     // Array of prompts for the typing test - loaded from prompts.txt
     let originalPrompts = [];
 
@@ -266,6 +271,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         sampleTextHighlighted.innerHTML = highlightedHtml;
     }
+
     const inputArea = document.getElementById('input-area');
     const startButton = document.getElementById('start-button');
     const results = document.getElementById('results');
@@ -339,12 +345,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
 
         // Make the dictionary accessible for debugging
-        window.getDictionary = function() {
+        window.getDictionary = function () {
             return dictionary;
         };
 
         // Add a function to test the autocorrect
-        window.testAutocorrect = function(word) {
+        window.testAutocorrect = function (word) {
             const corrected = findClosestWord(word);
             return corrected;
         };
@@ -457,27 +463,27 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Event listeners for the decrease button (both click and touch)
     decreasePromptsButton.addEventListener('click', decreasePromptCount);
-    decreasePromptsButton.addEventListener('touchstart', function(e) {
+    decreasePromptsButton.addEventListener('touchstart', function (e) {
         e.preventDefault(); // Prevent default touch behavior
         decreasePromptCount();
     });
 
     // Event listeners for the increase button (both click and touch)
     increasePromptsButton.addEventListener('click', increasePromptCount);
-    increasePromptsButton.addEventListener('touchstart', function(e) {
+    increasePromptsButton.addEventListener('touchstart', function (e) {
         e.preventDefault(); // Prevent default touch behavior
         increasePromptCount();
     });
 
     // Event listener for direct input changes
-    promptCountInput.addEventListener('change', function() {
+    promptCountInput.addEventListener('change', function () {
         updatePromptCount(parseInt(this.value));
     });
 
     // Add event listeners for dataset radio buttons
     const datasetRadios = document.querySelectorAll('input[name="dataset"]');
     datasetRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
+        radio.addEventListener('change', function () {
             if (this.checked) {
                 // Only change autocorrect settings if QA Mode is not enabled
                 if (!qaMode) {
@@ -503,7 +509,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Add event listeners for autocorrect mode radio buttons
     const autocorrectRadios = document.querySelectorAll('input[name="autocorrect-mode"]');
     autocorrectRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
+        radio.addEventListener('change', function () {
             if (this.checked) {
                 // Set the user-selected autocorrect mode based on the radio value
                 switch (this.value) {
@@ -533,32 +539,52 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     });
 
+    function qaModeChanged(enabled) {
+        if (enabled) {
+            // If QA Mode is enabled, set autocorrect to off and disable autocorrect selection
+            userSelectedAutocorrectMode = AUTOCORRECT_MODE.OFF;
+            updateAutocorrectRadioButtons(AUTOCORRECT_MODE.OFF);
+            setAutocorrectRadioButtonsEnabled(false);
+            configureInputArea();
+        } else {
+            // If QA Mode is disabled, re-enable autocorrect selection
+            setAutocorrectRadioButtonsEnabled(true);
+        }
+
+        // Update QA Mode display immediately
+        updateQAModeDisplay();
+
+        // Reset the test when QA Mode changes
+        resetTest();
+    }
+
     // Add event listeners for QA Mode radio buttons
     const qaModeRadios = document.querySelectorAll('input[name="qa-mode"]');
     qaModeRadios.forEach(radio => {
-        radio.addEventListener('change', function() {
+        radio.addEventListener('change', function () {
             if (this.checked) {
                 qaMode = this.value === 'on';
-
-                if (qaMode) {
-                    // If QA Mode is enabled, set autocorrect to off and disable autocorrect selection
-                    userSelectedAutocorrectMode = AUTOCORRECT_MODE.OFF;
-                    updateAutocorrectRadioButtons(AUTOCORRECT_MODE.OFF);
-                    setAutocorrectRadioButtonsEnabled(false);
-                    configureInputArea();
-                } else {
-                    // If QA Mode is disabled, re-enable autocorrect selection
-                    setAutocorrectRadioButtonsEnabled(true);
-                }
-
-                // Update QA Mode display immediately
-                updateQAModeDisplay();
-
-                // Reset the test when QA Mode changes
-                resetTest();
+                qaModeChanged(qaMode);
             }
         });
     });
+
+
+    function checkSettingPresetInUrlParameter() {
+        let value = getURLParameter('setting_preset')
+        if (value == null) {
+            return;
+        }
+
+        value = value.toLowerCase();
+        if (value === 'qa') {
+            document.getElementById("qa-mode-on").checked = true;
+            qaMode = true;
+            qaModeChanged(qaMode);
+        }
+    }
+
+    checkSettingPresetInUrlParameter();
 
     // Focus the input area when the page loads
     inputArea.focus();
@@ -588,7 +614,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     let previousInputLength = 0;
 
     // Handle all input events in a single handler for better cross-browser compatibility
-    inputArea.addEventListener('input', function() {
+    inputArea.addEventListener('input', function () {
         if (!testActive) {
             startTest();
             previousInputLength = 0;
@@ -642,7 +668,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
 
     // Handle key presses for Enter key
-    inputArea.addEventListener('keydown', function(e) {
+    inputArea.addEventListener('keydown', function (e) {
         if (!testActive) return;
 
         if (e.key === 'Enter') {
@@ -736,7 +762,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     // Reset button functionality
-    startButton.addEventListener('click', function() {
+    startButton.addEventListener('click', function () {
         resetTest();
     });
 
