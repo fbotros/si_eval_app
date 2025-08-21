@@ -815,12 +815,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Change button text
         startButton.textContent = 'Start New Test';
 
-        // Calculate results for the current prompt if not already done
-        if (inputArea.value.trim().length > 0) {
-            const promptResult = calculatePromptResult();
-            promptResults.push(promptResult);
-        }
-
         // Calculate and display average results
         calculateAverageResults();
 
