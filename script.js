@@ -35,8 +35,12 @@ document.addEventListener('DOMContentLoaded', async function () {
             file: 'prompts/nat_lang_with_cap_punc.txt',
             autocorrect: AUTOCORRECT_MODE.CUSTOM
         },
-        'emails-passwords': {
-            file: 'prompts/emails_passwords.txt',
+        'emails': {
+            file: 'prompts/emails.txt',
+            autocorrect: AUTOCORRECT_MODE.OFF
+        },
+        'passwords': {
+            file: 'prompts/passwords.txt',
             autocorrect: AUTOCORRECT_MODE.OFF
         },
         'metal-keys': {
