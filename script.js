@@ -876,7 +876,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         const cer = denominator > 0 ? incorrect_fixed / denominator : 0;
 
         // Calculate WPM
-        const words = typedLength / 5; // Assume average word is 5 characters
+        const words = (typedLength-1) / 5; // Assume average word is 5 characters
         const wpm = minutes > 0 ? Math.floor(words / minutes) : 0;
         const awpm = Math.floor(wpm * (1 - uer)); // Adjusted WPM based on uncorrected errors
 
