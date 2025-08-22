@@ -666,13 +666,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         const currentValue = inputArea.value;
         const currentLength = currentValue.length;
 
-        // If there's no previous value, just update and return
-        if (!previousInputValue) {
-            previousInputValue = currentValue;
-            previousInputLength = currentLength;
-            return;
-        }
-
         // Reset the correction flag if the user is typing a new character
         if (currentLength > previousInputLength) {
             lastWordCorrected = false;
@@ -737,6 +730,8 @@ document.addEventListener('DOMContentLoaded', async function () {
                 updateCurrentPrompt();
                 inputArea.value = '';
                 promptTimingStarted = false; // Reset timing flag for new prompt
+                previousInputValue = ''; // Reset input value for new prompt
+                previousInputLength = 0; // Reset input length for new prompt
 
                 // Reset counters for new prompt
                 keyPressCount = 0;
