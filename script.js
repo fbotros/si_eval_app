@@ -724,7 +724,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
             // Check if typed text is less than 80% of target prompt length
             const minRequiredLength = Math.ceil(promptText.length * 0.8);
-            if (typedText.length < ubmitPromptResultToGoogleForm(e.detail.me) {
+            if (typedText.length < minRequiredLength) {
                 // Show error message for insufficient length
                 const lengthErrorElement = document.getElementById('length-error-message');
                 lengthErrorElement.style.display = 'block';
