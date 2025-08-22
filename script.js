@@ -709,22 +709,36 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (e.key === 'Enter') {
             e.preventDefault(); // Prevent default Enter behavior
 
+            const typedText = inputArea.value;
+            const promptText = getCurrentPromptText();
+
             // Check QA Mode - if enabled, require 100% match
             if (qaMode) {
-                const typedText = inputArea.value;
-                const promptText = getCurrentPromptText();
-
                 if (typedText !== promptText) {
                     // Show error message for QA Mode mismatch
-                    const errorElement = document.getElementById('qa-error-message');
-                    errorElement.style.display = 'block';
+                    const qaErrorElement = document.getElementById('qa-error-message');
+                    qaErrorElement.style.display = 'block';
                     return; // Don't proceed to next prompt
                 }
             }
 
-            // Hide error message if we get here (text matches or QA mode is off)
-            const errorElement = document.getElementById('qa-error-message');
-            errorElement.style.display = 'none';
+            // Check if typed text is less than 80% of target prompt length
+            const minRequiredLength = Math.ceil(promptText.length * 0.8);
+            if (typedText.length < ubmitPromptResultToGoogleForm(e.detail.me) {
+                // Show error message for insufficient length
+                const lengthErrorElement = document.getElementById('length-error-message');
+                lengthErrorElement.style.display = 'block';
+                // Hide QA error message if it was showing
+                const qaErrorElement = document.getElementById('qa-error-message');
+                qaErrorElement.style.display = 'none';
+                return; // Don't proceed to next prompt
+            }
+
+            // Hide error messages if we get here (validation passed)
+            const qaErrorElement = document.getElementById('qa-error-message');
+            const lengthErrorElement = document.getElementById('length-error-message');
+            qaErrorElement.style.display = 'none';
+            lengthErrorElement.style.display = 'none';
 
             // Calculate results for the current prompt
             const promptResult = calculatePromptResult();
