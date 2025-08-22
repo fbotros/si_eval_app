@@ -859,7 +859,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Calculate accuracy as 1 minus normalized edit distance
         const maxDistance = Math.max(typedLength, promptLength);
         const normalizedDistance = maxDistance > 0 ? editDistance / maxDistance : 0;
-        const accuracy = Math.floor((1 - normalizedDistance) * 100);
+        const accuracy = (1 - normalizedDistance) * 100;
 
         // Calculate time spent on this prompt in minutes
         const endTime = Date.now();
@@ -877,8 +877,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Calculate WPM
         const words = (typedLength-1) / 5; // Assume average word is 5 characters
-        const wpm = minutes > 0 ? Math.floor(words / minutes) : 0;
-        const awpm = Math.floor(wpm * (1 - uer)); // Adjusted WPM based on uncorrected errors
+        const wpm = minutes > 0 ? words / minutes : 0;
+        const awpm = wpm * (1 - uer); // Adjusted WPM based on uncorrected errors
 
         const promptResult = {
             promptIndex: currentPromptIndex,
@@ -930,11 +930,11 @@ document.addEventListener('DOMContentLoaded', async function () {
             totalKeyPresses += result.keyPresses;
         });
 
-        const avgWpm = Math.floor(totalWpm / promptResults.length);
-        const avgAccuracy = Math.floor(totalAccuracy / promptResults.length);
+        const avgWpm = totalWpm / promptResults.length;
+        const avgAccuracy = totalAccuracy / promptResults.length;
 
         // Calculate additional metrics
-        const avgAwpm = Math.floor(avgWpm * (avgAccuracy / 100)); // Adjusted WPM based on accuracy
+        const avgAwpm = avgWpm * (avgAccuracy / 100); // Adjusted WPM based on accuracy
 
         // Calculate error rates
         const totalTypedChars = totalKeyPresses;
@@ -948,9 +948,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         const ter = terValue.toFixed(2);
 
         // Update results display
-        wpmElement.textContent = avgWpm;
-        document.getElementById('awpm').textContent = avgAwpm;
-        accuracyElement.textContent = `${avgAccuracy}%`;
+        wpmElement.textContent = avgWpm.toFixed(1);
+        document.getElementById('awpm').textContent = avgAwpm.toFixed(1);
+        accuracyElement.textContent = `${avgAccuracy.toFixed(1)}%`;
         document.getElementById('uer').textContent = `${uer}%`;
         document.getElementById('cer').textContent = `${cer}%`;
         document.getElementById('ter').textContent = `${ter}%`;
