@@ -604,6 +604,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             inputType = "physical-keyboard";
             document.getElementById("physical-keyboard").checked = true;
             setInputTypeRadioButtonsEnabled(false);
+            updatePromptCount(100);
 
             document.addEventListener('promptFinishedEvent', function (e) {
                 submitPromptResultToGoogleForm(e.detail.message);
@@ -613,6 +614,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             inputType = "skb";
             document.getElementById("skb").checked = true;
             setInputTypeRadioButtonsEnabled(false);
+            updatePromptCount(100);
 
             document.addEventListener('promptFinishedEvent', function (e) {
                 submitPromptResultToGoogleForm(e.detail.message);
