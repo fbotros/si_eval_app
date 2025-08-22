@@ -128,7 +128,8 @@
             <div class="settings-group">
                 <label class="settings-label">
                     QA Mode:
-                    <span class="info-icon" data-tooltip="QA Mode requires 100% accuracy to proceed. When enabled, autocorrect is disabled and you must type the prompt exactly as shown. Real-time highlighting shows correct (green) and incorrect (red) characters.">?</span>
+                    <span class="info-icon"
+                        data-tooltip="QA Mode requires 100% accuracy to proceed. When enabled, autocorrect is disabled and you must type the prompt exactly as shown. Real-time highlighting shows correct (green) and incorrect (red) characters.">?</span>
                 </label>
                 <div class="radio-group">
                     <div class="radio-option">
@@ -145,6 +146,35 @@
     </div>
 
     <script src="script.js"></script>
+
+    </div>
+
+    <form
+        action="https://docs.google.com/forms/d/e/1FAIpQLSfG_shx25a5Ti7gSwkmWHCNAexcEaeldrhOC4mFh_vJP9FK0w/formResponse"
+        target="_self" id="resultForm" method="POST" style="display:none;">
+
+        <input id="result_user_id" type="text" name="entry.1101754675" class="form-control">
+        <input id="result_date" type="text" name="entry.2012429964" class="form-control">
+        <input id="result_corpus" type="text" name="entry.1953745264" class="form-control">
+        <input id="result_input_type" type="text" name="entry.856345141" class="form-control">
+        <input id="result_auto_correct" type="text" name="entry.1913121261" class="form-control">
+        <input id="result_expected_prompt" type="text" name="entry.1936058992" class="form-control">
+        <input id="result_typed_prompt" type="text" name="entry.890041425" class="form-control">
+        <input id="result_wpm" type="text" name="entry.1603515859" class="form-control">
+        <input id="result_awpm" type="text" name="entry.42550895" class="form-control">
+        <input id="result_accuracy" type="text" name="entry.1281998858" class="form-control">
+        <input id="result_time_spent_ms" type="text" name="entry.1830385955" class="form-control">
+        <input id="result_uer" type="text" name="entry.4641434" class="form-control">
+        <input id="result_cer" type="text" name="entry.951712535" class="form-control">
+        <input id="result_ter" type="text" name="entry.1264971265" class="form-control">
+        <input id="result_total_chars" type="text" name="entry.823977115" class="form-control">
+        <input id="result_total_key_presses" type="text" name="entry.667977053" class="form-control">
+        <input id="result_total_corrected_errors" type="text" name="entry.1985337742" class="form-control">
+        <input id="result_total_uncorrected_errors" type="text" name="entry.821144588" class="form-control">
+
+        <input class="btn btn-primary" type="submit" value="Submit">
+    </form>
+
 </body>
 
 </html>

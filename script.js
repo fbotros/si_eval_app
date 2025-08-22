@@ -466,14 +466,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     decreasePromptsButton.addEventListener('touchstart', function (e) {
         e.preventDefault(); // Prevent default touch behavior
         decreasePromptCount();
-    });
+    }, { passive: true });
 
     // Event listeners for the increase button (both click and touch)
     increasePromptsButton.addEventListener('click', increasePromptCount);
     increasePromptsButton.addEventListener('touchstart', function (e) {
         e.preventDefault(); // Prevent default touch behavior
         increasePromptCount();
-    });
+    }, { passive: true });
 
     // Event listener for direct input changes
     promptCountInput.addEventListener('change', function () {
@@ -507,7 +507,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
 
     let inputType = 'physical-keyboard';
-
     // Function to enable/disable autocorrect radio buttons
     function setInputTypeRadioButtonsEnabled(enabled) {
         const inputTypeRadios = document.querySelectorAll('input[name="input-type"]');
@@ -606,8 +605,8 @@ document.addEventListener('DOMContentLoaded', async function () {
             document.getElementById("physical-keyboard").checked = true;
             setInputTypeRadioButtonsEnabled(false);
 
-            document.addEventListener('testFinishedEvent', function (e) {
-                downloadResultsAsJson(e.detail.message);
+            document.addEventListener('promptFinishedEvent', function (e) {
+                submitPromptResultToGoogleForm(e.detail.message);
             });
         }
         else if (value === 'uxr_webview') {
@@ -615,11 +614,8 @@ document.addEventListener('DOMContentLoaded', async function () {
             document.getElementById("skb").checked = true;
             setInputTypeRadioButtonsEnabled(false);
 
-            document.addEventListener('testFinishedEvent', function (e) {
-                console.log(JSON.stringify(e.detail.message, null, 2));
-                if (window.vuplex) {
-                    window.vuplex.postMessage(e.detail.message);
-                }
+            document.addEventListener('promptFinishedEvent', function (e) {
+                submitPromptResultToGoogleForm(e.detail.message);
             });
         }
     }
@@ -884,7 +880,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         const wpm = minutes > 0 ? Math.floor(words / minutes) : 0;
         const awpm = Math.floor(wpm * (1 - uer)); // Adjusted WPM based on uncorrected errors
 
-        return {
+        const promptResult = {
             promptIndex: currentPromptIndex,
             originalPromptIndex: getCurrentPromptOriginalIndex(),
             promptText: promptText,
@@ -902,6 +898,13 @@ document.addEventListener('DOMContentLoaded', async function () {
             uer: uer,
             cer: cer
         };
+
+        const promptFinishedEvent = new CustomEvent('promptFinishedEvent', {
+            detail: { message: promptResult },
+        });
+        document.dispatchEvent(promptFinishedEvent);
+
+        return promptResult;
     }
 
     // Calculate average results across all completed prompts
@@ -973,10 +976,12 @@ document.addEventListener('DOMContentLoaded', async function () {
             userId: document.getElementById('user-id').value,
         };
 
+        /*
         const testFinishedEvent = new CustomEvent('testFinishedEvent', {
             detail: { message: resultsData },
         });
         document.dispatchEvent(testFinishedEvent);
+        */
     }
 
     function downloadResultsAsJson(data) {
@@ -1007,5 +1012,50 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Clean up
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+    }
+
+    function submitPromptResultToGoogleForm(data) {
+        const form = document.getElementById('resultForm');
+        if (!form.dataset.submitHandlerAdded) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault(); // Prevent redirection to new page
+                const formData = new FormData(form);
+                fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    mode: 'no-cors' // Google Forms requires no-cors mode
+                })
+                    .then(() => {
+                        console.log('Form submitted successfully');
+                    })
+                    .catch((error) => {
+                        console.error('Error submitting form:', error);
+                    });
+            });
+            form.dataset.submitHandlerAdded = 'true';
+        }
+
+        // Populate the form fields
+        document.getElementById('result_user_id').value = document.getElementById('user-id').value;
+        document.getElementById('result_date').value = new Date().toISOString();
+        document.getElementById('result_corpus').value = document.querySelector('input[name="dataset"]:checked').value;
+        document.getElementById('result_input_type').value = inputType;
+        document.getElementById('result_auto_correct').value = getAutocorrectMode();
+        document.getElementById('result_expected_prompt').value = data.promptText;
+        document.getElementById('result_typed_prompt').value = data.typedText;
+        document.getElementById('result_wpm').value = data.wpm;
+        document.getElementById('result_awpm').value = data.awpm;
+        document.getElementById('result_accuracy').value = data.accuracy;
+        document.getElementById('result_time_spent_ms').value = data.timeSpentMs;
+        document.getElementById('result_uer').value = data.uer;
+        document.getElementById('result_cer').value = data.cer;
+        document.getElementById('result_ter').value = data.ter;
+        document.getElementById('result_total_chars').value = data.totalChars;
+        document.getElementById('result_total_key_presses').value = data.keyPresses;
+        document.getElementById('result_total_corrected_errors').value = data.correctedErrors;
+        document.getElementById('result_total_uncorrected_errors').value = data.uncorrectedErrors;
+
+        // Dispatch a synthetic submit event
+        form.dispatchEvent(new Event('submit', { cancelable: true }));
     }
 });
