@@ -625,6 +625,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             // register listener for data passed to WebView from Unity
             window.addEventListener('vuplexmessage', event => {
                 const surfaces = JSON.parse(event.value);
+                console.log("received surfaces: " + surfaces.handBasedSurface + ", " + surfaces.fiducialBasedSurface);
                 if (surfaces.handBasedSurface && surface.fiducialBasedSurface) {
                     surfaceDifference = surfaces.handBasedSurface - surfaces.fiducialBasedSurface;
                 }
@@ -1087,6 +1088,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         document.getElementById('result_total_corrected_errors').value = data.correctedErrors;
         document.getElementById('result_total_uncorrected_errors').value = data.uncorrectedErrors;
         document.getElementById('result_surface_difference').value = data.surfaceDifference;
+
+        console.log("Submitting prompt result to Google Form: " + JSON.stringify(data));
 
         // Dispatch a synthetic submit event
         form.dispatchEvent(new Event('submit', { cancelable: true }));
