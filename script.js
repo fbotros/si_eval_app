@@ -626,7 +626,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             window.addEventListener('vuplexmessage', event => {
                 const surfaces = JSON.parse(event.value);
                 console.log("received surfaces: " + surfaces.handBasedSurface + ", " + surfaces.fiducialBasedSurface);
-                if (surfaces.handBasedSurface && surface.fiducialBasedSurface) {
+                if (surfaces.handBasedSurface && surfaces.fiducialBasedSurface) {
                     surfaceDifference = surfaces.handBasedSurface - surfaces.fiducialBasedSurface;
                 }
             });
