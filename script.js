@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         return urlParams.get(name);
     }
 
+    let surfaceDifference = -1;
+
     // Array of prompts for the typing test - loaded from prompts.txt
     let originalPrompts = [];
 
@@ -620,8 +622,23 @@ document.addEventListener('DOMContentLoaded', async function () {
             setInputTypeRadioButtonsEnabled(false);
             updatePromptCount(100);
 
+            // register listener for data passed to WebView from Unity
+            window.addEventListener('vuplexmessage', event => {
+                const surfaces = JSON.parse(event.value);
+                if (surfaces.handBasedSurface && surface.fiducialBasedSurface) {
+                    surfaceDifference = surfaces.handBasedSurface - surfaces.fiducialBasedSurface;
+                }
+            });
+
             document.addEventListener('promptFinishedEvent', function (e) {
-                submitPromptResultToGoogleForm(e.detail.message);
+                if (surfaceDifference != -1) {
+                    let result = e.detail.message;
+                    result['surfaceDifference'] = surfaceDifference;
+                    submitPromptResultToGoogleForm(result);
+                }
+                else {
+                    submitPromptResultToGoogleForm(e.detail.message);
+                }
             });
         }
     }
@@ -1069,6 +1086,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         document.getElementById('result_total_key_presses').value = data.keyPresses;
         document.getElementById('result_total_corrected_errors').value = data.correctedErrors;
         document.getElementById('result_total_uncorrected_errors').value = data.uncorrectedErrors;
+        document.getElementById('result_surface_difference').value = data.surfaceDifference;
 
         // Dispatch a synthetic submit event
         form.dispatchEvent(new Event('submit', { cancelable: true }));
