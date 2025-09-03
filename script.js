@@ -646,9 +646,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     checkSettingPresetInUrlParameter();
 
-    // Focus the input area when the page loads
-    inputArea.focus();
-
     // Optimized input event handler
     // Configure input area based on autocorrect mode
     function configureInputArea() {
@@ -1070,7 +1067,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Populate the form fields
         document.getElementById('result_user_id').value = document.getElementById('user-id').value;
-        document.getElementById('result_date').value = new Date().toISOString();
         document.getElementById('result_corpus').value = document.querySelector('input[name="dataset"]:checked').value;
         document.getElementById('result_input_type').value = inputType;
         document.getElementById('result_auto_correct').value = getAutocorrectMode();
@@ -1088,6 +1084,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         document.getElementById('result_total_corrected_errors').value = data.correctedErrors;
         document.getElementById('result_total_uncorrected_errors').value = data.uncorrectedErrors;
         document.getElementById('result_surface_difference').value = data.surfaceDifference;
+        document.getElementById('result_platform').value = getURLParameter('platform');
 
         console.log("Submitting prompt result to Google Form: " + JSON.stringify(data));
 
