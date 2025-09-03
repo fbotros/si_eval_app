@@ -606,10 +606,9 @@ document.addEventListener('DOMContentLoaded', async function () {
             qaMode = true;
             qaModeChanged(qaMode);
         }
-        else if (value === 'uxr_pc') {
+        else if (value === 'uxr') {
             inputType = "physical-keyboard";
             document.getElementById("physical-keyboard").checked = true;
-            setInputTypeRadioButtonsEnabled(false);
             updatePromptCount(100);
 
             document.addEventListener('promptFinishedEvent', function (e) {
@@ -619,7 +618,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         else if (value === 'uxr_webview') {
             inputType = "skb";
             document.getElementById("skb").checked = true;
-            setInputTypeRadioButtonsEnabled(false);
             updatePromptCount(100);
 
             // register listener for data passed to WebView from Unity
