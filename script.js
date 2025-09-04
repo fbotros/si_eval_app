@@ -682,8 +682,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 
             // Check if a space or punctuation was added for autocorrect
             const lastChar = currentValue.slice(-1);
+            // log last char
             if (/[\s.,.!?;:"()]/.test(lastChar) && isCustomAutocorrectEnabled() && !lastWordCorrected) {
-                performAutocorrect(lastChar);
+                performAutocorrect(previousInputValue, lastChar);
             }
         }
         // If length decreased, count as corrected error (backspace)
@@ -764,17 +765,28 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
 
     // Optimized autocorrect function
-    function performAutocorrect(appendChar) {
+    function performAutocorrect(currentText, appendChar) {
         try {
-            const text = inputArea.value;
-            if (text.length > 0) {
-                // Get the last word - more robust splitting
-                let words = text.trim().split(/[\s.,.!?;:"'()]/);
+            const text = currentText;
+            if (text.length > 0 && appendChar.length == 1) {
+
+                let words = text.trim().split(/\s+/);
+
                 // filter out empty strings
                 words = words.filter(word => word.length > 0);
                 if (words.length === 0) return false;
 
-                const lastWord = words[words.length - 1].toLowerCase();
+                const originalLastWord = words[words.length - 1];
+
+                // if last char of last word ends in punctuation, return false
+                if(/[\s.,.!?;:"()]/.test(originalLastWord.slice(-1))) return false;
+
+
+                // Check if the original word is capitalized (first character only)
+                const isCapitalized = originalLastWord.length > 0 &&
+                                    originalLastWord[0] >= 'A' && originalLastWord[0] <= 'Z';
+
+                const lastWord = originalLastWord.toLowerCase();
 
                 // Skip very short words (1-2 characters)
                 if (lastWord.length > 2) {
@@ -782,11 +794,16 @@ document.addEventListener('DOMContentLoaded', async function () {
                     const correctedWord = findClosestWord(lastWord);
 
                     // If a correction was found and it's different from the original word
-                    if (correctedWord !== lastWord) {
+                    if (correctedWord !== originalLastWord) {
+                        // Capitalize the corrected word if the original word was capitalized
+                        const finalCorrectedWord = isCapitalized ?
+                            correctedWord.charAt(0).toUpperCase() + correctedWord.slice(1) :
+                            correctedWord;
+
                         // Replace the last word with the corrected one
-                        const lastIndex = text.lastIndexOf(lastWord);
+                        const lastIndex = text.lastIndexOf(originalLastWord);
                         if (lastIndex !== -1) {
-                            const newText = text.substring(0, lastIndex) + correctedWord;
+                            const newText = text.substring(0, lastIndex) + finalCorrectedWord;
 
                             // Direct update approach for better cross-browser compatibility
                             inputArea.value = newText + appendChar;
