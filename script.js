@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         return urlParams.get(name);
     }
 
+    let surfaceDifference = -1;
+
     // Array of prompts for the typing test - loaded from prompts.txt
     let originalPrompts = [];
 
@@ -604,10 +606,9 @@ document.addEventListener('DOMContentLoaded', async function () {
             qaMode = true;
             qaModeChanged(qaMode);
         }
-        else if (value === 'uxr_pc') {
+        else if (value === 'uxr') {
             inputType = "physical-keyboard";
             document.getElementById("physical-keyboard").checked = true;
-            setInputTypeRadioButtonsEnabled(false);
             updatePromptCount(100);
 
             document.addEventListener('promptFinishedEvent', function (e) {
@@ -617,19 +618,31 @@ document.addEventListener('DOMContentLoaded', async function () {
         else if (value === 'uxr_webview') {
             inputType = "skb";
             document.getElementById("skb").checked = true;
-            setInputTypeRadioButtonsEnabled(false);
             updatePromptCount(100);
 
+            // register listener for data passed to WebView from Unity
+            window.addEventListener('vuplexmessage', event => {
+                const surfaces = JSON.parse(event.value);
+                console.log("received surfaces: " + surfaces.handBasedSurface + ", " + surfaces.fiducialBasedSurface);
+                if (surfaces.handBasedSurface && surfaces.fiducialBasedSurface) {
+                    surfaceDifference = surfaces.handBasedSurface - surfaces.fiducialBasedSurface;
+                }
+            });
+
             document.addEventListener('promptFinishedEvent', function (e) {
-                submitPromptResultToGoogleForm(e.detail.message);
+                if (surfaceDifference != -1) {
+                    let result = e.detail.message;
+                    result['surfaceDifference'] = surfaceDifference;
+                    submitPromptResultToGoogleForm(result);
+                }
+                else {
+                    submitPromptResultToGoogleForm(e.detail.message);
+                }
             });
         }
     }
 
     checkSettingPresetInUrlParameter();
-
-    // Focus the input area when the page loads
-    inputArea.focus();
 
     // Optimized input event handler
     // Configure input area based on autocorrect mode
@@ -1069,7 +1082,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Populate the form fields
         document.getElementById('result_user_id').value = document.getElementById('user-id').value;
-        document.getElementById('result_date').value = new Date().toISOString();
         document.getElementById('result_corpus').value = document.querySelector('input[name="dataset"]:checked').value;
         document.getElementById('result_input_type').value = inputType;
         document.getElementById('result_auto_correct').value = getAutocorrectMode();
@@ -1086,6 +1098,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         document.getElementById('result_total_key_presses').value = data.keyPresses;
         document.getElementById('result_total_corrected_errors').value = data.correctedErrors;
         document.getElementById('result_total_uncorrected_errors').value = data.uncorrectedErrors;
+        document.getElementById('result_surface_difference_mm').value = data.surfaceDifference * 1000;
+        document.getElementById('result_platform').value = getURLParameter('platform');
+
+        console.log("Submitting prompt result to Google Form: " + JSON.stringify(data));
 
         // Dispatch a synthetic submit event
         form.dispatchEvent(new Event('submit', { cancelable: true }));
