@@ -1081,7 +1081,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         document.getElementById('result_total_key_presses').value = data.keyPresses;
         document.getElementById('result_total_corrected_errors').value = data.correctedErrors;
         document.getElementById('result_total_uncorrected_errors').value = data.uncorrectedErrors;
-        document.getElementById('result_surface_difference').value = data.surfaceDifference;
+        document.getElementById('result_surface_difference_mm').value = data.surfaceDifference * 1000;
         document.getElementById('result_platform').value = getURLParameter('platform');
 
         console.log("Submitting prompt result to Google Form: " + JSON.stringify(data));
