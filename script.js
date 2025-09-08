@@ -362,10 +362,15 @@ document.addEventListener('DOMContentLoaded', async function () {
         };
     }
 
-    // Calculate Levenshtein distance between two strings
-    function levenshteinDistance(a, b) {
-        if (a.length === 0) return b.length;
-        if (b.length === 0) return a.length;
+    // Calculate Levenshtein distance between two strings with early stopping
+    function levenshteinDistance(a, b, maxEditDist = 2) {
+        if (a.length === 0) return b.length > maxEditDist ? maxEditDist + 1 : b.length;
+        if (b.length === 0) return a.length > maxEditDist ? maxEditDist + 1 : a.length;
+
+        // Early exit if length difference exceeds maxEditDist
+        if (Math.abs(a.length - b.length) > maxEditDist) {
+            return maxEditDist + 1;
+        }
 
         const matrix = [];
 
@@ -380,6 +385,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Fill in the rest of the matrix
         for (let i = 1; i <= b.length; i++) {
+            let minInRow = Infinity;
+
             for (let j = 1; j <= a.length; j++) {
                 if (b.charAt(i - 1) === a.charAt(j - 1)) {
                     matrix[i][j] = matrix[i - 1][j - 1];
@@ -390,6 +397,14 @@ document.addEventListener('DOMContentLoaded', async function () {
                         matrix[i - 1][j] + 1      // deletion
                     );
                 }
+
+                // Track minimum value in current row
+                minInRow = Math.min(minInRow, matrix[i][j]);
+            }
+
+            // Early stopping: if all values in current row exceed maxEditDist, we can stop
+            if (minInRow > maxEditDist) {
+                return maxEditDist + 1;
             }
         }
 
