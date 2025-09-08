@@ -1,12 +1,7 @@
 // Keyboard neighbors are loaded from ../keyboard-layout.js
 
-// Typing test prompts from practice.txt
-const prompts = [
-    "How are you doing today?",
-    "I'm fine, thank you very much.",
-    "What's up with you lately?",
-    "Not much, just hanging out."
-];
+// Typing test prompts will be loaded from prompts.txt
+let prompts = [];
 
 // Base dictionary of common words
 const baseDictionary = [
@@ -29,6 +24,31 @@ const baseDictionary = [
 let dictionary = [...baseDictionary];
 let dictionarySet = new Set(dictionary);
 let trieDictionary = null;
+
+// Function to load prompts from prompts.txt file
+async function loadPrompts() {
+    try {
+        const response = await fetch('./prompts.txt');
+        if (!response.ok) {
+            throw new Error(`Failed to load prompts.txt: ${response.status} ${response.statusText}`);
+        }
+        const text = await response.text();
+        prompts = text
+            .split('\n')
+            .map(prompt => prompt.trim())
+            .filter(prompt => prompt.length > 0);
+
+        console.log(`Loaded ${prompts.length} prompts from prompts.txt`);
+
+        if (prompts.length === 0) {
+            throw new Error('prompts.txt file is empty or contains no valid prompts');
+        }
+    } catch (error) {
+        console.error('Error loading prompts.txt:', error.message);
+        alert(`Error: Could not load prompts from prompts.txt file.\n\n${error.message}\n\nPlease ensure the prompts.txt file exists and is accessible.`);
+        throw error;
+    }
+}
 
 // Combined function to initialize dictionary with base words, prompt words, and common words from file
 async function initializeDictionary() {
@@ -406,13 +426,13 @@ inputArea.addEventListener('keydown', function(e) {
         promptResults.push(promptResult);
 
         // Move to the next prompt or end the test
-        if (currentPromptIndex < prompts.length - 1) {
+        if (currentPromptIndex < 3) {  // Stop after 4 prompts (index 0-3)
             currentPromptIndex++;
             updateCurrentPrompt();
             inputArea.value = '';
             promptTimingStarted = false; // Reset timing flag for new prompt
         } else {
-            // End the test if all 4 prompts are completed
+            // End the test after 4 prompts are completed
             endTest();
         }
     }
@@ -431,6 +451,8 @@ function configureInputArea() {
 
 // Initialize the test on page load
 document.addEventListener('DOMContentLoaded', async function() {
+    // Load prompts from prompts.txt first
+    await loadPrompts();
     // Initialize dictionary with prompt words and common words from file
     await initializeDictionary();
     // Configure input area
