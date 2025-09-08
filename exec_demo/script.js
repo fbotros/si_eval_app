@@ -374,7 +374,7 @@ function generateLeaderboard() {
     // Create leaderboard entries with random results
     const leaderboardData = [
         { name: "Andrew Bosworth", wpm: 119, accuracy: 99, isCurrentUser: false },
-        { name: "Susan Li", wpm: 123, accuracy: 98, isCurrentUser: false },
+        { name: "Susan Li", wpm: 127, accuracy: 98, isCurrentUser: false },
         { name: "Robert Wang", wpm: 111, accuracy: 100, isCurrentUser: false },
         { name: "You", wpm: currentWpm, accuracy: currentAccuracy, isCurrentUser: true }
     ];
