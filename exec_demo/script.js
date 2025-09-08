@@ -25,6 +25,16 @@ let dictionary = [...baseDictionary];
 let dictionarySet = new Set(dictionary);
 let trieDictionary = null;
 
+// Fisher-Yates shuffle algorithm to randomize array
+function shuffleArray(array) {
+    const shuffled = [...array]; // Create a copy to avoid mutating the original
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
 // Function to load prompts from prompts.txt file
 async function loadPrompts() {
     try {
@@ -38,7 +48,10 @@ async function loadPrompts() {
             .map(prompt => prompt.trim())
             .filter(prompt => prompt.length > 0);
 
-        console.log(`Loaded ${prompts.length} prompts from prompts.txt`);
+        // Shuffle the prompts array to randomize order
+        prompts = shuffleArray(prompts);
+
+        console.log(`Loaded ${prompts.length} prompts from prompts.txt (shuffled)`);
 
         if (prompts.length === 0) {
             throw new Error('prompts.txt file is empty or contains no valid prompts');
