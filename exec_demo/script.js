@@ -29,6 +29,48 @@ const baseDictionary = [
 let dictionary = [...baseDictionary];
 let dictionarySet = new Set(dictionary);
 
+// Combined function to initialize dictionary with base words, prompt words, and common words from file
+async function initializeDictionary() {
+    // Start with base dictionary
+    dictionary = [...baseDictionary];
+    dictionarySet = new Set(dictionary);
+
+    // Add words from prompts
+    prompts.forEach(prompt => {
+        const words = extractWords(prompt);
+        words.forEach(word => {
+            if (!dictionarySet.has(word)) {
+                dictionary.push(word);
+                dictionarySet.add(word);
+            }
+        });
+    });
+
+    // Load common words from file
+    try {
+        const response = await fetch('./common_words.txt');
+        if (!response.ok) {
+            console.warn('Could not load common_words.txt file, using base dictionary only');
+            return;
+        }
+        const text = await response.text();
+        const commonWords = text
+            .split('\n')
+            .map(word => word.trim().toLowerCase())
+            .filter(word => word.length > 0 && !dictionarySet.has(word));
+
+        // Add new words to dictionary
+        commonWords.forEach(word => {
+            dictionary.push(word);
+            dictionarySet.add(word);
+        });
+
+        console.log(`Loaded ${commonWords.length} additional words from common_words.txt`);
+    } catch (error) {
+        console.warn('Error loading common_words.txt:', error.message);
+    }
+}
+
 let currentPromptIndex = 0;
 let testActive = false;
 let promptResults = [];
@@ -170,24 +212,6 @@ function extractWords(text) {
         .filter(word => word.length > 0);
 }
 
-// Function to add all words from prompts to the dictionary
-function addPromptWordsToDictionary() {
-    // Reset dictionary to base dictionary
-    dictionary = [...baseDictionary];
-    dictionarySet = new Set(dictionary);
-
-    // Extract all words from all prompts
-    prompts.forEach(prompt => {
-        const words = extractWords(prompt);
-        words.forEach(word => {
-            // Add word to dictionary if it's not already there
-            if (!dictionarySet.has(word)) {
-                dictionary.push(word);
-                dictionarySet.add(word);
-            }
-        });
-    });
-}
 
 // Autocorrect function
 function performAutocorrect(currentText, appendChar) {
@@ -406,9 +430,9 @@ function configureInputArea() {
 }
 
 // Initialize the test on page load
-document.addEventListener('DOMContentLoaded', function() {
-    // Add prompt words to dictionary
-    addPromptWordsToDictionary();
+document.addEventListener('DOMContentLoaded', async function() {
+    // Initialize dictionary with prompt words and common words from file
+    await initializeDictionary();
     // Configure input area
     configureInputArea();
     initializeTest();
