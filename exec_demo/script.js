@@ -28,6 +28,7 @@ const baseDictionary = [
 
 let dictionary = [...baseDictionary];
 let dictionarySet = new Set(dictionary);
+let trieDictionary = null;
 
 // Combined function to initialize dictionary with base words, prompt words, and common words from file
 async function initializeDictionary() {
@@ -69,6 +70,11 @@ async function initializeDictionary() {
     } catch (error) {
         console.warn('Error loading common_words.txt:', error.message);
     }
+
+    // Initialize TrieDictionary with all words
+    console.log(`Initializing TrieDictionary with ${dictionary.length} words...`);
+    trieDictionary = new TrieDictionary(0.4, dictionary);
+    console.log('TrieDictionary initialized successfully!');
 }
 
 let currentPromptIndex = 0;
@@ -180,29 +186,9 @@ function levenshteinDistance(a, b, maxEditDist = 2) {
     return matrix[b.length][a.length];
 }
 
-// Find the closest word in the dictionary
+// Find the closest word in the dictionary using TrieDictionary
 function findClosestWord(word) {
-    // If the word is already in the dictionary, return it
-    if (dictionarySet.has(word)) {
-        return word;
-    }
-
-    let closestWord = null;
-    let minDistance = Infinity;
-
-    // Find words with edit distance of up to 2
-    for (const dictWord of dictionary) {
-        const distance = levenshteinDistance(word, dictWord, 1000);
-
-        // Consider words with edit distance of 1 or 2
-        if (distance <= 2 && distance < minDistance) {
-            minDistance = distance;
-            closestWord = dictWord;
-        }
-    }
-
-    // Return the closest word if found, otherwise return the original word
-    return closestWord || word;
+    return trieDictionary.findClosestWord(word);
 }
 
 // Function to extract words from a string
@@ -387,13 +373,10 @@ inputArea.addEventListener('input', function() {
     else if (currentLength < previousInputLength) {
         // Count as one corrected error regardless of how many characters were deleted
         correctedErrorCount += 1;
-        console.log("Here1" + previousInputLength + " " + currentLength);
         // Check if user backspaced over a space - suppress autocorrect next time
         if (previousInputLength > 0 && currentLength >= 0) {
             const deletedChar = previousInputValue.charAt(currentLength);
-            console.log("Deleted char: " + deletedChar + " " + currentLength + " " + previousInputLength);
             if (/\s/.test(deletedChar)) {
-                console.log('Suppressed autocorrect')
                 suppressAutocorrect = true;
             }
         }
