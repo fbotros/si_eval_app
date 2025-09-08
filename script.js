@@ -362,7 +362,17 @@ document.addEventListener('DOMContentLoaded', async function () {
         };
     }
 
-    // Calculate Levenshtein distance between two strings with early stopping
+    // Function to check if two characters are neighbors on the keyboard
+    function areNeighboringKeys(char1, char2) {
+        const c1 = char1.toLowerCase();
+        const c2 = char2.toLowerCase();
+
+        if (c1 === c2) return false; // Same character, not a substitution
+
+        return keyboardNeighbors[c1] && keyboardNeighbors[c1].includes(c2);
+    }
+
+    // Calculate Levenshtein distance between two strings with early stopping and keyboard-aware substitution costs
     function levenshteinDistance(a, b, maxEditDist = 2) {
         if (a.length === 0) return b.length > maxEditDist ? maxEditDist + 1 : b.length;
         if (b.length === 0) return a.length > maxEditDist ? maxEditDist + 1 : a.length;
@@ -391,10 +401,15 @@ document.addEventListener('DOMContentLoaded', async function () {
                 if (b.charAt(i - 1) === a.charAt(j - 1)) {
                     matrix[i][j] = matrix[i - 1][j - 1];
                 } else {
+                    // Calculate substitution cost based on keyboard proximity
+                    const char1 = a.charAt(j - 1);
+                    const char2 = b.charAt(i - 1);
+                    const substitutionCost = areNeighboringKeys(char1, char2) ? 0.4 : 1.0;
+
                     matrix[i][j] = Math.min(
-                        matrix[i - 1][j - 1] + 1, // substitution
-                        matrix[i][j - 1] + 1,     // insertion
-                        matrix[i - 1][j] + 1      // deletion
+                        matrix[i - 1][j - 1] + substitutionCost, // substitution with keyboard-aware cost
+                        matrix[i][j - 1] + 1,                   // insertion
+                        matrix[i - 1][j] + 1                    // deletion
                     );
                 }
 
