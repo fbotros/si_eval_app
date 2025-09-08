@@ -35,6 +35,12 @@ function shuffleArray(array) {
     return shuffled;
 }
 
+// Function to shuffle the current prompts array
+function shufflePrompts() {
+    prompts = shuffleArray(prompts);
+    console.log(`Prompts shuffled`);
+}
+
 // Function to load prompts from prompts.txt file
 async function loadPrompts() {
     try {
@@ -49,7 +55,7 @@ async function loadPrompts() {
             .filter(prompt => prompt.length > 0);
 
         // Shuffle the prompts array to randomize order
-        prompts = shuffleArray(prompts);
+        shufflePrompts();
 
         console.log(`Loaded ${prompts.length} prompts from prompts.txt (shuffled)`);
 
@@ -417,6 +423,7 @@ function endTest() {
 }
 
 function restartTest() {
+    shufflePrompts(); // Shuffle prompts each time the test is restarted
     initializeTest();
 }
 
