@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Typing Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            padding: 2rem;
+            border-radius: 10px;
+            background-color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+        }
+
+        .instructions {
+            text-align: center;
+            margin-bottom: 1rem;
+            color: #7f8c8d;
+        }
+
+        .progress-indicator {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #7f8c8d;
+            font-weight: bold;
+        }
+
+        .sample-text {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            border-left: 4px solid #3498db;
+            font-family: monospace;
+            color: #333;
+        }
+
+        .input-area {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.1rem;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            resize: none;
+            margin-bottom: 1rem;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+            height: 100px;
+        }
+
+        .input-area:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .input-area:disabled {
+            background-color: #f5f5f5;
+            cursor: not-allowed;
+        }
+
+        .button {
+            display: block;
+            width: 200px;
+            margin: 0 auto;
+            padding: 0.8rem;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .button:hover {
+            background-color: #2980b9;
+        }
+
+        .button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .results {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+            text-align: center;
+        }
+
+        .results h2 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+
+        .metric {
+            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
+        }
+
+        .metric span {
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .wpm-metric {
+            font-size: 2rem;
+            color: #2c3e50;
+            margin: 1rem 0;
+        }
+
+        .accuracy-metric {
+            font-size: 1.5rem;
+            color: #27ae60;
+            margin: 1rem 0;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 1rem;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Simple Typing Test</h1>
+        <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next one. Autocorrect is enabled.</p>
+
+        <div class="progress-indicator">
+            Prompt <span id="current-prompt">1</span> of 4
+        </div>
+
+        <div class="sample-text" id="sample-text"></div>
+
+        <textarea class="input-area" id="input-area" placeholder="Start typing here..."
+                  autocomplete="on" autocorrect="on" autocapitalize="on" spellcheck="true"></textarea>
+
+        <button class="button" id="restart-button" style="display: none;">Restart Test</button>
+
+        <div class="results" id="results">
+            <h2>Test Complete!</h2>
+            <div class="wpm-metric">
+                <strong><span id="wpm">0</span> WPM</strong>
+            </div>
+            <div class="accuracy-metric">
+                <strong><span id="accuracy">0</span>% Accuracy</strong>
+            </div>
+            <button class="button" id="restart-button-final">Restart Test</button>
+        </div>
+    </div>
+
+      <script src="../keyboard-layout.js"></script>
+      <script src="script.js"></script>
+</body>
+
+</html>
