@@ -594,6 +594,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         });
     });
 
+    // Track if UXR mode is enabled
+    let uxrModeEnabled = false;
+
     function checkSettingPresetInUrlParameter() {
         let value = getURLParameter('setting_preset')
         if (value == null) {
@@ -607,18 +610,32 @@ document.addEventListener('DOMContentLoaded', async function () {
             qaModeChanged(qaMode);
         }
         else if (value === 'uxr') {
+            uxrModeEnabled = true;
             inputType = "physical-keyboard";
             document.getElementById("physical-keyboard").checked = true;
             updatePromptCount(100);
+
+            // Show User ID field when UXR mode is enabled
+            document.getElementById('user-id-group').style.display = 'block';
+
+            // Disable input area until user ID is provided
+            checkAndUpdateInputAreaState();
 
             document.addEventListener('promptFinishedEvent', function (e) {
                 submitPromptResultToGoogleForm(e.detail.message);
             });
         }
         else if (value === 'uxr_webview') {
+            uxrModeEnabled = true;
             inputType = "skb";
             document.getElementById("skb").checked = true;
             updatePromptCount(100);
+
+            // Show User ID field when UXR mode is enabled
+            document.getElementById('user-id-group').style.display = 'block';
+
+            // Disable input area until user ID is provided
+            checkAndUpdateInputAreaState();
 
             // register listener for data passed to WebView from Unity
             window.addEventListener('vuplexmessage', event => {
@@ -642,7 +659,31 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
     }
 
+    // Function to check if input area should be disabled based on UXR mode and user ID
+    function checkAndUpdateInputAreaState() {
+        if (uxrModeEnabled) {
+            const userIdInput = document.getElementById('user-id');
+            const userIdValue = userIdInput.value.trim();
+
+            if (userIdValue === '') {
+                // Disable input area and show message
+                inputArea.disabled = true;
+                inputArea.placeholder = "Please enter a User ID first to begin typing test";
+            } else {
+                // Enable input area
+                inputArea.disabled = false;
+                inputArea.placeholder = "Start typing here...";
+            }
+        }
+    }
+
     checkSettingPresetInUrlParameter();
+
+    // Add event listener for user ID input to handle UXR mode restrictions
+    const userIdInput = document.getElementById('user-id');
+    userIdInput.addEventListener('input', function() {
+        checkAndUpdateInputAreaState();
+    });
 
     // Optimized input event handler
     // Configure input area based on autocorrect mode
