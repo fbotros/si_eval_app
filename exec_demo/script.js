@@ -82,6 +82,7 @@ let keyPressCount = 0;
 let correctedErrorCount = 0;
 let previousInputValue = '';
 let lastWordCorrected = false;
+let suppressAutocorrect = false;
 
 const sampleTextElement = document.getElementById('sample-text');
 const currentPromptElement = document.getElementById('current-prompt');
@@ -373,18 +374,34 @@ inputArea.addEventListener('input', function() {
         // Check if a space or punctuation was added for autocorrect
         const lastChar = currentValue.slice(-1);
         if (/[\s.,.!?;:"()]/.test(lastChar) && !lastWordCorrected) {
-            performAutocorrect(previousInputValue, lastChar);
+            // Check if autocorrect is suppressed
+            if (suppressAutocorrect) {
+                // Skip autocorrect this time and re-enable it for next time
+                suppressAutocorrect = false;
+            } else {
+                performAutocorrect(previousInputValue, lastChar);
+            }
         }
     }
     // If length decreased, count as corrected error (backspace)
     else if (currentLength < previousInputLength) {
         // Count as one corrected error regardless of how many characters were deleted
         correctedErrorCount += 1;
+        console.log("Here1" + previousInputLength + " " + currentLength);
+        // Check if user backspaced over a space - suppress autocorrect next time
+        if (previousInputLength > 0 && currentLength >= 0) {
+            const deletedChar = previousInputValue.charAt(currentLength);
+            console.log("Deleted char: " + deletedChar + " " + currentLength + " " + previousInputLength);
+            if (/\s/.test(deletedChar)) {
+                console.log('Suppressed autocorrect')
+                suppressAutocorrect = true;
+            }
+        }
     }
 
     // Update previous values for next comparison
-    previousInputValue = currentValue;
-    previousInputLength = currentLength;
+    previousInputValue = inputArea.value;
+    previousInputLength = previousInputValue.length;
 });
 
 // Handle Enter key to move to next prompt
