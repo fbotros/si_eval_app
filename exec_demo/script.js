@@ -129,6 +129,7 @@ const inputArea = document.getElementById('input-area');
 const results = document.getElementById('results');
 const wpmElement = document.getElementById('wpm');
 const accuracyElement = document.getElementById('accuracy');
+const leaderboardList = document.getElementById('leaderboard-list');
 const restartButtonFinal = document.getElementById('restart-button-final');
 
 // Initialize the first prompt
@@ -351,10 +352,67 @@ function calculateAverageResults() {
     accuracyElement.textContent = Math.round(avgAccuracy);
 }
 
+// Generate leaderboard with random results and current user
+function generateLeaderboard() {
+    let currentWpm = 0;
+    let currentAccuracy = 0;
+
+    // If we have completed prompts, calculate current stats
+    if (promptResults.length > 0) {
+        let totalWpm = 0;
+        let totalAccuracy = 0;
+
+        promptResults.forEach(result => {
+            totalWpm += result.wpm;
+            totalAccuracy += result.accuracy;
+        });
+
+        currentWpm = Math.round(totalWpm / promptResults.length);
+        currentAccuracy = Math.round(totalAccuracy / promptResults.length);
+    }
+
+    // Create leaderboard entries with random results
+    const leaderboardData = [
+        { name: "Andrew Bosworth", wpm: 119, accuracy: 99, isCurrentUser: false },
+        { name: "Susan Li", wpm: 123, accuracy: 98, isCurrentUser: false },
+        { name: "Robert Wang", wpm: 111, accuracy: 100, isCurrentUser: false },
+        { name: "You", wpm: currentWpm, accuracy: currentAccuracy, isCurrentUser: true }
+    ];
+
+    // Sort by wpm * accuracy (descending)
+    leaderboardData.sort((a, b) => (b.wpm * b.accuracy / 100) - (a.wpm * a.accuracy / 100));
+
+    // Clear existing leaderboard
+    leaderboardList.innerHTML = '';
+
+    // Create leaderboard items
+    leaderboardData.forEach((entry, index) => {
+        const listItem = document.createElement('li');
+        listItem.className = `leaderboard-item ${entry.isCurrentUser ? 'current-user' : ''}`;
+
+        const score = Math.round(entry.wpm * entry.accuracy / 100);
+
+        listItem.innerHTML = `
+            <span class="rank">${index + 1}.</span>
+            <span class="name">${entry.name}</span>
+            <span class="stats">${entry.wpm} wpm, ${entry.accuracy}%</span>
+            <span class="score">${score}</span>
+        `;
+
+        leaderboardList.appendChild(listItem);
+    });
+}
+
+// Initialize leaderboard with default values
+function initializeLeaderboard() {
+    generateLeaderboard();
+}
+
 function endTest() {
     testActive = false;
     inputArea.disabled = true;
     calculateAverageResults();
+    generateLeaderboard();
     results.style.display = 'block';
 }
 
@@ -471,4 +529,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Configure input area
     configureInputArea();
     initializeTest();
+    // Initialize leaderboard
+    initializeLeaderboard();
 });

@@ -13,18 +13,29 @@
             background-color: #f5f5f5;
             color: #333;
             min-height: 100vh;
+        }
+
+        .main-layout {
             display: flex;
-            justify-content: center;
-            align-items: center;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            align-items: flex-start;
         }
 
         .container {
-            max-width: 800px;
-            width: 100%;
+            flex: 2;
             padding: 2rem;
             border-radius: 10px;
             background-color: white;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar {
+            flex: 1;
+            min-width: 300px;
+            position: sticky;
+            top: 20px;
         }
 
         h1 {
@@ -140,51 +151,159 @@
             margin: 1rem 0;
         }
 
+        .leaderboard {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background-color: #ecf0f1;
+            border-radius: 8px;
+            border: 2px solid #bdc3c7;
+        }
+
+        .leaderboard h3 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            color: #2c3e50;
+            text-align: center;
+        }
+
+        .leaderboard-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            background-color: white;
+            border-radius: 5px;
+            border-left: 4px solid #95a5a6;
+        }
+
+        .leaderboard-item.current-user {
+            border-left-color: #3498db;
+            background-color: #e8f4fd;
+            font-weight: bold;
+        }
+
+        .leaderboard-item .rank {
+            font-weight: bold;
+            color: #7f8c8d;
+            margin-right: 0.5rem;
+            min-width: 30px;
+        }
+
+        .leaderboard-item .name {
+            flex-grow: 1;
+            color: #2c3e50;
+        }
+
+        .leaderboard-item .stats {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+
+        .leaderboard-item .score {
+            font-weight: bold;
+            color: #27ae60;
+            margin-left: 1rem;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        @media (max-width: 768px) {
+            .main-layout {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .sidebar {
+                order: -1;
+                position: static;
+                min-width: unset;
+            }
+
+            .leaderboard {
+                margin-top: 0;
+            }
+        }
+
         @media (max-width: 600px) {
             body {
                 padding: 10px;
             }
+
             .container {
                 padding: 1rem;
             }
+
             h1 {
                 font-size: 1.5rem;
+            }
+
+            .leaderboard-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.25rem;
+            }
+
+            .leaderboard-item .rank {
+                margin-right: 0;
+            }
+
+            .leaderboard-item .stats,
+            .leaderboard-item .score {
+                margin-left: 0;
             }
         }
     </style>
 </head>
 
 <body>
-    <div class="container">
-        <h1>Simple Typing Test</h1>
-        <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next one. Autocorrect is enabled.</p>
+    <div class="main-layout">
+        <div class="container">
+            <h1>Simple Typing Test</h1>
+            <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next one.
+                Autocorrect is enabled.</p>
 
-        <div class="progress-indicator">
-            Prompt <span id="current-prompt">1</span> of 4
+            <div class="progress-indicator">
+                Prompt <span id="current-prompt">1</span> of 4
+            </div>
+
+            <div class="sample-text" id="sample-text"></div>
+
+            <textarea class="input-area" id="input-area" placeholder="Start typing here..." autocomplete="on"
+                autocorrect="on" autocapitalize="on" spellcheck="true"></textarea>
+
+            <button class="button" id="restart-button" style="display: none;">Restart Test</button>
+
+            <div class="results" id="results">
+                <h2>Test Complete!</h2>
+                <div class="wpm-metric">
+                    <strong><span id="wpm">0</span> WPM</strong>
+                </div>
+                <div class="accuracy-metric">
+                    <strong><span id="accuracy">0</span>% Accuracy</strong>
+                </div>
+                <button class="button" id="restart-button-final">Restart Test</button>
+            </div>
         </div>
 
-        <div class="sample-text" id="sample-text"></div>
-
-        <textarea class="input-area" id="input-area" placeholder="Start typing here..."
-                  autocomplete="on" autocorrect="on" autocapitalize="on" spellcheck="true"></textarea>
-
-        <button class="button" id="restart-button" style="display: none;">Restart Test</button>
-
-        <div class="results" id="results">
-            <h2>Test Complete!</h2>
-            <div class="wpm-metric">
-                <strong><span id="wpm">0</span> WPM</strong>
+        <div class="sidebar">
+            <div class="leaderboard">
+                <h3>Leaderboard</h3>
+                <ul class="leaderboard-list" id="leaderboard-list">
+                </ul>
             </div>
-            <div class="accuracy-metric">
-                <strong><span id="accuracy">0</span>% Accuracy</strong>
-            </div>
-            <button class="button" id="restart-button-final">Restart Test</button>
         </div>
     </div>
 
-      <script src="../keyboard-layout.js"></script>
-      <script src="TrieDictionary.js"></script>
-      <script src="script.js"></script>
+    <script src="../keyboard-layout.js"></script>
+    <script src="TrieDictionary.js"></script>
+    <script src="script.js"></script>
 </body>
 
 </html>
