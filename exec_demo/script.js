@@ -312,7 +312,7 @@ function calculatePromptResult() {
     const promptLength = promptText.length;
 
     // Use Levenshtein distance to calculate edit distance
-    const editDistance = levenshteinDistance(typedText, promptText);
+    const editDistance = levenshteinDistance(typedText, promptText, 1000);
 
     // Calculate accuracy as 1 minus normalized edit distance
     const maxDistance = Math.max(typedLength, promptLength);
