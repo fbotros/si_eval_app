@@ -44,9 +44,9 @@ function shufflePrompts() {
 // Function to load prompts from prompts.txt file
 async function loadPrompts() {
     try {
-        const response = await fetch('./prompts.txt');
+        const response = await fetch('./conversational_easy.txt');
         if (!response.ok) {
-            throw new Error(`Failed to load prompts.txt: ${response.status} ${response.statusText}`);
+            throw new Error(`Failed to load conversational_easy.txt: ${response.status} ${response.statusText}`);
         }
         const text = await response.text();
         prompts = text
@@ -57,14 +57,14 @@ async function loadPrompts() {
         // Shuffle the prompts array to randomize order
         shufflePrompts();
 
-        console.log(`Loaded ${prompts.length} prompts from prompts.txt (shuffled)`);
+        console.log(`Loaded ${prompts.length} prompts from conversational_easy.txt (shuffled)`);
 
         if (prompts.length === 0) {
-            throw new Error('prompts.txt file is empty or contains no valid prompts');
+            throw new Error('conversational_easy.txt file is empty or contains no valid prompts');
         }
     } catch (error) {
-        console.error('Error loading prompts.txt:', error.message);
-        alert(`Error: Could not load prompts from prompts.txt file.\n\n${error.message}\n\nPlease ensure the prompts.txt file exists and is accessible.`);
+        console.error('Error loading conversational_easy.txt:', error.message);
+        alert(`Error: Could not load prompts from conversational_easy.txt file.\n\n${error.message}\n\nPlease ensure the prompts.txt file exists and is accessible.`);
         throw error;
     }
 }
