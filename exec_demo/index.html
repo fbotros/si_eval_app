@@ -167,52 +167,78 @@
             text-align: center;
         }
 
-        .leaderboard-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .leaderboard-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.75rem 1rem;
-            margin-bottom: 0.5rem;
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
             background-color: white;
-            border-radius: 5px;
-            border-left: 4px solid #95a5a6;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
-        .leaderboard-item.current-user {
-            border-left-color: #3498db;
-            background-color: #e8f4fd;
+        .leaderboard-table th {
+            background-color: #34495e;
+            color: white;
+            padding: 0.75rem 0.5rem;
+            text-align: center;
             font-weight: bold;
-        }
-
-        .leaderboard-item .rank {
-            font-weight: bold;
-            color: #7f8c8d;
-            margin-right: 0.5rem;
-            min-width: 30px;
-        }
-
-        .leaderboard-item .name {
-            flex-grow: 1;
-            color: #2c3e50;
-        }
-
-        .leaderboard-item .stats {
-            color: #7f8c8d;
             font-size: 0.9rem;
         }
 
-        .leaderboard-item .score {
+        .leaderboard-table th:first-child {
+            text-align: center;
+            width: 50px;
+        }
+
+        .leaderboard-table th:nth-child(2) {
+            text-align: left;
+            width: auto;
+        }
+
+        .leaderboard-table td {
+            padding: 0.75rem 0.5rem;
+            text-align: center;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .leaderboard-table td:nth-child(2) {
+            text-align: left;
+            font-weight: 500;
+        }
+
+        .leaderboard-table tr.current-user {
+            background-color: #e8f4fd;
+            border-left: 4px solid #3498db;
             font-weight: bold;
+        }
+
+        .leaderboard-table tr:hover:not(.current-user) {
+            background-color: #f8f9fa;
+        }
+
+        .rank-cell {
+            font-weight: bold;
+            color: #7f8c8d;
+        }
+
+        .name-cell {
+            color: #2c3e50;
+        }
+
+        .wpm-cell {
+            color: #3498db;
+            font-weight: 600;
+        }
+
+        .accuracy-cell {
             color: #27ae60;
-            margin-left: 1rem;
-            min-width: 60px;
-            text-align: right;
+            font-weight: 600;
+        }
+
+        .score-cell {
+            color: #e67e22;
+            font-weight: bold;
+            font-size: 1.1rem;
         }
 
         @media (max-width: 768px) {
@@ -267,7 +293,8 @@
     <div class="main-layout">
         <div class="container">
             <h1>Typing Test</h1>
-            <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next one.</p>
+            <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next
+                one.</p>
 
             <div class="progress-indicator">
                 Prompt <span id="current-prompt">1</span> of 4
@@ -295,8 +322,19 @@
         <div class="sidebar">
             <div class="leaderboard">
                 <h3>Leaderboard</h3>
-                <ul class="leaderboard-list" id="leaderboard-list">
-                </ul>
+                <table class="leaderboard-table" id="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Name</th>
+                            <th>WPM</th>
+                            <th>Accuracy</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-list">
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

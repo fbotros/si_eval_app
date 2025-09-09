@@ -391,21 +391,22 @@ function generateLeaderboard() {
     // Clear existing leaderboard
     leaderboardList.innerHTML = '';
 
-    // Create leaderboard items
+    // Create leaderboard rows
     leaderboardData.forEach((entry, index) => {
-        const listItem = document.createElement('li');
-        listItem.className = `leaderboard-item ${entry.isCurrentUser ? 'current-user' : ''}`;
+        const tableRow = document.createElement('tr');
+        tableRow.className = entry.isCurrentUser ? 'current-user' : '';
 
         const score = Math.round(entry.wpm * entry.accuracy / 100);
 
-        listItem.innerHTML = `
-            <span class="rank">${index + 1}.</span>
-            <span class="name">${entry.name}</span>
-            <span class="stats">${entry.wpm} wpm, ${entry.accuracy}%</span>
-            <span class="score">${score}</span>
+        tableRow.innerHTML = `
+            <td class="rank-cell">${index + 1}</td>
+            <td class="name-cell">${entry.name}</td>
+            <td class="wpm-cell">${entry.wpm}</td>
+            <td class="accuracy-cell">${entry.accuracy}%</td>
+            <td class="score-cell">${score}</td>
         `;
 
-        leaderboardList.appendChild(listItem);
+        leaderboardList.appendChild(tableRow);
     });
 }
 
