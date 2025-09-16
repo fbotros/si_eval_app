@@ -288,6 +288,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     let lastTypedWord = '';
     let lastSuggestion = '';
     let startTime = 0; // Track when the current prompt started
+    let endTime = 0; // Track when the last key was entered
     let promptTimingStarted = false; // Track if timing has started for current prompt
 
     // Function to start the test
@@ -749,6 +750,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Start timing for current prompt on first keystroke
         if (!promptTimingStarted) {
             startTime = Date.now();
+            endTime = startTime; // Reset endTime to startTime for new prompt
             promptTimingStarted = true;
         }
 
@@ -790,6 +792,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Handle key presses for Enter key
     inputArea.addEventListener('keydown', function (e) {
         if (!testActive) return;
+
+        // Update end time for all keys except Enter (to track until last key entered)
+        if (e.key !== 'Enter') {
+            endTime = Date.now();
+        }
 
         if (e.key === 'Enter') {
             e.preventDefault(); // Prevent default Enter behavior
@@ -978,7 +985,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         const accuracy = (1 - normalizedDistance) * 100;
 
         // Calculate time spent on this prompt in minutes
-        const endTime = Date.now();
         const timeSpentMs = endTime - startTime;
         const minutes = timeSpentMs / 60000; // Convert ms to minutes
 
