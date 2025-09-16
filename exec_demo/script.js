@@ -120,6 +120,7 @@ let currentPromptIndex = 0;
 let testActive = false;
 let promptResults = [];
 let startTime = 0;
+let endTime = 0;
 let promptTimingStarted = false;
 
 // Autocorrect tracking variables
@@ -320,7 +321,6 @@ function calculatePromptResult() {
     const accuracy = Math.max(0, (1 - normalizedDistance) * 100);
 
     // Calculate time spent on this prompt in minutes
-    const endTime = Date.now();
     const timeSpentMs = endTime - startTime;
     const minutes = timeSpentMs / 60000; // Convert ms to minutes
 
@@ -444,6 +444,7 @@ inputArea.addEventListener('input', function() {
     // Start timing for current prompt on first keystroke
     if (!promptTimingStarted) {
         startTime = Date.now();
+        endTime = startTime; // Reset endTime to startTime for new prompt
         promptTimingStarted = true;
     }
 
@@ -492,6 +493,11 @@ inputArea.addEventListener('input', function() {
 // Handle Enter key to move to next prompt
 inputArea.addEventListener('keydown', function(e) {
     if (!testActive) return;
+
+    // Update end time for all keys except Enter (to track until last key entered)
+    if (e.key !== 'Enter') {
+        endTime = Date.now();
+    }
 
     if (e.key === 'Enter') {
         e.preventDefault(); // Prevent default Enter behavior
