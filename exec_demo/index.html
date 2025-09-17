@@ -118,39 +118,70 @@
         }
 
         .results {
-            margin-top: 1.5rem;
-            padding: 1rem;
-            background-color: #f8f9fa;
-            border-radius: 5px;
+            margin-top: 1rem;
+            padding: 1.25rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
             display: none;
             text-align: center;
+            color: white;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
 
         .results h2 {
             margin-top: 0;
+            margin-bottom: 1rem;
+            color: white;
+            font-size: 1.6rem;
+            font-weight: 600;
+        }
+
+        .results-metrics {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.75rem 1.25rem;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            min-width: 110px;
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 0.15rem;
+            display: block;
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.8);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+
+        .results .button {
+            background: rgba(255, 255, 255, 0.9);
             color: #2c3e50;
+            border: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-top: 0.25rem;
         }
 
-        .metric {
-            margin-bottom: 0.5rem;
-            font-size: 1.2rem;
-        }
-
-        .metric span {
-            font-weight: bold;
-            color: #3498db;
-        }
-
-        .wpm-metric {
-            font-size: 2rem;
-            color: #2c3e50;
-            margin: 1rem 0;
-        }
-
-        .accuracy-metric {
-            font-size: 1.5rem;
-            color: #27ae60;
-            margin: 1rem 0;
+        .results .button:hover {
+            background: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
         .leaderboard {
@@ -309,12 +340,16 @@
             <button class="button" id="restart-button" style="display: none;">Restart Test</button>
 
             <div class="results" id="results">
-                <h2>Test Complete!</h2>
-                <div class="wpm-metric">
-                    <strong><span id="wpm">0</span> WPM</strong>
-                </div>
-                <div class="accuracy-metric">
-                    <strong><span id="accuracy">0</span>% Accuracy</strong>
+                <h2>🎉 Test Complete!</h2>
+                <div class="results-metrics">
+                    <div class="metric-card">
+                        <span class="metric-value" id="wpm">0</span>
+                        <div class="metric-label">Words per Minute</div>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-value" id="accuracy">0</span>
+                        <div class="metric-label">Accuracy</div>
+                    </div>
                 </div>
                 <button class="button" id="restart-button-final">Restart Test</button>
             </div>

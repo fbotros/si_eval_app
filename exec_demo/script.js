@@ -355,7 +355,7 @@ function calculateAverageResults() {
 
     // Update results display
     wpmElement.textContent = Math.round(avgWpm);
-    accuracyElement.textContent = Math.round(avgAccuracy);
+    accuracyElement.textContent = Math.round(avgAccuracy) + '%';
 }
 
 // Generate leaderboard with random results and current user
