@@ -441,16 +441,24 @@ inputArea.addEventListener('input', function() {
         previousInputLength = 0;
     }
 
+    // Get the current input value and length
+    const currentValue = inputArea.value;
+    const currentLength = currentValue.length;
+
+    // If input field is empty, restart the timer
+    if (currentLength === 0) {
+        promptTimingStarted = false;
+        startTime = 0;
+        endTime = 0;
+        return;
+    }
+
     // Start timing for current prompt on first keystroke
     if (!promptTimingStarted) {
         startTime = Date.now();
         endTime = startTime; // Reset endTime to startTime for new prompt
         promptTimingStarted = true;
     }
-
-    // Get the current input value and length
-    const currentValue = inputArea.value;
-    const currentLength = currentValue.length;
 
     // Reset the correction flag if the user is typing a new character
     if (currentLength > previousInputLength) {
