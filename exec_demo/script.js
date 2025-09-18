@@ -173,8 +173,8 @@ function areNeighboringKeys(char1, char2) {
     return keyboardNeighbors[c1] && keyboardNeighbors[c1].includes(c2);
 }
 
-// Calculate Levenshtein distance between two strings with keyboard-aware substitution costs
-function levenshteinDistance(a, b, maxEditDist = 2) {
+// Calculate Levenshtein distance between two strings with optional keyboard-aware substitution costs
+function levenshteinDistance(a, b, maxEditDist = 2, useKeyboardAwareness = true) {
     if (a.length === 0) return b.length > maxEditDist ? maxEditDist + 1 : b.length;
     if (b.length === 0) return a.length > maxEditDist ? maxEditDist + 1 : a.length;
 
@@ -202,10 +202,10 @@ function levenshteinDistance(a, b, maxEditDist = 2) {
             if (b.charAt(i - 1) === a.charAt(j - 1)) {
                 matrix[i][j] = matrix[i - 1][j - 1];
             } else {
-                // Calculate substitution cost based on keyboard proximity
+                // Calculate substitution cost based on keyboard proximity if enabled
                 const char1 = a.charAt(j - 1);
                 const char2 = b.charAt(i - 1);
-                const substitutionCost = areNeighboringKeys(char1, char2) ? 0.4 : 1.0;
+                const substitutionCost = useKeyboardAwareness && areNeighboringKeys(char1, char2) ? 0.4 : 1.0;
 
                 matrix[i][j] = Math.min(
                     matrix[i - 1][j - 1] + substitutionCost, // substitution with keyboard-aware cost
@@ -312,8 +312,8 @@ function calculatePromptResult() {
     const typedLength = typedText.length;
     const promptLength = promptText.length;
 
-    // Use Levenshtein distance to calculate edit distance
-    const editDistance = levenshteinDistance(typedText, promptText, 1000);
+    // Use Levenshtein distance to calculate edit distance (without keyboard-aware penalties for user results)
+    const editDistance = levenshteinDistance(typedText, promptText, 1000, false);
 
     // Calculate accuracy as 1 minus normalized edit distance
     const maxDistance = Math.max(typedLength, promptLength);
