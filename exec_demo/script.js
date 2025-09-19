@@ -25,7 +25,8 @@ const baseDictionary = [
     'curve', 'riding', 'unicycle', 'discreet', 'meeting', 'raindrops', 'falling',
     'head', 'excellent', 'communicate', 'how', 'are', 'you', 'doing', 'today',
     'fine', 'thank', 'very', 'much', 'whats', 'with', 'lately', 'not',
-    'just', 'hanging', 'out', 'hello', 'world', 'test', 'the', 'that'
+    'just', 'hanging', 'out', 'hello', 'world', 'test', 'the', 'that',
+    'can', 'we'
 ];
 
 let dictionary = [...baseDictionary];
@@ -249,6 +250,12 @@ function findClosestWord(word) {
         return word;
     }
 
+    // First check for two-word splits (higher priority than single-word corrections)
+    const twoWordSplit = findTwoWordSplit(word);
+    if (twoWordSplit) {
+        return twoWordSplit;
+    }
+
     let closestWord = null;
     let minDistance = Infinity;
 
@@ -269,6 +276,13 @@ function findClosestWord(word) {
 
 // Separate function for tooltip preview using TrieDictionary (faster for real-time)
 function findClosestWordForPreview(word) {
+    // First check for two-word splits (higher priority than single-word corrections)
+    const twoWordSplit = findTwoWordSplit(word);
+    if (twoWordSplit) {
+        return twoWordSplit;
+    }
+
+    // Fallback to single-word correction
     return trieDictionary.findClosestWord(word);
 }
 
@@ -278,6 +292,37 @@ function extractWords(text) {
     return text.toLowerCase()
         .split(/[\s.,!?;:"()]+/)
         .filter(word => word.length > 0);
+}
+
+// Two-word splitting system: detect concatenated words and split them
+function findTwoWordSplit(word) {
+    // Skip very short words or words already in dictionary
+    if (word.length < 4 || dictionarySet.has(word.toLowerCase())) {
+        return null;
+    }
+
+    const lowerWord = word.toLowerCase();
+
+    // Try splitting at each position (leaving at least 2 chars for each part)
+    for (let i = 2; i <= lowerWord.length - 2; i++) {
+        const firstPart = lowerWord.substring(0, i);
+        const secondPart = lowerWord.substring(i);
+
+        // Check if both parts are valid dictionary words
+        if (dictionarySet.has(firstPart) && dictionarySet.has(secondPart)) {
+            // Preserve original capitalization pattern
+            let result;
+            if (word[0] === word[0].toUpperCase()) {
+                // If original was capitalized, capitalize first word
+                result = firstPart.charAt(0).toUpperCase() + firstPart.slice(1) + ' ' + secondPart;
+            } else {
+                result = firstPart + ' ' + secondPart;
+            }
+            return result;
+        }
+    }
+
+    return null; // No valid split found
 }
 
 // Autocorrect tooltip functions
@@ -397,6 +442,36 @@ function hideAutocorrectTooltip() {
 // Simple autocorrect suppression logic
 function shouldSuppressAutocorrect() {
     return charsTypedSinceLastBackspace < 2;
+}
+
+// Generic function to trigger autocorrect (works for any terminating character)
+function triggerAutocorrect(terminatingChar = ' ') {
+    if (lastWordCorrected) return false;
+
+    hideAutocorrectTooltip();
+
+    // Check suppression using current counter
+    const shouldSuppress = shouldSuppressAutocorrect();
+
+    // Reset counter after word termination (new word starts)
+    charsTypedSinceLastBackspace = 0;
+
+    // Apply suppression logic
+    if (suppressAutocorrect) {
+        suppressAutocorrect = false;
+        return false;
+    } else if (!shouldSuppress) {
+        // Get the current input value before the terminating character
+        const currentText = inputArea.value;
+        // Remove the terminating character from the end for autocorrect processing
+        const textForCorrection = currentText.endsWith(terminatingChar)
+            ? currentText.slice(0, -1)
+            : currentText;
+
+        return performAutocorrect(textForCorrection, terminatingChar);
+    }
+
+    return false;
 }
 
 
@@ -670,21 +745,8 @@ inputArea.addEventListener('input', function() {
         }
 
         // Handle space/punctuation for autocorrect
-        if (isSpaceOrPunct && !lastWordCorrected) {
-            hideAutocorrectTooltip();
-
-            // Check suppression using current counter (space doesn't count!)
-            const shouldSuppress = shouldSuppressAutocorrect();
-
-            // Reset counter after space (new word starts)
-            charsTypedSinceLastBackspace = 0;
-
-            // Apply suppression logic
-            if (suppressAutocorrect) {
-                suppressAutocorrect = false;
-            } else if (!shouldSuppress) {
-                performAutocorrect(previousInputValue, lastChar);
-            }
+        if (isSpaceOrPunct) {
+            triggerAutocorrect(lastChar);
         }
     }
     // If length decreased, count as corrected error (backspace)
@@ -714,6 +776,9 @@ inputArea.addEventListener('keydown', function(e) {
 
     if (e.key === 'Enter') {
         e.preventDefault(); // Prevent default Enter behavior
+
+        // Trigger autocorrect before processing the final text
+        triggerAutocorrect('\n');
 
         const typedText = inputArea.value.trim();
 
