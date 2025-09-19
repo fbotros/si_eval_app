@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Google Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #202124;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 16px 24px;
+            box-shadow: 0 1px 3px rgba(60, 64, 67, 0.1);
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 400;
+            color: #5f6368;
+            margin: 0;
+        }
+
+        .nav-links {
+            margin-top: 8px;
+        }
+
+        .nav-links a {
+            color: #1a73e8;
+            text-decoration: none;
+            font-size: 14px;
+            margin-right: 16px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .nav-links a:hover {
+            background-color: #f1f3f4;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            background: white;
+            box-shadow: 0 4px 6px rgba(60, 64, 67, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .document-header {
+            padding: 24px 32px 16px;
+            border-bottom: 1px solid #e8eaed;
+            background: #fafafa;
+        }
+
+        .document-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: #202124;
+            margin-bottom: 4px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            outline: none;
+        }
+
+        .document-title:hover {
+            background-color: #f1f3f4;
+        }
+
+        .document-title:focus {
+            background-color: #fff;
+            box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
+        }
+
+        .document-subtitle {
+            font-size: 13px;
+            color: #5f6368;
+        }
+
+        .editor-container {
+            padding: 32px;
+            min-height: 600px;
+        }
+
+        .editor {
+            width: 100%;
+            min-height: 500px;
+            border: none;
+            outline: none;
+            font-family: 'Google Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 16px;
+            line-height: 1.7;
+            color: #202124;
+            background: transparent;
+            padding: 0;
+            overflow-y: auto;
+        }
+
+        .editor:empty:before {
+            content: attr(data-placeholder);
+            color: #9aa0a6;
+            font-style: italic;
+            pointer-events: none;
+        }
+
+        .editor:focus {
+            outline: none;
+        }
+
+        .word-count {
+            position: absolute;
+            bottom: 16px;
+            right: 24px;
+            font-size: 12px;
+            color: #5f6368;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #e8eaed;
+        }
+
+        .status-bar {
+            background: #f8f9fa;
+            padding: 12px 32px;
+            border-top: 1px solid #e8eaed;
+            font-size: 13px;
+            color: #5f6368;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .auto-save {
+            color: #34a853;
+        }
+
+        .toolbar {
+            background: white;
+            border-bottom: 1px solid #e8eaed;
+            padding: 12px 32px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .toolbar-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .toolbar-separator {
+            width: 1px;
+            height: 20px;
+            background: #e8eaed;
+        }
+
+        .format-btn {
+            padding: 6px 12px;
+            border: 1px solid transparent;
+            background: transparent;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #5f6368;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .format-btn:hover {
+            background: #f1f3f4;
+            border-color: #e8eaed;
+        }
+
+        .format-btn.active {
+            background: #e8f0fe;
+            color: #1a73e8;
+            border-color: #1a73e8;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 16px;
+                border-radius: 0;
+            }
+
+            .editor-container {
+                padding: 24px 20px;
+            }
+
+            .toolbar {
+                padding: 12px 20px;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+        }
+
+        /* Custom scrollbar for webkit browsers */
+        .editor::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .editor::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .editor::-webkit-scrollbar-thumb {
+            background: #dadce0;
+            border-radius: 3px;
+        }
+
+        .editor::-webkit-scrollbar-thumb:hover {
+            background: #bdc1c6;
+        }
+
+        /* Autocorrect Tooltip Styles */
+        .autocorrect-tooltip {
+            position: fixed;
+            background: white;
+            color: #333;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #1a73e8;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(-2px);
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            white-space: nowrap;
+            font-family: 'Google Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 16px;
+            font-weight: normal;
+            line-height: 1.2;
+        }
+
+        .autocorrect-tooltip.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .autocorrect-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 8px;
+            border: 5px solid transparent;
+            border-top-color: #1a73e8;
+        }
+
+        .autocorrect-tooltip::before {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 8px;
+            border: 6px solid transparent;
+            border-top-color: white;
+            margin-top: -1px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Document Editor</h1>
+    </div>
+
+    <div class="container">
+        <div class="document-header">
+            <div class="document-title" id="document-title" contenteditable="true">Untitled Document</div>
+            <div class="document-subtitle">Created just now</div>
+        </div>
+
+        <div class="toolbar">
+            <div class="toolbar-group">
+                <button class="format-btn" id="bold-btn" title="Bold (Ctrl+B)">
+                    <strong>B</strong>
+                </button>
+                <button class="format-btn" id="italic-btn" title="Italic (Ctrl+I)">
+                    <em>I</em>
+                </button>
+                <button class="format-btn" id="underline-btn" title="Underline (Ctrl+U)">
+                    <u>U</u>
+                </button>
+            </div>
+
+            <div class="toolbar-separator"></div>
+
+            <div class="toolbar-group">
+                <select class="format-btn" id="font-size" title="Font Size">
+                    <option value="12">12</option>
+                    <option value="14">14</option>
+                    <option value="16" selected>16</option>
+                    <option value="18">18</option>
+                    <option value="20">20</option>
+                    <option value="24">24</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="editor-container" style="position: relative;">
+            <div
+                class="editor"
+                id="document-editor"
+                contenteditable="true"
+                spellcheck="true"
+                data-placeholder="Start writing your document..."
+            >This is a sample text document</div>
+
+            <div class="autocorrect-tooltip" id="autocorrect-tooltip">
+                <span id="correction-text"></span>
+            </div>
+
+            <div class="word-count" id="word-count">
+                1 word, 6 characters
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div id="cursor-position">
+                Line 1, Column 1
+            </div>
+        </div>
+    </div>
+
+    <script src="../shared-dictionary.js"></script>
+    <script src="keyboard-layout.js"></script>
+    <script src="TrieDictionary.js"></script>
+    <script src="AutocorrectEngine.js"></script>
+
+    <script>
+        // Initialize autocorrect engine for the document editor
+        let editorAutocorrectEngine = null;
+
+        // Autocorrect suppression state (same as main typing test)
+        let charsTypedSinceLastBackspace = 0;
+        let previousInputLength = 0;
+
+        // Helper function to reset backspace counter
+        function resetBackspaceCounter(reason) {
+            charsTypedSinceLastBackspace = 0;
+        }
+
+        // Simple autocorrect suppression logic
+        function shouldSuppressAutocorrect() {
+            return charsTypedSinceLastBackspace < 2;
+        }
+
+        async function initializeEditorAutocorrect() {
+            // Use shared dictionary from consolidated source
+            const baseDictionary = typeof sharedDictionary !== 'undefined' ? sharedDictionary : [];
+
+            try {
+                // Load common words
+                const response = await fetch('./common_words.txt');
+                const commonWords = response.ok ?
+                    (await response.text()).split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length > 0) :
+                    [];
+
+                editorAutocorrectEngine = new AutocorrectEngine({
+                    baseWords: [...baseDictionary, ...commonWords],
+                    keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {},
+                    maxEditDistance: 2,
+                    adjacentKeyMultiplier: 0.4
+                });
+            } catch (error) {
+                console.error('Failed to initialize autocorrect:', error);
+                // Fallback to basic dictionary
+                editorAutocorrectEngine = new AutocorrectEngine({
+                    baseWords: baseDictionary,
+                    keyboardNeighbors: {},
+                    maxEditDistance: 2,
+                    adjacentKeyMultiplier: 0.4
+                });
+            }
+        }
+
+        // Editor functionality
+        const editor = document.getElementById('document-editor');
+        const wordCount = document.getElementById('word-count');
+        const cursorPosition = document.getElementById('cursor-position');
+        const documentTitle = document.getElementById('document-title');
+
+        // Word count and character count
+        function updateWordCount() {
+            const text = editor.textContent || editor.innerText || '';
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            const characters = text.length;
+
+            wordCount.textContent = `${words} word${words !== 1 ? 's' : ''}, ${characters} character${characters !== 1 ? 's' : ''}`;
+        }
+
+        // Cursor position tracking
+        function updateCursorPosition() {
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                const text = editor.textContent || '';
+                const beforeCursor = text.substring(0, getTextOffset(range.startContainer, range.startOffset));
+                const lines = beforeCursor.split('\n');
+                const line = lines.length;
+                const column = lines[lines.length - 1].length + 1;
+
+                cursorPosition.textContent = `Line ${line}, Column ${column}`;
+            }
+        }
+
+        // Helper function to get text offset in contenteditable
+        function getTextOffset(node, offset) {
+            if (!node || !editor.contains(node)) {
+                return 0;
+            }
+
+            let textOffset = 0;
+            const walker = document.createTreeWalker(
+                editor,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+
+            let currentNode;
+            while (currentNode = walker.nextNode()) {
+                if (currentNode === node) {
+                    return textOffset + Math.min(offset, currentNode.textContent.length);
+                }
+                textOffset += currentNode.textContent.length;
+            }
+
+            // If node not found, return current text length
+            return editor.textContent ? editor.textContent.length : 0;
+        }
+
+
+        // Basic formatting
+        function toggleFormat(command) {
+            // Execute the formatting command
+            document.execCommand(command, false, null);
+
+            // Update button state
+            const btn = document.getElementById(command + '-btn');
+            if (btn) {
+                const isActive = document.queryCommandState(command);
+                btn.classList.toggle('active', isActive);
+            }
+
+            // Keep focus on editor
+            editor.focus();
+        }
+
+        // Font size change
+        function changeFontSize(size) {
+            editor.style.fontSize = size + 'px';
+        }
+
+        // Autocorrect functionality
+        function getWordAtPosition(text, position) {
+            const wordChar = /[a-zA-Z'\-]/;
+            let start = position;
+            while (start > 0 && wordChar.test(text[start - 1])) {
+                start--;
+            }
+            let end = position;
+            while (end < text.length && wordChar.test(text[end])) {
+                end++;
+            }
+            const word = text.substring(start, end);
+            return { word, start, end };
+        }
+
+        function calculateCaretPosition(editorElement, cursorPos) {
+            // For contenteditable, use a simpler approach
+            // Get the current selection to find the exact position
+            const selection = window.getSelection();
+            if (selection.rangeCount === 0) {
+                // Fallback to element position
+                const rect = editorElement.getBoundingClientRect();
+                return {
+                    x: rect.left + 50,
+                    y: rect.top - 35
+                };
+            }
+
+            const range = selection.getRangeAt(0);
+            const tempRange = range.cloneRange();
+            tempRange.collapse(true);
+
+            // Create a temporary span to measure position
+            const span = document.createElement('span');
+            span.innerHTML = '&nbsp;';
+            tempRange.insertNode(span);
+
+            const rect = span.getBoundingClientRect();
+
+            // Clean up
+            span.remove();
+
+            return {
+                x: rect.left,
+                y: rect.top - 35 // Position tooltip above cursor
+            };
+        }
+
+        function performAutocorrectPreview() {
+            if (!editorAutocorrectEngine) return;
+
+            const selection = window.getSelection();
+            if (selection.rangeCount === 0) return;
+
+            const range = selection.getRangeAt(0);
+            const cursorPos = getTextOffset(range.startContainer, range.startOffset);
+            const currentValue = editor.textContent || '';
+            const textBeforeCursor = currentValue.substring(0, cursorPos);
+
+            const { word } = getWordAtPosition(textBeforeCursor, cursorPos);
+
+            if (word && word.length > 1) {
+                const correction = editorAutocorrectEngine.findClosestWord(word);
+                if (correction && correction !== word) {
+                    showTooltip(correction, cursorPos);
+                    return;
+                }
+            }
+            hideTooltip();
+        }
+
+        function showTooltip(text, position) {
+            const tooltip = document.getElementById('autocorrect-tooltip');
+            const correctionText = document.getElementById('correction-text');
+
+            correctionText.textContent = text;
+
+            // Use actual cursor position
+            const pos = calculateCaretPosition(editor, position);
+
+            // Position tooltip first to measure its width
+            tooltip.style.left = pos.x + 'px';
+            tooltip.style.top = pos.y + 'px';
+            tooltip.classList.add('show');
+
+            // Position tooltip so right edge is consistent relative to cursor
+            const tooltipWidth = tooltip.offsetWidth;
+            tooltip.style.left = (pos.x - tooltipWidth + 16) + 'px';
+
+        }
+
+        function hideTooltip() {
+            const tooltip = document.getElementById('autocorrect-tooltip');
+            tooltip.classList.remove('show');
+        }
+
+        function performAutocorrectInEditor() {
+            console.log('performAutocorrectInEditor called');
+            if (!editorAutocorrectEngine) {
+                console.log('No autocorrect engine');
+                return;
+            }
+
+            // Check suppression using CURRENT counter value (before resetting)
+            const shouldSuppress = shouldSuppressAutocorrect();
+            console.log('Should suppress:', shouldSuppress);
+
+            // Reset counter after word termination (new word starts) - AFTER checking suppression
+            resetBackspaceCounter('word termination');
+
+            // Apply suppression logic
+            if (shouldSuppress) {
+                return false;
+            }
+
+            const selection = window.getSelection();
+            if (selection.rangeCount === 0) {
+                console.log('No selection');
+                return false;
+            }
+
+            const range = selection.getRangeAt(0);
+            const cursorPos = getTextOffset(range.startContainer, range.startOffset);
+            const currentValue = editor.textContent || '';
+
+            // Find the word before the space/punctuation that just triggered autocorrect
+            // We need to look before the trigger character
+            let textToAnalyze = currentValue.substring(0, cursorPos);
+            // Remove the trailing space/punctuation that triggered this
+            textToAnalyze = textToAnalyze.replace(/\s+$/, '');
+
+            console.log('Current text:', currentValue);
+            console.log('Text to analyze:', textToAnalyze);
+            console.log('Cursor pos:', cursorPos);
+
+            const { word, start } = getWordAtPosition(textToAnalyze, textToAnalyze.length);
+            console.log('Found word:', word, 'at position:', start);
+
+            if (word && word.length > 1) {
+                const correction = editorAutocorrectEngine.findClosestWord(word);
+                console.log('Correction found:', correction, 'for word:', word);
+                if (correction && correction !== word) {
+                    console.log('Applying correction:', word, '->', correction);
+                    // Find the word in the current selection and replace it
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+
+                        // Create a range that selects the word to replace
+                        const wordRange = document.createRange();
+
+                        // Find the text node containing the word
+                        const walker = document.createTreeWalker(
+                            editor,
+                            NodeFilter.SHOW_TEXT,
+                            null,
+                            false
+                        );
+
+                        let textOffset = 0;
+                        let targetNode = null;
+                        let wordStartInNode = 0;
+
+                        while (targetNode = walker.nextNode()) {
+                            const nodeLength = targetNode.textContent.length;
+                            if (textOffset + nodeLength > start) {
+                                wordStartInNode = start - textOffset;
+                                break;
+                            }
+                            textOffset += nodeLength;
+                        }
+
+                        if (targetNode) {
+                            // Select the word and replace it
+                            wordRange.setStart(targetNode, wordStartInNode);
+                            wordRange.setEnd(targetNode, Math.min(wordStartInNode + word.length, targetNode.textContent.length));
+
+                            // Replace the selected text with correction + space
+                            wordRange.deleteContents();
+                            const correctionWithSpace = document.createTextNode(correction + ' ');
+                            wordRange.insertNode(correctionWithSpace);
+
+                            // Position cursor after the correction and space
+                            const newRange = document.createRange();
+                            newRange.setStartAfter(correctionWithSpace);
+                            newRange.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                        }
+                    }
+
+                    updateWordCount();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Event listeners
+        editor.addEventListener('input', function(e) {
+            updateWordCount();
+
+            // Track length changes for backspace detection
+            const currentLength = (editor.textContent || '').length;
+
+            // If length increased, count characters typed
+            if (currentLength > previousInputLength) {
+                const charsAdded = currentLength - previousInputLength;
+                const selection = window.getSelection();
+                const currentValue = editor.textContent || '';
+                let cursorPos = 0;
+
+                try {
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        cursorPos = getTextOffset(range.startContainer, range.startOffset);
+                    }
+                } catch (error) {
+                    cursorPos = currentValue.length;
+                }
+
+                const actualTypedChar = cursorPos > 0 ? currentValue.charAt(cursorPos - 1) : '';
+                const isSpaceOrPunct = /[\s.,.!?;:"()]/.test(actualTypedChar);
+
+                console.log('Input event - typed char:', JSON.stringify(actualTypedChar), 'cursorPos:', cursorPos, 'isSpaceOrPunct:', isSpaceOrPunct);
+
+                // Only count non-space characters toward backspace penalty
+                if (!isSpaceOrPunct) {
+                    charsTypedSinceLastBackspace += charsAdded;
+                }
+
+                // Check for autocorrect on space or punctuation
+                if (isSpaceOrPunct) {
+                    console.log('Space/punctuation detected, triggering autocorrect');
+                    hideTooltip();
+                    setTimeout(() => performAutocorrectInEditor(), 50);
+                } else {
+                    console.log('Regular character, showing preview');
+                    // Show preview tooltip while typing
+                    setTimeout(() => performAutocorrectPreview(), 100);
+                }
+            }
+            // If length decreased, handle backspace
+            else if (currentLength < previousInputLength) {
+                // Reset counter on backspace (suppresses autocorrect until 2+ new chars typed)
+                resetBackspaceCounter('backspace detected');
+                // Always hide tooltip after backspace
+                hideTooltip();
+            }
+
+            // Update previous length for next comparison
+            previousInputLength = currentLength;
+        });
+
+        // Update button states based on current selection
+        function updateButtonStates() {
+            document.getElementById('bold-btn').classList.toggle('active', document.queryCommandState('bold'));
+            document.getElementById('italic-btn').classList.toggle('active', document.queryCommandState('italic'));
+            document.getElementById('underline-btn').classList.toggle('active', document.queryCommandState('underline'));
+        }
+
+        editor.addEventListener('keyup', function() {
+            updateCursorPosition();
+            updateButtonStates();
+        });
+
+        editor.addEventListener('click', function() {
+            updateCursorPosition();
+            updateButtonStates();
+            hideTooltip();
+        });
+
+        editor.addEventListener('mouseup', function() {
+            updateButtonStates();
+        });
+
+        // Hide tooltip on cursor movement
+        editor.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
+                e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                hideTooltip();
+            }
+        });
+
+        // Formatting buttons
+        document.getElementById('bold-btn').addEventListener('click', () => toggleFormat('bold'));
+        document.getElementById('italic-btn').addEventListener('click', () => toggleFormat('italic'));
+        document.getElementById('underline-btn').addEventListener('click', () => toggleFormat('underline'));
+
+        document.getElementById('font-size').addEventListener('change', function() {
+            changeFontSize(this.value);
+        });
+
+        // Document title editing
+        documentTitle.addEventListener('input', function() {
+            // Title changed
+        });
+
+        documentTitle.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.blur();
+            }
+        });
+
+        // Keyboard shortcuts
+        editor.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'b':
+                        e.preventDefault();
+                        toggleFormat('bold');
+                        break;
+                    case 'i':
+                        e.preventDefault();
+                        toggleFormat('italic');
+                        break;
+                    case 'u':
+                        e.preventDefault();
+                        toggleFormat('underline');
+                        break;
+                }
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeEditorAutocorrect();
+            updateWordCount();
+            updateCursorPosition();
+
+            // Initialize length tracking
+            previousInputLength = (editor.textContent || '').length;
+
+            // Focus the editor
+            editor.focus();
+
+            // Position cursor at end of seed text
+            const range = document.createRange();
+            const selection = window.getSelection();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        });
+    </script>
+</body>
+</html>
