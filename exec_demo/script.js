@@ -29,30 +29,10 @@ async function loadPrompts() {
 }
 
 async function initializeAutocorrect() {
-    // Base dictionary of common words
-    const baseDictionary = [
-        'a', 'an', 'in', 'on', 'at', 'by', 'for', 'with', 'about', 'against',
-        'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
-        'from', 'up', 'down', 'out', 'off', 'over', 'under', 'again', 'further',
-        'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all',
-        'any', 'both', 'each', 'few', 'more', 'most', 'some', 'other', 'have',
-        'has', 'had', 'do', 'does', 'did', 'but', 'if', 'or', 'because', 'until',
-        'while', 'of', 'this', 'these', 'those', 'am', 'are', 'was', 'were',
-        'nation', 'stability', 'rectangular', 'objects', 'sides', 'silly', 'questions',
-        'learn', 'walk', 'run', 'important', 'news', 'always', 'seems', 'late',
-        'quick', 'brown', 'fox', 'jumps', 'lazy', 'dog', 'steep', 'learning',
-        'curve', 'riding', 'unicycle', 'discreet', 'meeting', 'raindrops', 'falling',
-        'head', 'excellent', 'communicate', 'how', 'are', 'you', 'doing', 'today',
-        'fine', 'thank', 'very', 'much', 'whats', 'with', 'lately', 'not',
-        'just', 'hanging', 'out', 'hello', 'world', 'test', 'the', 'that',
-        'can', 'we', 'should', 'good', 'go', 'old', 'fantastic', 'arbitrary', 'wow',
-        "don't", "can't", "won't", "it's", "i'm", "you're", "we're", "they're",
-        'pleasant', 'beautiful', 'wonderful', 'amazing', 'fantastic', 'excellent',
-        'terrible', 'horrible', 'awful', 'perfect', 'great', 'nice', 'lovely',
-        'pretty', 'handsome', 'gorgeous', 'stunning', 'magnificent', 'brilliant'
-    ];
+    // Load dictionary from text file - now includes comprehensive word list with verb forms
+    const baseDictionary = await loadDictionary();
 
-    // Initialize AutocorrectEngine with base words and keyboard layout
+    // Initialize AutocorrectEngine with loaded dictionary and keyboard layout
     autocorrectEngine = new AutocorrectEngine({
         baseWords: baseDictionary,
         keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {},

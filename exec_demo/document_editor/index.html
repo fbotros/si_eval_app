@@ -313,7 +313,7 @@
 
         <div class="editor-container" style="position: relative;">
             <div class="editor" id="document-editor" contenteditable="true" spellcheck="true"
-                data-placeholder="Start writing your document...">This is a sample text document. 
+                data-placeholder="Start writing your document...">This is a sample text document.
             </div>
 
             <div class="autocorrect-tooltip" id="autocorrect-tooltip">
@@ -332,10 +332,10 @@
         </div>
     </div>
 
-    <script src="../shared-dictionary.js"></script>
-    <script src="keyboard-layout.js"></script>
-    <script src="TrieDictionary.js"></script>
-    <script src="AutocorrectEngine.js"></script>
+    <script src="../dictionary-loader.js"></script>
+    <script src="../keyboard-layout.js"></script>
+    <script src="../TrieDictionary.js"></script>
+    <script src="../AutocorrectEngine.js"></script>
 
     <script>
         // Initialize autocorrect engine for the document editor
@@ -356,32 +356,15 @@
         }
 
         async function initializeEditorAutocorrect() {
-            // Use shared dictionary from consolidated source
-            const baseDictionary = typeof sharedDictionary !== 'undefined' ? sharedDictionary : [];
+            // Load comprehensive dictionary from text file - includes verb forms like "jumped"
+            const baseDictionary = await loadDictionary();
 
-            try {
-                // Load common words
-                const response = await fetch('./common_words.txt');
-                const commonWords = response.ok ?
-                    (await response.text()).split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length > 0) :
-                    [];
-
-                editorAutocorrectEngine = new AutocorrectEngine({
-                    baseWords: [...baseDictionary, ...commonWords],
-                    keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {},
-                    maxEditDistance: 2,
-                    adjacentKeyMultiplier: 0.4
-                });
-            } catch (error) {
-                console.error('Failed to initialize autocorrect:', error);
-                // Fallback to basic dictionary
-                editorAutocorrectEngine = new AutocorrectEngine({
-                    baseWords: baseDictionary,
-                    keyboardNeighbors: {},
-                    maxEditDistance: 2,
-                    adjacentKeyMultiplier: 0.4
-                });
-            }
+            editorAutocorrectEngine = new AutocorrectEngine({
+                baseWords: baseDictionary,
+                keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {},
+                maxEditDistance: 2,
+                adjacentKeyMultiplier: 0.4
+            });
         }
 
         // Editor functionality
