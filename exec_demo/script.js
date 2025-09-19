@@ -1,11 +1,5 @@
 // Keyboard neighbors are loaded from ../keyboard-layout.js
 
-// Check if keyboard layout is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    if (typeof keyboardNeighbors === 'undefined') {
-        console.error('keyboardNeighbors not loaded! Check if keyboard-layout.js is loading correctly.');
-    }
-});
 
 // Typing test prompts will be loaded from prompts.txt
 let prompts = [];
@@ -26,7 +20,8 @@ const baseDictionary = [
     'head', 'excellent', 'communicate', 'how', 'are', 'you', 'doing', 'today',
     'fine', 'thank', 'very', 'much', 'whats', 'with', 'lately', 'not',
     'just', 'hanging', 'out', 'hello', 'world', 'test', 'the', 'that',
-    'can', 'we'
+    'can', 'we', 'should', 'good', 'go', 'old', 'fantastic', 'arbitrary',
+    "don't", "can't", "won't", "it's", "i'm", "you're", "we're", "they're"
 ];
 
 let dictionary = [...baseDictionary];
@@ -43,48 +38,23 @@ function shuffleArray(array) {
     return shuffled;
 }
 
-// Function to shuffle the current prompts array
 function shufflePrompts() {
     prompts = shuffleArray(prompts);
 }
 
-// Function to load prompts from prompts.txt file
 async function loadPrompts() {
-    try {
-        const response = await fetch('./conversational_easy.txt');
-        if (!response.ok) {
-            throw new Error(`Failed to load conversational_easy.txt: ${response.status} ${response.statusText}`);
-        }
-        const text = await response.text();
-        prompts = text
-            .split('\n')
-            .map(prompt => prompt.trim())
-            .filter(prompt => prompt.length > 0);
-
-        // Shuffle the prompts array to randomize order
-        shufflePrompts();
-
-
-        if (prompts.length === 0) {
-            throw new Error('conversational_easy.txt file is empty or contains no valid prompts');
-        }
-    } catch (error) {
-        console.error('Error loading conversational_easy.txt:', error.message);
-        alert(`Error: Could not load prompts from conversational_easy.txt file.\n\n${error.message}\n\nPlease ensure the prompts.txt file exists and is accessible.`);
-        throw error;
-    }
+    const response = await fetch('./conversational_easy.txt');
+    const text = await response.text();
+    prompts = text.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+    shufflePrompts();
 }
 
-// Combined function to initialize dictionary with base words, prompt words, and common words from file
 async function initializeDictionary() {
-    // Start with base dictionary
     dictionary = [...baseDictionary];
     dictionarySet = new Set(dictionary);
 
-    // Add words from prompts
     prompts.forEach(prompt => {
-        const words = extractWords(prompt);
-        words.forEach(word => {
+        extractWords(prompt).forEach(word => {
             if (!dictionarySet.has(word)) {
                 dictionary.push(word);
                 dictionarySet.add(word);
@@ -92,30 +62,21 @@ async function initializeDictionary() {
         });
     });
 
-    // Load common words from file
     try {
         const response = await fetch('./common_words.txt');
-        if (!response.ok) {
-            return;
+        if (response.ok) {
+            const text = await response.text();
+            text.split('\n')
+                .map(word => word.trim().toLowerCase())
+                .filter(word => word.length > 0 && !dictionarySet.has(word))
+                .forEach(word => {
+                    dictionary.push(word);
+                    dictionarySet.add(word);
+                });
         }
-        const text = await response.text();
-        const commonWords = text
-            .split('\n')
-            .map(word => word.trim().toLowerCase())
-            .filter(word => word.length > 0 && !dictionarySet.has(word));
+    } catch (error) {}
 
-        // Add new words to dictionary
-        commonWords.forEach(word => {
-            dictionary.push(word);
-            dictionarySet.add(word);
-        });
-
-    } catch (error) {
-    }
-
-    // Initialize TrieDictionary with all words
     trieDictionary = new TrieDictionary(0.4, dictionary);
-
 }
 
 let currentPromptIndex = 0;
@@ -174,210 +135,253 @@ function startTest() {
     promptTimingStarted = false;
 }
 
-// Function to check if two characters are neighbors on the keyboard
 function areNeighboringKeys(char1, char2) {
     const c1 = char1.toLowerCase();
     const c2 = char2.toLowerCase();
-
-    if (c1 === c2) return false;
-
-    // Check if keyboardNeighbors is available
-    if (typeof keyboardNeighbors === 'undefined') {
-        return false;
-    }
-
-    return keyboardNeighbors[c1] && keyboardNeighbors[c1].includes(c2);
+    return c1 !== c2 && keyboardNeighbors[c1]?.includes(c2) || false;
 }
 
-// Calculate Levenshtein distance between two strings with keyboard-aware substitution costs
 function levenshteinDistance(a, b, maxEditDist = 2) {
     if (a.length === 0) return b.length > maxEditDist ? maxEditDist + 1 : b.length;
     if (b.length === 0) return a.length > maxEditDist ? maxEditDist + 1 : a.length;
+    if (Math.abs(a.length - b.length) > maxEditDist) return maxEditDist + 1;
 
-    // Early exit if length difference exceeds maxEditDist
-    if (Math.abs(a.length - b.length) > maxEditDist) {
-        return maxEditDist + 1;
-    }
+    const lengthDiff = Math.abs(a.length - b.length);
+    const lengthPenalty = lengthDiff * 0.2;
+    const simpleBonus = lengthDiff > 0 ? -0.5 : 0;
 
-    const matrix = [];
+    const matrix = Array(b.length + 1).fill().map((_, i) => [i]);
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
 
-    // Initialize matrix
-    for (let i = 0; i <= b.length; i++) {
-        matrix[i] = [i];
-    }
-
-    for (let j = 0; j <= a.length; j++) {
-        matrix[0][j] = j;
-    }
-
-    // Fill in the rest of the matrix
     for (let i = 1; i <= b.length; i++) {
         let minInRow = Infinity;
-
         for (let j = 1; j <= a.length; j++) {
-            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+            if (b[i - 1] === a[j - 1]) {
                 matrix[i][j] = matrix[i - 1][j - 1];
             } else {
-                // Calculate substitution cost based on keyboard proximity
-                const char1 = a.charAt(j - 1);
-                const char2 = b.charAt(i - 1);
-                const substitutionCost = areNeighboringKeys(char1, char2) ? 0.4 : 1.0;
-
+                const substitutionCost = areNeighboringKeys(a[j - 1], b[i - 1]) ? 0.4 : 1.0;
                 matrix[i][j] = Math.min(
-                    matrix[i - 1][j - 1] + substitutionCost, // substitution with keyboard-aware cost
-                    matrix[i][j - 1] + 1,                   // insertion
-                    matrix[i - 1][j] + 1                    // deletion
+                    matrix[i - 1][j - 1] + substitutionCost,
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j] + 1
                 );
             }
-
-            // Track minimum value in current row
             minInRow = Math.min(minInRow, matrix[i][j]);
         }
-
-        // Early stopping: if all values in current row exceed maxEditDist, we can stop
-        if (minInRow > maxEditDist) {
-            return maxEditDist + 1;
-        }
+        if (minInRow > maxEditDist) return maxEditDist + 1;
     }
 
-    return matrix[b.length][a.length];
+    return matrix[b.length][a.length] + lengthPenalty + simpleBonus;
 }
 
-// Find the closest word in the dictionary (original logic for actual autocorrect)
 function findClosestWord(word) {
-    // If the word is already in the dictionary, return it (using Set for O(1) lookup)
-    if (dictionarySet.has(word)) {
-        return word;
-    }
+    if (dictionarySet.has(word)) return word;
 
-    // First check for two-word splits (higher priority than single-word corrections)
+    const singleWordCorrection = trieDictionary.findClosestWord(word);
+    const singleWordDistance = singleWordCorrection === word ? Infinity : levenshteinDistance(word, singleWordCorrection);
+
     const twoWordSplit = findTwoWordSplit(word);
-    if (twoWordSplit) {
+    const twoWordDistance = twoWordSplit ? getTwoWordSplitDistance(word) : Infinity;
+
+    if (singleWordCorrection !== word && singleWordDistance <= twoWordDistance) {
+        return singleWordCorrection;
+    } else if (twoWordSplit && twoWordDistance <= 2) {
         return twoWordSplit;
     }
 
-    let closestWord = null;
-    let minDistance = Infinity;
-
-    // Find words with edit distance of up to 2
-    for (const dictWord of dictionary) {
-        const distance = levenshteinDistance(word, dictWord);
-
-        // Consider words with edit distance of 1 or 2
-        if (distance <= 2 && distance < minDistance) {
-            minDistance = distance;
-            closestWord = dictWord;
-        }
-    }
-
-    // Return the closest word if found, otherwise return the original word
-    return closestWord || word;
+    return singleWordCorrection;
 }
 
-// Separate function for tooltip preview using TrieDictionary (faster for real-time)
-function findClosestWordForPreview(word) {
-    // First check for two-word splits (higher priority than single-word corrections)
-    const twoWordSplit = findTwoWordSplit(word);
-    if (twoWordSplit) {
-        return twoWordSplit;
-    }
-
-    // Fallback to single-word correction
-    return trieDictionary.findClosestWord(word);
-}
-
-// Function to extract words from a string
-function extractWords(text) {
-    // Split by punctuation and spaces
-    return text.toLowerCase()
-        .split(/[\s.,!?;:"()]+/)
-        .filter(word => word.length > 0);
-}
-
-// Two-word splitting system: detect concatenated words and split them
-function findTwoWordSplit(word) {
-    // Skip very short words or words already in dictionary
-    if (word.length < 4 || dictionarySet.has(word.toLowerCase())) {
-        return null;
-    }
-
+function getTwoWordSplitDistance(word) {
     const lowerWord = word.toLowerCase();
+    let bestDistance = Infinity;
 
-    // Try splitting at each position (leaving at least 2 chars for each part)
     for (let i = 2; i <= lowerWord.length - 2; i++) {
         const firstPart = lowerWord.substring(0, i);
         const secondPart = lowerWord.substring(i);
 
-        // Check if both parts are valid dictionary words
         if (dictionarySet.has(firstPart) && dictionarySet.has(secondPart)) {
-            // Preserve original capitalization pattern
-            let result;
-            if (word[0] === word[0].toUpperCase()) {
-                // If original was capitalized, capitalize first word
-                result = firstPart.charAt(0).toUpperCase() + firstPart.slice(1) + ' ' + secondPart;
-            } else {
-                result = firstPart + ' ' + secondPart;
-            }
-            return result;
+            return 1;
+        }
+
+        const firstCorrected = findBestCorrectionForPart(firstPart);
+        const secondCorrected = findBestCorrectionForPart(secondPart);
+
+        if (firstCorrected && secondCorrected) {
+            const totalDistance = levenshteinDistance(firstPart, firstCorrected, 2) +
+                                levenshteinDistance(secondPart, secondCorrected, 2) + 1;
+            if (totalDistance < bestDistance) bestDistance = totalDistance;
         }
     }
 
-    return null; // No valid split found
+    return bestDistance;
 }
 
-// Autocorrect tooltip functions
+function findClosestWordForPreview(word) {
+    if (dictionarySet.has(word)) return word;
+
+    const singleWordCorrection = trieDictionary.findClosestWord(word);
+    const singleWordDistance = singleWordCorrection === word ? Infinity : levenshteinDistance(word, singleWordCorrection);
+
+    const twoWordSplit = findTwoWordSplit(word);
+    const twoWordDistance = twoWordSplit ? getTwoWordSplitDistance(word) : Infinity;
+
+    if (singleWordCorrection !== word && singleWordDistance <= twoWordDistance) {
+        return singleWordCorrection;
+    } else if (twoWordSplit && twoWordDistance <= 2) {
+        return twoWordSplit;
+    }
+
+    return singleWordCorrection;
+}
+
+function extractWords(text) {
+    return text.toLowerCase().split(/[\s.,!?;:"()]+/).filter(word => word.length > 0);
+}
+
+function findTwoWordSplit(word) {
+    if (word.length < 4 || dictionarySet.has(word.toLowerCase())) return null;
+
+    const lowerWord = word.toLowerCase();
+    const isCapitalized = word[0] === word[0].toUpperCase();
+    let bestSplit = null;
+    let bestScore = Infinity;
+
+    for (let i = 2; i <= lowerWord.length - 2; i++) {
+        const firstPart = lowerWord.substring(0, i);
+        const secondPart = lowerWord.substring(i);
+
+        if (dictionarySet.has(firstPart) && dictionarySet.has(secondPart)) {
+            const result = isCapitalized ?
+                firstPart.charAt(0).toUpperCase() + firstPart.slice(1) + ' ' + secondPart :
+                firstPart + ' ' + secondPart;
+            return result;
+        }
+
+        const firstCorrected = findBestCorrectionForPart(firstPart);
+        const secondCorrected = findBestCorrectionForPart(secondPart);
+
+        if (firstCorrected && secondCorrected) {
+            const totalDistance = levenshteinDistance(firstPart, firstCorrected, 2) +
+                                levenshteinDistance(secondPart, secondCorrected, 2);
+
+            if (totalDistance <= 2 && totalDistance < bestScore) {
+                bestScore = totalDistance;
+                bestSplit = isCapitalized ?
+                    firstCorrected.charAt(0).toUpperCase() + firstCorrected.slice(1) + ' ' + secondCorrected :
+                    firstCorrected + ' ' + secondCorrected;
+            }
+        }
+    }
+
+    return bestSplit;
+}
+
+// Cache for expensive correction lookups
+let correctionCache = new Map();
+
+function findBestCorrectionForPart(part) {
+    if (dictionarySet.has(part)) return part;
+    if (part.length < 2) return null;
+
+    // Check cache first
+    if (correctionCache.has(part)) {
+        return correctionCache.get(part);
+    }
+
+    // Use TrieDictionary for more efficient search instead of iterating entire dictionary
+    const correction = trieDictionary.findClosestWord(part);
+    const distance = levenshteinDistance(part, correction, 2);
+
+    const result = (distance <= 2 && correction !== part) ? correction : null;
+
+    // Cache the result (limit cache size to prevent memory issues)
+    if (correctionCache.size > 1000) {
+        correctionCache.clear();
+    }
+    correctionCache.set(part, result);
+
+    return result;
+}
+
 function getCurrentIncompleteWord() {
     const currentValue = inputArea.value;
     if (!currentValue) return '';
 
-    // Split by spaces and get the last word (currently being typed)
     const words = currentValue.split(/\s+/);
     const lastWord = words[words.length - 1];
+    const match = lastWord.match(/^([^a-zA-Z]*)([a-zA-Z']+)([^a-zA-Z]*)$/);
 
-    // Remove any trailing punctuation for correction checking
-    return lastWord.replace(/[.,!?;:"()]+$/, '');
+    return match ? match[2] : '';
 }
+
+// Cache for caret position calculations to reduce DOM operations
+let caretPositionCache = {
+    lastText: '',
+    lastPosition: -1,
+    lastResult: null,
+    mirrorDiv: null
+};
 
 function getCaretPosition() {
     const element = inputArea;
     const position = element.selectionStart;
+    const currentText = element.value.substring(0, position);
 
-    // Create mirror div to measure text position
-    const div = document.createElement('div');
-    const computed = getComputedStyle(element);
+    // Use cached result if text and position haven't changed
+    if (caretPositionCache.lastText === currentText &&
+        caretPositionCache.lastPosition === position &&
+        caretPositionCache.lastResult) {
+        return caretPositionCache.lastResult;
+    }
 
-    // Copy essential styles that affect text layout
-    const properties = [
-        'width', 'height', 'overflowY', 'overflowX',
-        'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-        'fontSize', 'fontFamily', 'fontWeight', 'lineHeight',
-        'letterSpacing', 'wordSpacing', 'textIndent', 'textAlign',
-        'boxSizing', 'borderTopWidth', 'borderRightWidth',
-        'borderBottomWidth', 'borderLeftWidth'
-    ];
+    // Reuse or create mirror div to reduce DOM creation overhead
+    let div = caretPositionCache.mirrorDiv;
+    if (!div) {
+        div = document.createElement('div');
+        caretPositionCache.mirrorDiv = div;
 
-    properties.forEach(prop => {
-        div.style[prop] = computed[prop];
-    });
+        const computed = getComputedStyle(element);
 
-    // Position off-screen
-    div.style.position = 'absolute';
-    div.style.visibility = 'hidden';
-    div.style.top = '-9999px';
-    div.style.left = '-9999px';
-    div.style.whiteSpace = 'pre-wrap';
-    div.style.wordWrap = 'break-word';
+        // Copy essential styles that affect text layout
+        const properties = [
+            'width', 'height', 'overflowY', 'overflowX',
+            'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+            'fontSize', 'fontFamily', 'fontWeight', 'lineHeight',
+            'letterSpacing', 'wordSpacing', 'textIndent', 'textAlign',
+            'boxSizing', 'borderTopWidth', 'borderRightWidth',
+            'borderBottomWidth', 'borderLeftWidth'
+        ];
 
-    document.body.appendChild(div);
+        properties.forEach(prop => {
+            div.style[prop] = computed[prop];
+        });
 
-    // Add text up to caret position
-    const textBeforeCaret = element.value.substring(0, position);
-    div.textContent = textBeforeCaret;
+        // Position off-screen
+        div.style.position = 'absolute';
+        div.style.visibility = 'hidden';
+        div.style.top = '-9999px';
+        div.style.left = '-9999px';
+        div.style.whiteSpace = 'pre-wrap';
+        div.style.wordWrap = 'break-word';
+    }
+
+    // Only append to DOM when needed
+    if (!div.parentNode) {
+        document.body.appendChild(div);
+    }
+
+    // Update content
+    div.textContent = currentText;
 
     // Add a span to mark where caret would be
-    const span = document.createElement('span');
-    span.textContent = '|';
-    div.appendChild(span);
+    let span = div.querySelector('span.caret-marker');
+    if (!span) {
+        span = document.createElement('span');
+        span.className = 'caret-marker';
+        span.textContent = '|';
+        div.appendChild(span);
+    }
 
     // Get the span position
     const coordinates = {
@@ -385,14 +389,19 @@ function getCaretPosition() {
         left: span.offsetLeft
     };
 
-    document.body.removeChild(div);
-
     // Convert to viewport coordinates
     const elementRect = element.getBoundingClientRect();
     const x = elementRect.left + coordinates.left - element.scrollLeft;
     const y = elementRect.top + coordinates.top - element.scrollTop;
 
-    return { x, y };
+    const result = { x, y };
+
+    // Cache the result
+    caretPositionCache.lastText = currentText;
+    caretPositionCache.lastPosition = position;
+    caretPositionCache.lastResult = result;
+
+    return result;
 }
 
 function showAutocorrectTooltip(originalWord, correctedWord) {
@@ -405,12 +414,11 @@ function showAutocorrectTooltip(originalWord, correctedWord) {
     lastTooltipWord = originalWord.toLowerCase();
     lastTooltipSuggestion = correctedWord;
 
-    // Set only the corrected word as tooltip content
+    // Set only the corrected word as tooltip content immediately
     correctionText.textContent = correctedWord;
 
-    // Position tooltip above and to the left of the caret
-    // Use setTimeout to ensure DOM is updated after keystroke
-    setTimeout(() => {
+    // Schedule positioning for next frame to avoid blocking current input
+    requestAnimationFrame(() => {
         const caretPos = getCaretPosition();
         autocorrectTooltip.style.position = 'fixed';
         autocorrectTooltip.style.visibility = 'hidden';
@@ -426,10 +434,10 @@ function showAutocorrectTooltip(originalWord, correctedWord) {
         autocorrectTooltip.style.top = (caretPos.y - lineHeight - 10) + 'px';
         autocorrectTooltip.style.zIndex = '10000';
         autocorrectTooltip.style.visibility = 'visible';
-    }, 0);
 
-    // Show tooltip with animation
-    autocorrectTooltip.classList.add('show');
+        // Show tooltip with animation
+        autocorrectTooltip.classList.add('show');
+    });
 }
 
 function hideAutocorrectTooltip() {
@@ -442,6 +450,53 @@ function hideAutocorrectTooltip() {
 // Simple autocorrect suppression logic
 function shouldSuppressAutocorrect() {
     return charsTypedSinceLastBackspace < 2;
+}
+
+// Debounced autocorrect preview to prevent blocking on every keystroke
+let autocorrectPreviewTimer = null;
+function scheduleAutocorrectPreview() {
+    // Cancel any pending preview
+    if (autocorrectPreviewTimer) {
+        clearTimeout(autocorrectPreviewTimer);
+    }
+
+    // Schedule new preview with minimal delay to not block typing
+    autocorrectPreviewTimer = setTimeout(() => {
+        performAutocorrectPreview();
+        autocorrectPreviewTimer = null;
+    }, 16); // ~1 frame at 60fps for smooth typing
+}
+
+function performAutocorrectPreview() {
+    const incompleteWord = getCurrentIncompleteWord();
+
+    if (incompleteWord.length > 2) {
+        if (shouldSuppressAutocorrect()) {
+            hideAutocorrectTooltip();
+        } else {
+            // Use requestIdleCallback if available for better performance
+            if (window.requestIdleCallback) {
+                requestIdleCallback(() => {
+                    const suggestion = findClosestWordForPreview(incompleteWord.toLowerCase());
+                    if (suggestion !== incompleteWord.toLowerCase()) {
+                        showAutocorrectTooltip(incompleteWord, suggestion);
+                    } else {
+                        hideAutocorrectTooltip();
+                    }
+                });
+            } else {
+                // Fallback for browsers without requestIdleCallback
+                const suggestion = findClosestWordForPreview(incompleteWord.toLowerCase());
+                if (suggestion !== incompleteWord.toLowerCase()) {
+                    showAutocorrectTooltip(incompleteWord, suggestion);
+                } else {
+                    hideAutocorrectTooltip();
+                }
+            }
+        }
+    } else {
+        hideAutocorrectTooltip();
+    }
 }
 
 // Generic function to trigger autocorrect (works for any terminating character)
@@ -489,14 +544,20 @@ function performAutocorrect(currentText, appendChar) {
 
             const originalLastWord = words[words.length - 1];
 
-            // if last char of last word ends in punctuation, return false
-            if(/[\s.,.!?;:"()]/.test(originalLastWord.slice(-1))) return false;
+            // Extract word core and surrounding punctuation
+            const wordPattern = /^([^a-zA-Z]*)([a-zA-Z']+)([^a-zA-Z]*)$/;
+            const match = originalLastWord.match(wordPattern);
 
-            // Check if the original word is capitalized (first character only)
-            const isCapitalized = originalLastWord.length > 0 &&
-                                originalLastWord[0] >= 'A' && originalLastWord[0] <= 'Z';
+            if (!match) return false; // No alphabetic content to correct
 
-            const lastWord = originalLastWord.toLowerCase();
+            const [, prefixPunct, wordCore, suffixPunct] = match;
+
+
+            // Check if the word core is capitalized (first character only)
+            const isCapitalized = wordCore.length > 0 &&
+                                wordCore[0] >= 'A' && wordCore[0] <= 'Z';
+
+            const lastWord = wordCore.toLowerCase();
 
             // Skip very short words (1-2 characters)
             if (lastWord.length > 2) {
@@ -510,12 +571,16 @@ function performAutocorrect(currentText, appendChar) {
                     correctedWord = findClosestWord(lastWord);
                 }
 
-                // If a correction was found and it's different from the original word
-                if (correctedWord !== originalLastWord.toLowerCase() && correctedWord !== lastWord) {
-                    // Capitalize the corrected word if the original word was capitalized
-                    const finalCorrectedWord = isCapitalized ?
+
+                // If a correction was found and it's different from the word core
+                if (correctedWord !== wordCore.toLowerCase() && correctedWord !== lastWord) {
+                    // Capitalize the corrected word if the original word core was capitalized
+                    const finalCorrectedWordCore = isCapitalized ?
                         correctedWord.charAt(0).toUpperCase() + correctedWord.slice(1) :
                         correctedWord;
+
+                    // Reconstruct with original punctuation
+                    const finalCorrectedWord = prefixPunct + finalCorrectedWordCore + suffixPunct;
 
                     // Replace the last word with the corrected one
                     const lastIndex = text.lastIndexOf(originalLastWord);
@@ -724,24 +789,10 @@ inputArea.addEventListener('input', function() {
 
         keyPressCount += charsAdded;
 
-        // Real-time autocorrect preview (only for non-space chars)
+        // Real-time autocorrect preview (only for non-space chars) - using async processing
         if (!isSpaceOrPunct) {
-            const incompleteWord = getCurrentIncompleteWord();
-
-            if (incompleteWord.length > 2) {
-                if (shouldSuppressAutocorrect()) {
-                    hideAutocorrectTooltip();
-                } else {
-                    const suggestion = findClosestWordForPreview(incompleteWord.toLowerCase());
-                    if (suggestion !== incompleteWord.toLowerCase()) {
-                        showAutocorrectTooltip(incompleteWord, suggestion);
-                    } else {
-                        hideAutocorrectTooltip();
-                    }
-                }
-            } else {
-                hideAutocorrectTooltip();
-            }
+            // Schedule autocorrect preview to run after current event loop
+            scheduleAutocorrectPreview();
         }
 
         // Handle space/punctuation for autocorrect
@@ -756,13 +807,21 @@ inputArea.addEventListener('input', function() {
         // Reset counter on backspace (suppresses autocorrect until 2+ new chars typed)
         charsTypedSinceLastBackspace = 0;
 
-        // Always hide tooltip after backspace
+        // Always hide tooltip after backspace (non-blocking)
         hideAutocorrectTooltip();
+
+        // Clear position cache since text has changed
+        caretPositionCache.lastResult = null;
     }
 
     // Update previous values for next comparison
     previousInputValue = inputArea.value;
     previousInputLength = previousInputValue.length;
+
+    // Invalidate caret position cache on any input change
+    if (caretPositionCache.lastResult) {
+        caretPositionCache.lastResult = null;
+    }
 });
 
 // Handle Enter key to move to next prompt
