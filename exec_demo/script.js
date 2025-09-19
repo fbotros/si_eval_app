@@ -46,7 +46,10 @@ async function initializeAutocorrect() {
         'fine', 'thank', 'very', 'much', 'whats', 'with', 'lately', 'not',
         'just', 'hanging', 'out', 'hello', 'world', 'test', 'the', 'that',
         'can', 'we', 'should', 'good', 'go', 'old', 'fantastic', 'arbitrary', 'wow',
-        "don't", "can't", "won't", "it's", "i'm", "you're", "we're", "they're"
+        "don't", "can't", "won't", "it's", "i'm", "you're", "we're", "they're",
+        'pleasant', 'beautiful', 'wonderful', 'amazing', 'fantastic', 'excellent',
+        'terrible', 'horrible', 'awful', 'perfect', 'great', 'nice', 'lovely',
+        'pretty', 'handsome', 'gorgeous', 'stunning', 'magnificent', 'brilliant'
     ];
 
     // Initialize AutocorrectEngine with base words and keyboard layout

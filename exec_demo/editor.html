@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Google Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: #202124;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 16px 24px;
+            box-shadow: 0 1px 3px rgba(60, 64, 67, 0.1);
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 400;
+            color: #5f6368;
+            margin: 0;
+        }
+
+        .nav-links {
+            margin-top: 8px;
+        }
+
+        .nav-links a {
+            color: #1a73e8;
+            text-decoration: none;
+            font-size: 14px;
+            margin-right: 16px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .nav-links a:hover {
+            background-color: #f1f3f4;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            background: white;
+            box-shadow: 0 4px 6px rgba(60, 64, 67, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .document-header {
+            padding: 24px 32px 16px;
+            border-bottom: 1px solid #e8eaed;
+            background: #fafafa;
+        }
+
+        .document-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: #202124;
+            margin-bottom: 4px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            outline: none;
+        }
+
+        .document-title:hover {
+            background-color: #f1f3f4;
+        }
+
+        .document-title:focus {
+            background-color: #fff;
+            box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
+        }
+
+        .document-subtitle {
+            font-size: 13px;
+            color: #5f6368;
+        }
+
+        .editor-container {
+            padding: 32px;
+            min-height: 600px;
+        }
+
+        .editor {
+            width: 100%;
+            min-height: 500px;
+            border: none;
+            outline: none;
+            font-family: 'Google Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 16px;
+            line-height: 1.7;
+            color: #202124;
+            resize: none;
+            background: transparent;
+            padding: 0;
+        }
+
+        .editor::placeholder {
+            color: #9aa0a6;
+            font-style: italic;
+        }
+
+        .editor:focus {
+            outline: none;
+        }
+
+        .word-count {
+            position: absolute;
+            bottom: 16px;
+            right: 24px;
+            font-size: 12px;
+            color: #5f6368;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #e8eaed;
+        }
+
+        .status-bar {
+            background: #f8f9fa;
+            padding: 12px 32px;
+            border-top: 1px solid #e8eaed;
+            font-size: 13px;
+            color: #5f6368;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .auto-save {
+            color: #34a853;
+        }
+
+        .toolbar {
+            background: white;
+            border-bottom: 1px solid #e8eaed;
+            padding: 12px 32px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .toolbar-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .toolbar-separator {
+            width: 1px;
+            height: 20px;
+            background: #e8eaed;
+        }
+
+        .format-btn {
+            padding: 6px 12px;
+            border: 1px solid transparent;
+            background: transparent;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #5f6368;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .format-btn:hover {
+            background: #f1f3f4;
+            border-color: #e8eaed;
+        }
+
+        .format-btn.active {
+            background: #e8f0fe;
+            color: #1a73e8;
+            border-color: #1a73e8;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 16px;
+                border-radius: 0;
+            }
+
+            .editor-container {
+                padding: 24px 20px;
+            }
+
+            .toolbar {
+                padding: 12px 20px;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+        }
+
+        /* Custom scrollbar for webkit browsers */
+        .editor::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .editor::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .editor::-webkit-scrollbar-thumb {
+            background: #dadce0;
+            border-radius: 3px;
+        }
+
+        .editor::-webkit-scrollbar-thumb:hover {
+            background: #bdc1c6;
+        }
+
+        /* Autocorrect Tooltip Styles */
+        .autocorrect-tooltip {
+            position: fixed;
+            background: white;
+            color: #333;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #1a73e8;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(-2px);
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            white-space: nowrap;
+            font-family: 'Google Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 16px;
+            font-weight: normal;
+            line-height: 1.2;
+        }
+
+        .autocorrect-tooltip.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .autocorrect-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 8px;
+            border: 5px solid transparent;
+            border-top-color: #1a73e8;
+        }
+
+        .autocorrect-tooltip::before {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 8px;
+            border: 6px solid transparent;
+            border-top-color: white;
+            margin-top: -1px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Document Editor</h1>
+        <div class="nav-links">
+            <a href="index.html">← Back to Typing Test</a>
+            <a href="test-autocorrect.html">Autocorrect Tests</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="document-header">
+            <div class="document-title" id="document-title" contenteditable="true">Untitled Document</div>
+            <div class="document-subtitle">Created just now</div>
+        </div>
+
+        <div class="toolbar">
+            <div class="toolbar-group">
+                <button class="format-btn" id="bold-btn" title="Bold (Ctrl+B)">
+                    <strong>B</strong>
+                </button>
+                <button class="format-btn" id="italic-btn" title="Italic (Ctrl+I)">
+                    <em>I</em>
+                </button>
+                <button class="format-btn" id="underline-btn" title="Underline (Ctrl+U)">
+                    <u>U</u>
+                </button>
+            </div>
+
+            <div class="toolbar-separator"></div>
+
+            <div class="toolbar-group">
+                <select class="format-btn" id="font-size" title="Font Size">
+                    <option value="12">12</option>
+                    <option value="14">14</option>
+                    <option value="16" selected>16</option>
+                    <option value="18">18</option>
+                    <option value="20">20</option>
+                    <option value="24">24</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="editor-container" style="position: relative;">
+            <textarea
+                class="editor"
+                id="document-editor"
+                placeholder="Start writing your document..."
+                spellcheck="true"
+            >This is a sample text document</textarea>
+
+            <div class="autocorrect-tooltip" id="autocorrect-tooltip">
+                <span id="correction-text"></span>
+            </div>
+
+            <div class="word-count" id="word-count">
+                1 word, 6 characters
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div class="auto-save" id="save-status">
+                All changes saved automatically
+            </div>
+            <div id="cursor-position">
+                Line 1, Column 1
+            </div>
+        </div>
+    </div>
+
+    <script src="keyboard-layout.js"></script>
+    <script src="TrieDictionary.js"></script>
+    <script src="AutocorrectEngine.js"></script>
+
+    <script>
+        // Initialize autocorrect engine for the document editor
+        let editorAutocorrectEngine = null;
+
+        // Autocorrect suppression state (same as main typing test)
+        let charsTypedSinceLastBackspace = 0;
+        let previousInputLength = 0;
+
+        // Helper function to reset backspace counter
+        function resetBackspaceCounter(reason) {
+            charsTypedSinceLastBackspace = 0;
+        }
+
+        // Simple autocorrect suppression logic
+        function shouldSuppressAutocorrect() {
+            return charsTypedSinceLastBackspace < 2;
+        }
+
+        async function initializeEditorAutocorrect() {
+            // Base dictionary for document editing
+            const baseDictionary = [
+                'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i',
+                'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at',
+                'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her', 'she',
+                'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 'their',
+                'what', 'so', 'up', 'out', 'if', 'about', 'who', 'get', 'which', 'go',
+                'me', 'when', 'make', 'can', 'like', 'time', 'no', 'just', 'him',
+                'know', 'take', 'people', 'into', 'year', 'your', 'good', 'some',
+                'could', 'them', 'see', 'other', 'than', 'then', 'now', 'look',
+                'only', 'come', 'its', 'over', 'think', 'also', 'back', 'after',
+                'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way', 'even',
+                'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us',
+                'is', 'was', 'are', 'been', 'has', 'had', 'were', 'said', 'each',
+                'which', 'their', 'time', 'will', 'about', 'if', 'up', 'out', 'many',
+                'then', 'them', 'can', 'said', 'number', 'no', 'way', 'could', 'people',
+                'my', 'than', 'first', 'water', 'been', 'call', 'who', 'its', 'now',
+                'find', 'long', 'down', 'day', 'did', 'get', 'come', 'made', 'may', 'part',
+                'document', 'sample', 'text', 'writing', 'edit', 'editor', 'page',
+                'hello', 'world', 'test', 'example', 'create', 'delete', 'save',
+                'file', 'content', 'paragraph', 'sentence', 'word', 'character',
+                'format', 'style', 'font', 'size', 'color', 'bold', 'italic',
+                'underline', 'align', 'center', 'left', 'right', 'justify',
+                'wow', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic',
+                'pleasant', 'beautiful', 'terrible', 'horrible', 'awful', 'perfect',
+                'nice', 'lovely', 'pretty', 'handsome', 'gorgeous', 'stunning',
+                'magnificent', 'brilliant'
+            ];
+
+            try {
+                // Load common words
+                const response = await fetch('./common_words.txt');
+                const commonWords = response.ok ?
+                    (await response.text()).split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length > 0) :
+                    [];
+
+                editorAutocorrectEngine = new AutocorrectEngine({
+                    baseWords: [...baseDictionary, ...commonWords],
+                    keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {},
+                    maxEditDistance: 2,
+                    adjacentKeyMultiplier: 0.4
+                });
+            } catch (error) {
+                console.error('Failed to initialize autocorrect:', error);
+                // Fallback to basic dictionary
+                editorAutocorrectEngine = new AutocorrectEngine({
+                    baseWords: baseDictionary,
+                    keyboardNeighbors: {},
+                    maxEditDistance: 2,
+                    adjacentKeyMultiplier: 0.4
+                });
+            }
+        }
+
+        // Editor functionality
+        const editor = document.getElementById('document-editor');
+        const wordCount = document.getElementById('word-count');
+        const saveStatus = document.getElementById('save-status');
+        const cursorPosition = document.getElementById('cursor-position');
+        const documentTitle = document.getElementById('document-title');
+
+        // Word count and character count
+        function updateWordCount() {
+            const text = editor.value;
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            const characters = text.length;
+
+            wordCount.textContent = `${words} word${words !== 1 ? 's' : ''}, ${characters} character${characters !== 1 ? 's' : ''}`;
+        }
+
+        // Cursor position tracking
+        function updateCursorPosition() {
+            const text = editor.value;
+            const cursorPos = editor.selectionStart;
+            const beforeCursor = text.substring(0, cursorPos);
+            const lines = beforeCursor.split('\n');
+            const line = lines.length;
+            const column = lines[lines.length - 1].length + 1;
+
+            cursorPosition.textContent = `Line ${line}, Column ${column}`;
+        }
+
+        // Auto-save simulation
+        function showSaveStatus() {
+            saveStatus.textContent = 'Saving...';
+            saveStatus.style.color = '#ea4335';
+
+            setTimeout(() => {
+                saveStatus.textContent = 'All changes saved automatically';
+                saveStatus.style.color = '#34a853';
+            }, 800);
+        }
+
+        // Basic formatting
+        function toggleFormat(command) {
+            const btn = document.getElementById(command + '-btn');
+            if (btn) {
+                btn.classList.toggle('active');
+                // In a real implementation, you'd apply formatting to selected text
+                showSaveStatus();
+            }
+        }
+
+        // Font size change
+        function changeFontSize(size) {
+            editor.style.fontSize = size + 'px';
+            showSaveStatus();
+        }
+
+        // Autocorrect functionality
+        function getWordAtPosition(text, position) {
+            const wordChar = /[a-zA-Z'\-]/;
+            let start = position;
+            while (start > 0 && wordChar.test(text[start - 1])) {
+                start--;
+            }
+            let end = position;
+            while (end < text.length && wordChar.test(text[end])) {
+                end++;
+            }
+            const word = text.substring(start, end);
+            return { word, start, end };
+        }
+
+        function calculateCaretPosition(textarea, cursorPos) {
+            // Create a mirrored element to calculate exact coordinates
+            const mirroredEle = document.createElement('div');
+            const style = window.getComputedStyle(textarea);
+
+            // Copy all relevant styles from textarea to mirrored element
+            mirroredEle.style.position = 'absolute';
+            mirroredEle.style.visibility = 'hidden';
+            mirroredEle.style.top = '0px';
+            mirroredEle.style.left = '0px';
+            mirroredEle.style.whiteSpace = 'pre-wrap';
+            mirroredEle.style.wordWrap = 'break-word';
+            mirroredEle.style.font = style.font;
+            mirroredEle.style.fontSize = style.fontSize;
+            mirroredEle.style.fontFamily = style.fontFamily;
+            mirroredEle.style.fontWeight = style.fontWeight;
+            mirroredEle.style.lineHeight = style.lineHeight;
+            mirroredEle.style.padding = style.padding;
+            mirroredEle.style.border = style.border;
+            mirroredEle.style.width = style.width;
+            mirroredEle.style.height = style.height;
+            mirroredEle.style.boxSizing = style.boxSizing;
+            mirroredEle.style.overflow = 'hidden';
+
+            // Split text before and after cursor
+            const textBeforeCursor = textarea.value.substring(0, cursorPos);
+            const textAfterCursor = textarea.value.substring(cursorPos);
+
+            // Create nodes to represent cursor position
+            const pre = document.createTextNode(textBeforeCursor);
+            const post = document.createTextNode(textAfterCursor);
+            const caretEle = document.createElement('span');
+            caretEle.innerHTML = '&nbsp;';
+
+            // Append nodes to mirrored element
+            mirroredEle.innerHTML = '';
+            mirroredEle.append(pre, caretEle, post);
+            document.body.appendChild(mirroredEle);
+
+            // Get cursor coordinates relative to mirrored element
+            const caretRect = caretEle.getBoundingClientRect();
+            // Get textarea position
+            const textareaRect = textarea.getBoundingClientRect();
+
+            // Clean up
+            document.body.removeChild(mirroredEle);
+
+            return {
+                x: textareaRect.left + caretRect.left,
+                y: textareaRect.top + caretRect.top - 35 // Position tooltip above cursor
+            };
+        }
+
+        function performAutocorrectPreview() {
+            if (!editorAutocorrectEngine) return;
+
+            const cursorPos = editor.selectionStart;
+            const currentValue = editor.value;
+            const textBeforeCursor = currentValue.substring(0, cursorPos);
+
+            const { word } = getWordAtPosition(textBeforeCursor, cursorPos);
+
+            if (word && word.length > 1) {
+                const correction = editorAutocorrectEngine.findClosestWord(word);
+                if (correction && correction !== word) {
+                    showTooltip(correction, cursorPos);
+                    return;
+                }
+            }
+            hideTooltip();
+        }
+
+        function showTooltip(text, position) {
+            const tooltip = document.getElementById('autocorrect-tooltip');
+            const correctionText = document.getElementById('correction-text');
+
+            correctionText.textContent = text;
+
+            // Use actual cursor position
+            const pos = calculateCaretPosition(editor, position);
+
+            // Position tooltip first to measure its width
+            tooltip.style.left = pos.x + 'px';
+            tooltip.style.top = pos.y + 'px';
+            tooltip.classList.add('show');
+
+            // Position tooltip so right edge is consistent relative to cursor
+            const tooltipWidth = tooltip.offsetWidth;
+            tooltip.style.left = (pos.x - tooltipWidth + 16) + 'px';
+
+        }
+
+        function hideTooltip() {
+            const tooltip = document.getElementById('autocorrect-tooltip');
+            tooltip.classList.remove('show');
+        }
+
+        function performAutocorrectInEditor() {
+            if (!editorAutocorrectEngine) return;
+
+            // Check suppression using CURRENT counter value (before resetting)
+            const shouldSuppress = shouldSuppressAutocorrect();
+
+            // Reset counter after word termination (new word starts) - AFTER checking suppression
+            resetBackspaceCounter('word termination');
+
+            // Apply suppression logic
+            if (shouldSuppress) {
+                return false;
+            }
+
+            const cursorPos = editor.selectionStart;
+            const currentValue = editor.value;
+            const textBeforeCursor = currentValue.substring(0, cursorPos - 1);
+
+            const { word, start } = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
+
+            if (word && word.length > 1) {
+                const correction = editorAutocorrectEngine.findClosestWord(word);
+                if (correction && correction !== word) {
+                    const beforeWord = currentValue.substring(0, start);
+                    const afterWord = currentValue.substring(start + word.length);
+                    const newValue = beforeWord + correction + afterWord;
+                    const newCursorPos = cursorPos + (correction.length - word.length);
+
+                    editor.value = newValue;
+                    editor.setSelectionRange(newCursorPos, newCursorPos);
+                    updateWordCount();
+                    showSaveStatus();
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Event listeners
+        editor.addEventListener('input', function(e) {
+            updateWordCount();
+            showSaveStatus();
+
+            // Track length changes for backspace detection
+            const currentLength = editor.value.length;
+
+            // If length increased, count characters typed
+            if (currentLength > previousInputLength) {
+                const charsAdded = currentLength - previousInputLength;
+                const cursorPos = editor.selectionStart;
+                const currentValue = editor.value;
+                const actualTypedChar = currentValue.charAt(cursorPos - 1);
+                const isSpaceOrPunct = /[\s.,.!?;:"()]/.test(actualTypedChar);
+
+                // Only count non-space characters toward backspace penalty
+                if (!isSpaceOrPunct) {
+                    charsTypedSinceLastBackspace += charsAdded;
+                }
+
+                // Check for autocorrect on space or punctuation
+                if (actualTypedChar === ' ' || actualTypedChar === '.' || actualTypedChar === ',' ||
+                    actualTypedChar === '!' || actualTypedChar === '?') {
+                    hideTooltip();
+                    setTimeout(() => performAutocorrectInEditor(), 50);
+                } else {
+                    // Show preview tooltip while typing
+                    setTimeout(() => performAutocorrectPreview(), 100);
+                }
+            }
+            // If length decreased, handle backspace
+            else if (currentLength < previousInputLength) {
+                // Reset counter on backspace (suppresses autocorrect until 2+ new chars typed)
+                resetBackspaceCounter('backspace detected');
+                // Always hide tooltip after backspace
+                hideTooltip();
+            }
+
+            // Update previous length for next comparison
+            previousInputLength = currentLength;
+        });
+
+        editor.addEventListener('keyup', updateCursorPosition);
+        editor.addEventListener('click', function() {
+            updateCursorPosition();
+            hideTooltip();
+        });
+
+        // Hide tooltip on cursor movement
+        editor.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
+                e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                hideTooltip();
+            }
+        });
+
+        // Formatting buttons
+        document.getElementById('bold-btn').addEventListener('click', () => toggleFormat('bold'));
+        document.getElementById('italic-btn').addEventListener('click', () => toggleFormat('italic'));
+        document.getElementById('underline-btn').addEventListener('click', () => toggleFormat('underline'));
+
+        document.getElementById('font-size').addEventListener('change', function() {
+            changeFontSize(this.value);
+        });
+
+        // Document title editing
+        documentTitle.addEventListener('input', function() {
+            showSaveStatus();
+        });
+
+        documentTitle.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.blur();
+            }
+        });
+
+        // Keyboard shortcuts
+        editor.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'b':
+                        e.preventDefault();
+                        toggleFormat('bold');
+                        break;
+                    case 'i':
+                        e.preventDefault();
+                        toggleFormat('italic');
+                        break;
+                    case 'u':
+                        e.preventDefault();
+                        toggleFormat('underline');
+                        break;
+                }
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeEditorAutocorrect();
+            updateWordCount();
+            updateCursorPosition();
+
+            // Initialize length tracking
+            previousInputLength = editor.value.length;
+
+            // Focus the editor
+            editor.focus();
+
+            // Position cursor at end of seed text
+            editor.setSelectionRange(editor.value.length, editor.value.length);
+        });
+    </script>
+</body>
+</html>
