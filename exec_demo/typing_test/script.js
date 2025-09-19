@@ -610,12 +610,9 @@ function generateLeaderboard() {
 
     // Create leaderboard entries with random results
     const leaderboardData = [
-        // { name: "Andrew Bosworth", wpm: 119, accuracy: 99, isCurrentUser: false },
-        // { name: "Susan Li", wpm: 127, accuracy: 98, isCurrentUser: false },
-        // { name: "Alex Himel", wpm: 117, accuracy: 97, isCurrentUser: false },
-        { name: "Andrew Bosworth", wpm: 95, accuracy: 99, isCurrentUser: false },
-        { name: "Susan Li", wpm: 101, accuracy: 98, isCurrentUser: false },
-        { name: "Alex Himel", wpm: 93, accuracy: 97, isCurrentUser: false },
+        { name: "Ali Kosh", wpm: 118, accuracy: 96, isCurrentUser: false },
+        { name: "Newlin Hui", wpm: 101, accuracy: 95, isCurrentUser: false },
+        { name: "Abhik Lahiri", wpm: 89, accuracy: 100, isCurrentUser: false },
         { name: "You", wpm: currentWpm, accuracy: currentAccuracy, isCurrentUser: true }
     ];
 

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -271,6 +272,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <h1>Document Editor</h1>
@@ -310,13 +312,9 @@
         </div>
 
         <div class="editor-container" style="position: relative;">
-            <div
-                class="editor"
-                id="document-editor"
-                contenteditable="true"
-                spellcheck="true"
-                data-placeholder="Start writing your document..."
-            >This is a sample text document</div>
+            <div class="editor" id="document-editor" contenteditable="true" spellcheck="true"
+                data-placeholder="Start writing your document...">This is a sample text document. 
+            </div>
 
             <div class="autocorrect-tooltip" id="autocorrect-tooltip">
                 <span id="correction-text"></span>
@@ -561,15 +559,12 @@
         }
 
         function performAutocorrectInEditor() {
-            console.log('performAutocorrectInEditor called');
             if (!editorAutocorrectEngine) {
-                console.log('No autocorrect engine');
                 return;
             }
 
             // Check suppression using CURRENT counter value (before resetting)
             const shouldSuppress = shouldSuppressAutocorrect();
-            console.log('Should suppress:', shouldSuppress);
 
             // Reset counter after word termination (new word starts) - AFTER checking suppression
             resetBackspaceCounter('word termination');
@@ -581,7 +576,6 @@
 
             const selection = window.getSelection();
             if (selection.rangeCount === 0) {
-                console.log('No selection');
                 return false;
             }
 
@@ -595,18 +589,11 @@
             // Remove the trailing space/punctuation that triggered this
             textToAnalyze = textToAnalyze.replace(/\s+$/, '');
 
-            console.log('Current text:', currentValue);
-            console.log('Text to analyze:', textToAnalyze);
-            console.log('Cursor pos:', cursorPos);
-
             const { word, start } = getWordAtPosition(textToAnalyze, textToAnalyze.length);
-            console.log('Found word:', word, 'at position:', start);
 
             if (word && word.length > 1) {
                 const correction = editorAutocorrectEngine.findClosestWord(word);
-                console.log('Correction found:', correction, 'for word:', word);
                 if (correction && correction !== word) {
-                    console.log('Applying correction:', word, '->', correction);
                     // Find the word in the current selection and replace it
                     const selection = window.getSelection();
                     if (selection.rangeCount > 0) {
@@ -663,7 +650,7 @@
         }
 
         // Event listeners
-        editor.addEventListener('input', function(e) {
+        editor.addEventListener('input', function (e) {
             updateWordCount();
 
             // Track length changes for backspace detection
@@ -688,8 +675,6 @@
                 const actualTypedChar = cursorPos > 0 ? currentValue.charAt(cursorPos - 1) : '';
                 const isSpaceOrPunct = /[\s.,.!?;:"()]/.test(actualTypedChar);
 
-                console.log('Input event - typed char:', JSON.stringify(actualTypedChar), 'cursorPos:', cursorPos, 'isSpaceOrPunct:', isSpaceOrPunct);
-
                 // Only count non-space characters toward backspace penalty
                 if (!isSpaceOrPunct) {
                     charsTypedSinceLastBackspace += charsAdded;
@@ -697,11 +682,9 @@
 
                 // Check for autocorrect on space or punctuation
                 if (isSpaceOrPunct) {
-                    console.log('Space/punctuation detected, triggering autocorrect');
                     hideTooltip();
                     setTimeout(() => performAutocorrectInEditor(), 50);
                 } else {
-                    console.log('Regular character, showing preview');
                     // Show preview tooltip while typing
                     setTimeout(() => performAutocorrectPreview(), 100);
                 }
@@ -725,23 +708,23 @@
             document.getElementById('underline-btn').classList.toggle('active', document.queryCommandState('underline'));
         }
 
-        editor.addEventListener('keyup', function() {
+        editor.addEventListener('keyup', function () {
             updateCursorPosition();
             updateButtonStates();
         });
 
-        editor.addEventListener('click', function() {
+        editor.addEventListener('click', function () {
             updateCursorPosition();
             updateButtonStates();
             hideTooltip();
         });
 
-        editor.addEventListener('mouseup', function() {
+        editor.addEventListener('mouseup', function () {
             updateButtonStates();
         });
 
         // Hide tooltip on cursor movement
-        editor.addEventListener('keydown', function(e) {
+        editor.addEventListener('keydown', function (e) {
             if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
                 e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                 hideTooltip();
@@ -753,16 +736,16 @@
         document.getElementById('italic-btn').addEventListener('click', () => toggleFormat('italic'));
         document.getElementById('underline-btn').addEventListener('click', () => toggleFormat('underline'));
 
-        document.getElementById('font-size').addEventListener('change', function() {
+        document.getElementById('font-size').addEventListener('change', function () {
             changeFontSize(this.value);
         });
 
         // Document title editing
-        documentTitle.addEventListener('input', function() {
+        documentTitle.addEventListener('input', function () {
             // Title changed
         });
 
-        documentTitle.addEventListener('keydown', function(e) {
+        documentTitle.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 this.blur();
@@ -770,9 +753,9 @@
         });
 
         // Keyboard shortcuts
-        editor.addEventListener('keydown', function(e) {
+        editor.addEventListener('keydown', function (e) {
             if (e.ctrlKey || e.metaKey) {
-                switch(e.key) {
+                switch (e.key) {
                     case 'b':
                         e.preventDefault();
                         toggleFormat('bold');
@@ -790,7 +773,7 @@
         });
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             initializeEditorAutocorrect();
             updateWordCount();
             updateCursorPosition();
@@ -811,4 +794,5 @@
         });
     </script>
 </body>
+
 </html>
