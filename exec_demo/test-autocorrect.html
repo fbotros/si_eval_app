@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autocorrect Engine Tests</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+        }
+        .test-case {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 4px solid #ddd;
+            background-color: #f9f9f9;
+        }
+        .test-case.pass {
+            border-left-color: #4CAF50;
+            background-color: #f1f8e9;
+        }
+        .test-case.fail {
+            border-left-color: #f44336;
+            background-color: #ffebee;
+        }
+        .test-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .test-details {
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .summary {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .stats {
+            background: #f3e5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Autocorrect Engine Tests</h1>
+
+    <div class="test-container">
+        <div class="stats" id="engine-stats"></div>
+        <div id="test-results"></div>
+        <div class="summary" id="test-summary"></div>
+    </div>
+
+    <script src="keyboard-layout.js"></script>
+    <script src="TrieDictionary.js"></script>
+    <script src="AutocorrectEngine.js"></script>
+
+    <script>
+        // Test suite for AutocorrectEngine
+        class AutocorrectTester {
+            constructor() {
+                this.tests = [];
+                this.results = [];
+                this.setupEngine();
+            }
+
+            setupEngine() {
+                // Common test dictionary
+                const testWords = [
+                    'hello', 'world', 'test', 'the', 'quick', 'brown', 'fox',
+                    'jumps', 'over', 'lazy', 'dog', 'good', 'great', 'fantastic',
+                    'can', 'we', 'should', 'would', 'could', 'example', 'simple',
+                    'typing', 'keyboard', 'autocorrect', 'spell', 'check',
+                    "don't", "can't", "won't", "it's", "i'm", "you're",
+                    'a', 'an', 'i', 'to', 'of', 'and', 'or', 'but', 'if'
+                ];
+
+                this.engine = new AutocorrectEngine({
+                    baseWords: testWords,
+                    keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {},
+                    maxEditDistance: 2,
+                    adjacentKeyMultiplier: 0.4
+                });
+
+                // Display engine stats
+                const stats = this.engine.getStats();
+                document.getElementById('engine-stats').innerHTML = `
+                    <h3>Engine Statistics</h3>
+                    <p><strong>Dictionary Size:</strong> ${stats.dictionarySize}</p>
+                    <p><strong>Max Edit Distance:</strong> ${stats.maxEditDistance}</p>
+                    <p><strong>Has TrieDictionary:</strong> ${stats.hasTrieDictionary}</p>
+                    <p><strong>Keyboard Neighbors:</strong> ${stats.keyboardNeighborsCount} keys</p>
+                    <p><strong>Cache Size:</strong> ${stats.cacheSize}</p>
+                `;
+            }
+
+            addTest(name, testFn) {
+                this.tests.push({ name, testFn });
+            }
+
+            runTests() {
+                console.log('Running autocorrect tests...');
+
+                this.results = [];
+                this.tests.forEach(test => {
+                    try {
+                        const result = test.testFn(this.engine);
+                        this.results.push({
+                            name: test.name,
+                            passed: result.passed,
+                            details: result.details || '',
+                            expected: result.expected,
+                            actual: result.actual
+                        });
+                    } catch (error) {
+                        this.results.push({
+                            name: test.name,
+                            passed: false,
+                            details: `Error: ${error.message}`,
+                            expected: 'No error',
+                            actual: error.message
+                        });
+                    }
+                });
+
+                this.displayResults();
+            }
+
+            displayResults() {
+                const container = document.getElementById('test-results');
+                const summary = document.getElementById('test-summary');
+
+                const passed = this.results.filter(r => r.passed).length;
+                const total = this.results.length;
+
+                // Group tests by category
+                const categories = {
+                    'Basic Corrections': [],
+                    'Keyboard Proximity': [],
+                    'Two-Word Splitting': [],
+                    'Edge Cases': [],
+                    'Performance': []
+                };
+
+                this.results.forEach(result => {
+                    let category = 'Basic Corrections';
+                    if (result.name.includes('keyboard') || result.name.includes('neighbor')) {
+                        category = 'Keyboard Proximity';
+                    } else if (result.name.includes('split') || result.name.includes('two')) {
+                        category = 'Two-Word Splitting';
+                    } else if (result.name.includes('edge') || result.name.includes('empty')) {
+                        category = 'Edge Cases';
+                    } else if (result.name.includes('performance') || result.name.includes('cache')) {
+                        category = 'Performance';
+                    }
+                    categories[category].push(result);
+                });
+
+                let html = '';
+                Object.entries(categories).forEach(([category, tests]) => {
+                    if (tests.length === 0) return;
+
+                    html += `<div class="test-section">`;
+                    html += `<h3>${category}</h3>`;
+
+                    tests.forEach(result => {
+                        const cssClass = result.passed ? 'pass' : 'fail';
+                        html += `<div class="test-case ${cssClass}">`;
+                        html += `<div class="test-name">${result.passed ? '✓' : '✗'} ${result.name}</div>`;
+                        if (result.details) {
+                            html += `<div class="test-details">${result.details}</div>`;
+                        }
+                        if (!result.passed) {
+                            html += `<div class="test-details">Expected: ${result.expected}</div>`;
+                            html += `<div class="test-details">Actual: ${result.actual}</div>`;
+                        }
+                        html += `</div>`;
+                    });
+
+                    html += `</div>`;
+                });
+
+                container.innerHTML = html;
+                summary.innerHTML = `
+                    <h3>Test Summary</h3>
+                    <p><strong>${passed}/${total}</strong> tests passed (${Math.round(passed/total*100)}%)</p>
+                    ${passed === total ? '<p style="color: green;">🎉 All tests passed!</p>' : '<p style="color: orange;">⚠️ Some tests failed</p>'}
+                `;
+            }
+
+            // Test helper methods
+            assertEqual(actual, expected, message = '') {
+                const passed = actual === expected;
+                return {
+                    passed,
+                    details: message,
+                    expected: expected,
+                    actual: actual
+                };
+            }
+
+            assertTrue(condition, message = '') {
+                return {
+                    passed: !!condition,
+                    details: message,
+                    expected: 'true',
+                    actual: String(!!condition)
+                };
+            }
+        }
+
+        // Initialize tester
+        const tester = new AutocorrectTester();
+
+        // Add tests
+        tester.addTest('Engine setup verification', (engine) => {
+            const stats = engine.getStats();
+            return tester.assertTrue(stats.dictionarySize > 0, `Engine initialized with ${stats.dictionarySize} words`);
+        });
+
+        tester.addTest('Basic word correction', (engine) => {
+            const result = engine.findClosestWord('helo');
+            return tester.assertEqual(result, 'hello', 'Should correct "helo" to "hello"');
+        });
+
+        tester.addTest('Word already correct', (engine) => {
+            const result = engine.findClosestWord('hello');
+            return tester.assertEqual(result, 'hello', 'Should return "hello" unchanged');
+        });
+
+        tester.addTest('No correction needed', (engine) => {
+            const result = engine.findClosestWord('world');
+            return tester.assertEqual(result, 'world', 'Should return "world" unchanged');
+        });
+
+        tester.addTest('Debug: Edit distances for "teh"', (engine) => {
+            const distanceToThe = engine.levenshteinDistance('teh', 'the');
+            const distanceToTest = engine.levenshteinDistance('teh', 'test');
+            const stats = engine.getStats();
+            return tester.assertTrue(distanceToThe < distanceToTest, `Distance to "the": ${distanceToThe}, to "test": ${distanceToTest}, TrieDictionary: ${stats.hasTrieDictionary}`);
+        });
+
+        tester.addTest('Debug: Manual best correction for "teh"', (engine) => {
+            const result = engine.findBestCorrectionForPart('teh');
+            return tester.assertEqual(result, 'the', `Manual correction returned: ${result}`);
+        });
+
+        tester.addTest('Multiple character corrections', (engine) => {
+            const result = engine.findClosestWord('teh');
+            return tester.assertEqual(result, 'the', 'Should correct "teh" to "the"');
+        });
+
+        tester.addTest('Keyboard neighbors available', (engine) => {
+            const stats = engine.getStats();
+            return tester.assertTrue(stats.keyboardNeighborsCount > 0, `Keyboard neighbors loaded: ${stats.keyboardNeighborsCount} keys`);
+        });
+
+        tester.addTest('Keyboard neighbor correction', (engine) => {
+            // Test if keyboard neighbors get lower edit distance
+            const distance1 = engine.levenshteinDistance('heklo', 'hello'); // k -> l (neighbors)
+            const distance2 = engine.levenshteinDistance('hexlo', 'hello'); // x -> l (not neighbors)
+            return tester.assertTrue(distance1 < distance2, `k->l distance: ${distance1}, x->l distance: ${distance2}`);
+        });
+
+        tester.addTest('Two-word splitting: basic', (engine) => {
+            const result = engine.findTwoWordSplit('canwe');
+            return tester.assertEqual(result, 'can we', 'Should split "canwe" to "can we"');
+        });
+
+        tester.addTest('Two-word splitting: capitalized', (engine) => {
+            const result = engine.findTwoWordSplit('Canwe');
+            return tester.assertEqual(result, 'Can we', 'Should split "Canwe" to "Can we" with proper capitalization');
+        });
+
+        tester.addTest('Two-word splitting: no valid split', (engine) => {
+            const result = engine.findTwoWordSplit('xyz123');
+            return tester.assertEqual(result, null, 'Should return null for non-splittable words');
+        });
+
+        tester.addTest('Edge case: empty string', (engine) => {
+            const result = engine.findClosestWord('');
+            return tester.assertEqual(result, '', 'Should handle empty string gracefully');
+        });
+
+        tester.addTest('Edge case: single character', (engine) => {
+            const result = engine.findClosestWord('a');
+            return tester.assertEqual(result, 'a', 'Should handle single character words');
+        });
+
+        tester.addTest('Edge case: very long incorrect word', (engine) => {
+            const result = engine.findClosestWord('supercalifragilisticexpialidocious');
+            return tester.assertTrue(result !== '', 'Should handle very long words without crashing');
+        });
+
+        tester.addTest('Contractions support', (engine) => {
+            const result = engine.findClosestWord("dont");
+            return tester.assertEqual(result, "don't", 'Should correct "dont" to "don\'t"');
+        });
+
+        tester.addTest('Case preservation in corrections', (engine) => {
+            const result = engine.findClosestWord('HELO');
+            // Note: current implementation lowercases, this test documents current behavior
+            return tester.assertTrue(result.toLowerCase() === 'hello', 'Should find correct word regardless of case');
+        });
+
+        tester.addTest('Levenshtein distance calculation', (engine) => {
+            const distance = engine.levenshteinDistance('kitten', 'sitting');
+            return tester.assertTrue(distance > 0 && distance < 10, 'Should calculate reasonable edit distance');
+        });
+
+        tester.addTest('Dictionary word checking', (engine) => {
+            const hasHello = engine.hasWord('hello');
+            const hasXyz = engine.hasWord('xyz123');
+            return tester.assertTrue(hasHello && !hasXyz, 'Dictionary should contain expected words');
+        });
+
+        tester.addTest('Cache functionality', (engine) => {
+            engine.clearCache();
+            const initialCacheSize = engine.getStats().cacheSize;
+            engine.findBestCorrectionForPart('helo');
+            const afterCacheSize = engine.getStats().cacheSize;
+            return tester.assertTrue(afterCacheSize > initialCacheSize, 'Cache should store correction results');
+        });
+
+        tester.addTest('Process text functionality', (engine) => {
+            const result = engine.processText('hello wrold');
+            return tester.assertTrue(result.corrected, 'Should detect and offer corrections for text');
+        });
+
+        // Run all tests
+        tester.runTests();
+    </script>
+</body>
+</html>

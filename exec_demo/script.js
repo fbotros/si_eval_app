@@ -4,29 +4,8 @@
 // Typing test prompts will be loaded from prompts.txt
 let prompts = [];
 
-// Base dictionary of common words
-const baseDictionary = [
-    'a', 'an', 'in', 'on', 'at', 'by', 'for', 'with', 'about', 'against',
-    'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
-    'from', 'up', 'down', 'out', 'off', 'over', 'under', 'again', 'further',
-    'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all',
-    'any', 'both', 'each', 'few', 'more', 'most', 'some', 'other', 'have',
-    'has', 'had', 'do', 'does', 'did', 'but', 'if', 'or', 'because', 'until',
-    'while', 'of', 'this', 'these', 'those', 'am', 'are', 'was', 'were',
-    'nation', 'stability', 'rectangular', 'objects', 'sides', 'silly', 'questions',
-    'learn', 'walk', 'run', 'important', 'news', 'always', 'seems', 'late',
-    'quick', 'brown', 'fox', 'jumps', 'lazy', 'dog', 'steep', 'learning',
-    'curve', 'riding', 'unicycle', 'discreet', 'meeting', 'raindrops', 'falling',
-    'head', 'excellent', 'communicate', 'how', 'are', 'you', 'doing', 'today',
-    'fine', 'thank', 'very', 'much', 'whats', 'with', 'lately', 'not',
-    'just', 'hanging', 'out', 'hello', 'world', 'test', 'the', 'that',
-    'can', 'we', 'should', 'good', 'go', 'old', 'fantastic', 'arbitrary',
-    "don't", "can't", "won't", "it's", "i'm", "you're", "we're", "they're"
-];
-
-let dictionary = [...baseDictionary];
-let dictionarySet = new Set(dictionary);
-let trieDictionary = null;
+// Initialize AutocorrectEngine
+let autocorrectEngine = null;
 
 // Fisher-Yates shuffle algorithm to randomize array
 function shuffleArray(array) {
@@ -49,34 +28,59 @@ async function loadPrompts() {
     shufflePrompts();
 }
 
-async function initializeDictionary() {
-    dictionary = [...baseDictionary];
-    dictionarySet = new Set(dictionary);
+async function initializeAutocorrect() {
+    // Base dictionary of common words
+    const baseDictionary = [
+        'a', 'an', 'in', 'on', 'at', 'by', 'for', 'with', 'about', 'against',
+        'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
+        'from', 'up', 'down', 'out', 'off', 'over', 'under', 'again', 'further',
+        'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all',
+        'any', 'both', 'each', 'few', 'more', 'most', 'some', 'other', 'have',
+        'has', 'had', 'do', 'does', 'did', 'but', 'if', 'or', 'because', 'until',
+        'while', 'of', 'this', 'these', 'those', 'am', 'are', 'was', 'were',
+        'nation', 'stability', 'rectangular', 'objects', 'sides', 'silly', 'questions',
+        'learn', 'walk', 'run', 'important', 'news', 'always', 'seems', 'late',
+        'quick', 'brown', 'fox', 'jumps', 'lazy', 'dog', 'steep', 'learning',
+        'curve', 'riding', 'unicycle', 'discreet', 'meeting', 'raindrops', 'falling',
+        'head', 'excellent', 'communicate', 'how', 'are', 'you', 'doing', 'today',
+        'fine', 'thank', 'very', 'much', 'whats', 'with', 'lately', 'not',
+        'just', 'hanging', 'out', 'hello', 'world', 'test', 'the', 'that',
+        'can', 'we', 'should', 'good', 'go', 'old', 'fantastic', 'arbitrary',
+        "don't", "can't", "won't", "it's", "i'm", "you're", "we're", "they're"
+    ];
 
+    // Initialize AutocorrectEngine with base words and keyboard layout
+    autocorrectEngine = new AutocorrectEngine({
+        baseWords: baseDictionary,
+        keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {},
+        maxEditDistance: 2,
+        adjacentKeyMultiplier: 0.4
+    });
+
+    // Add words from prompts
+    const allWords = [];
     prompts.forEach(prompt => {
-        extractWords(prompt).forEach(word => {
-            if (!dictionarySet.has(word)) {
-                dictionary.push(word);
-                dictionarySet.add(word);
-            }
+        autocorrectEngine.extractWords(prompt).forEach(word => {
+            allWords.push(word);
         });
     });
 
+    // Load additional words from common_words.txt
     try {
         const response = await fetch('./common_words.txt');
         if (response.ok) {
             const text = await response.text();
-            text.split('\n')
+            const commonWords = text.split('\n')
                 .map(word => word.trim().toLowerCase())
-                .filter(word => word.length > 0 && !dictionarySet.has(word))
-                .forEach(word => {
-                    dictionary.push(word);
-                    dictionarySet.add(word);
-                });
+                .filter(word => word.length > 0);
+            allWords.push(...commonWords);
         }
     } catch (error) {}
 
-    trieDictionary = new TrieDictionary(0.4, dictionary);
+    // Add all words to the autocorrect engine
+    if (allWords.length > 0) {
+        autocorrectEngine.addWords(allWords);
+    }
 }
 
 let currentPromptIndex = 0;
@@ -135,174 +139,6 @@ function startTest() {
     promptTimingStarted = false;
 }
 
-function areNeighboringKeys(char1, char2) {
-    const c1 = char1.toLowerCase();
-    const c2 = char2.toLowerCase();
-    return c1 !== c2 && keyboardNeighbors[c1]?.includes(c2) || false;
-}
-
-function levenshteinDistance(a, b, maxEditDist = 2) {
-    if (a.length === 0) return b.length > maxEditDist ? maxEditDist + 1 : b.length;
-    if (b.length === 0) return a.length > maxEditDist ? maxEditDist + 1 : a.length;
-    if (Math.abs(a.length - b.length) > maxEditDist) return maxEditDist + 1;
-
-    const lengthDiff = Math.abs(a.length - b.length);
-    const lengthPenalty = lengthDiff * 0.2;
-    const simpleBonus = lengthDiff > 0 ? -0.5 : 0;
-
-    const matrix = Array(b.length + 1).fill().map((_, i) => [i]);
-    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-
-    for (let i = 1; i <= b.length; i++) {
-        let minInRow = Infinity;
-        for (let j = 1; j <= a.length; j++) {
-            if (b[i - 1] === a[j - 1]) {
-                matrix[i][j] = matrix[i - 1][j - 1];
-            } else {
-                const substitutionCost = areNeighboringKeys(a[j - 1], b[i - 1]) ? 0.4 : 1.0;
-                matrix[i][j] = Math.min(
-                    matrix[i - 1][j - 1] + substitutionCost,
-                    matrix[i][j - 1] + 1,
-                    matrix[i - 1][j] + 1
-                );
-            }
-            minInRow = Math.min(minInRow, matrix[i][j]);
-        }
-        if (minInRow > maxEditDist) return maxEditDist + 1;
-    }
-
-    return matrix[b.length][a.length] + lengthPenalty + simpleBonus;
-}
-
-function findClosestWord(word) {
-    if (dictionarySet.has(word)) return word;
-
-    const singleWordCorrection = trieDictionary.findClosestWord(word);
-    const singleWordDistance = singleWordCorrection === word ? Infinity : levenshteinDistance(word, singleWordCorrection);
-
-    const twoWordSplit = findTwoWordSplit(word);
-    const twoWordDistance = twoWordSplit ? getTwoWordSplitDistance(word) : Infinity;
-
-    if (singleWordCorrection !== word && singleWordDistance <= twoWordDistance) {
-        return singleWordCorrection;
-    } else if (twoWordSplit && twoWordDistance <= 2) {
-        return twoWordSplit;
-    }
-
-    return singleWordCorrection;
-}
-
-function getTwoWordSplitDistance(word) {
-    const lowerWord = word.toLowerCase();
-    let bestDistance = Infinity;
-
-    for (let i = 2; i <= lowerWord.length - 2; i++) {
-        const firstPart = lowerWord.substring(0, i);
-        const secondPart = lowerWord.substring(i);
-
-        if (dictionarySet.has(firstPart) && dictionarySet.has(secondPart)) {
-            return 1;
-        }
-
-        const firstCorrected = findBestCorrectionForPart(firstPart);
-        const secondCorrected = findBestCorrectionForPart(secondPart);
-
-        if (firstCorrected && secondCorrected) {
-            const totalDistance = levenshteinDistance(firstPart, firstCorrected, 2) +
-                                levenshteinDistance(secondPart, secondCorrected, 2) + 1;
-            if (totalDistance < bestDistance) bestDistance = totalDistance;
-        }
-    }
-
-    return bestDistance;
-}
-
-function findClosestWordForPreview(word) {
-    if (dictionarySet.has(word)) return word;
-
-    const singleWordCorrection = trieDictionary.findClosestWord(word);
-    const singleWordDistance = singleWordCorrection === word ? Infinity : levenshteinDistance(word, singleWordCorrection);
-
-    const twoWordSplit = findTwoWordSplit(word);
-    const twoWordDistance = twoWordSplit ? getTwoWordSplitDistance(word) : Infinity;
-
-    if (singleWordCorrection !== word && singleWordDistance <= twoWordDistance) {
-        return singleWordCorrection;
-    } else if (twoWordSplit && twoWordDistance <= 2) {
-        return twoWordSplit;
-    }
-
-    return singleWordCorrection;
-}
-
-function extractWords(text) {
-    return text.toLowerCase().split(/[\s.,!?;:"()]+/).filter(word => word.length > 0);
-}
-
-function findTwoWordSplit(word) {
-    if (word.length < 4 || dictionarySet.has(word.toLowerCase())) return null;
-
-    const lowerWord = word.toLowerCase();
-    const isCapitalized = word[0] === word[0].toUpperCase();
-    let bestSplit = null;
-    let bestScore = Infinity;
-
-    for (let i = 2; i <= lowerWord.length - 2; i++) {
-        const firstPart = lowerWord.substring(0, i);
-        const secondPart = lowerWord.substring(i);
-
-        if (dictionarySet.has(firstPart) && dictionarySet.has(secondPart)) {
-            const result = isCapitalized ?
-                firstPart.charAt(0).toUpperCase() + firstPart.slice(1) + ' ' + secondPart :
-                firstPart + ' ' + secondPart;
-            return result;
-        }
-
-        const firstCorrected = findBestCorrectionForPart(firstPart);
-        const secondCorrected = findBestCorrectionForPart(secondPart);
-
-        if (firstCorrected && secondCorrected) {
-            const totalDistance = levenshteinDistance(firstPart, firstCorrected, 2) +
-                                levenshteinDistance(secondPart, secondCorrected, 2);
-
-            if (totalDistance <= 2 && totalDistance < bestScore) {
-                bestScore = totalDistance;
-                bestSplit = isCapitalized ?
-                    firstCorrected.charAt(0).toUpperCase() + firstCorrected.slice(1) + ' ' + secondCorrected :
-                    firstCorrected + ' ' + secondCorrected;
-            }
-        }
-    }
-
-    return bestSplit;
-}
-
-// Cache for expensive correction lookups
-let correctionCache = new Map();
-
-function findBestCorrectionForPart(part) {
-    if (dictionarySet.has(part)) return part;
-    if (part.length < 2) return null;
-
-    // Check cache first
-    if (correctionCache.has(part)) {
-        return correctionCache.get(part);
-    }
-
-    // Use TrieDictionary for more efficient search instead of iterating entire dictionary
-    const correction = trieDictionary.findClosestWord(part);
-    const distance = levenshteinDistance(part, correction, 2);
-
-    const result = (distance <= 2 && correction !== part) ? correction : null;
-
-    // Cache the result (limit cache size to prevent memory issues)
-    if (correctionCache.size > 1000) {
-        correctionCache.clear();
-    }
-    correctionCache.set(part, result);
-
-    return result;
-}
 
 function getCurrentIncompleteWord() {
     const currentValue = inputArea.value;
@@ -477,7 +313,7 @@ function performAutocorrectPreview() {
             // Use requestIdleCallback if available for better performance
             if (window.requestIdleCallback) {
                 requestIdleCallback(() => {
-                    const suggestion = findClosestWordForPreview(incompleteWord.toLowerCase());
+                    const suggestion = autocorrectEngine.findClosestWordForPreview(incompleteWord.toLowerCase());
                     if (suggestion !== incompleteWord.toLowerCase()) {
                         showAutocorrectTooltip(incompleteWord, suggestion);
                     } else {
@@ -486,7 +322,7 @@ function performAutocorrectPreview() {
                 });
             } else {
                 // Fallback for browsers without requestIdleCallback
-                const suggestion = findClosestWordForPreview(incompleteWord.toLowerCase());
+                const suggestion = autocorrectEngine.findClosestWordForPreview(incompleteWord.toLowerCase());
                 if (suggestion !== incompleteWord.toLowerCase()) {
                     showAutocorrectTooltip(incompleteWord, suggestion);
                 } else {
@@ -568,7 +404,7 @@ function performAutocorrect(currentText, appendChar) {
                     correctedWord = lastTooltipSuggestion;
                 } else {
                     // Fallback to computing the correction
-                    correctedWord = findClosestWord(lastWord);
+                    correctedWord = autocorrectEngine.findClosestWord(lastWord);
                 }
 
 
@@ -622,7 +458,7 @@ function calculatePromptResult() {
     const promptLength = promptText.length;
 
     // Use Levenshtein distance to calculate edit distance
-    const editDistance = levenshteinDistance(typedText, promptText, 1000);
+    const editDistance = autocorrectEngine.levenshteinDistance(typedText, promptText, 1000);
 
     // Calculate accuracy as 1 minus normalized edit distance
     const maxDistance = Math.max(typedLength, promptLength);
@@ -904,7 +740,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Load prompts from prompts.txt first
     await loadPrompts();
     // Initialize dictionary with prompt words and common words from file
-    await initializeDictionary();
+    await initializeAutocorrect();
     // Configure input area
     configureInputArea();
     initializeTest();
