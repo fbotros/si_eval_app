@@ -84,7 +84,7 @@ class TrieDictionary {
     searchImpl(node, char, lastRow, word, maxEditDist, results) {
         const sz = lastRow.length;
 
-        if (lastRow.length === 0) {
+        if (sz === 0) {
             return;
         }
 
@@ -107,10 +107,7 @@ class TrieDictionary {
                 }
             }
 
-            currentRow[i] = Math.min(
-                Math.min(insertCondition, deleteCondition),
-                replaceCondition
-            );
+            currentRow[i] = Math.min(insertCondition, deleteCondition, replaceCondition);
         }
 
         // If we found a complete word within edit distance, add to results
@@ -122,7 +119,14 @@ class TrieDictionary {
         }
 
         // Continue search if any value in current row is within maxEditDist
-        const minInRow = Math.min(...currentRow);
+        // More efficient than Math.min(...currentRow) for large arrays
+        let minInRow = currentRow[0];
+        for (let i = 1; i < currentRow.length; i++) {
+            if (currentRow[i] < minInRow) {
+                minInRow = currentRow[i];
+            }
+        }
+
         if (minInRow <= maxEditDist) {
             for (const [nextChar, childNode] of node.children) {
                 this.searchImpl(childNode, nextChar, currentRow, word, maxEditDist, results);
@@ -143,16 +147,18 @@ class TrieDictionary {
             return word; // No correction found
         }
 
-        // Sort by edit distance and return the best match
-        candidates.sort((a, b) => {
-            // First sort by edit distance, then by word length (prefer shorter words)
-            if (a.editDistance !== b.editDistance) {
-                return a.editDistance - b.editDistance;
+        // Find best match without full sort (more efficient for single result)
+        let bestCandidate = candidates[0];
+        for (let i = 1; i < candidates.length; i++) {
+            const candidate = candidates[i];
+            if (candidate.editDistance < bestCandidate.editDistance ||
+                (candidate.editDistance === bestCandidate.editDistance &&
+                 candidate.word.length < bestCandidate.word.length)) {
+                bestCandidate = candidate;
             }
-            return a.word.length - b.word.length;
-        });
+        }
 
-        return candidates[0].word;
+        return bestCandidate.word;
     }
 
     // Get word candidates with their edit distances (similar to C++ version)

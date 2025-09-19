@@ -1,5 +1,12 @@
 // Keyboard neighbors are loaded from ../keyboard-layout.js
 
+// Check if keyboard layout is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof keyboardNeighbors === 'undefined') {
+        console.error('keyboardNeighbors not loaded! Check if keyboard-layout.js is loading correctly.');
+    }
+});
+
 // Typing test prompts will be loaded from prompts.txt
 let prompts = [];
 
@@ -18,7 +25,7 @@ const baseDictionary = [
     'curve', 'riding', 'unicycle', 'discreet', 'meeting', 'raindrops', 'falling',
     'head', 'excellent', 'communicate', 'how', 'are', 'you', 'doing', 'today',
     'fine', 'thank', 'very', 'much', 'whats', 'with', 'lately', 'not',
-    'just', 'hanging', 'out'
+    'just', 'hanging', 'out', 'hello', 'world', 'test', 'the', 'that'
 ];
 
 let dictionary = [...baseDictionary];
@@ -38,7 +45,6 @@ function shuffleArray(array) {
 // Function to shuffle the current prompts array
 function shufflePrompts() {
     prompts = shuffleArray(prompts);
-    console.log(`Prompts shuffled`);
 }
 
 // Function to load prompts from prompts.txt file
@@ -57,7 +63,6 @@ async function loadPrompts() {
         // Shuffle the prompts array to randomize order
         shufflePrompts();
 
-        console.log(`Loaded ${prompts.length} prompts from conversational_easy.txt (shuffled)`);
 
         if (prompts.length === 0) {
             throw new Error('conversational_easy.txt file is empty or contains no valid prompts');
@@ -90,7 +95,6 @@ async function initializeDictionary() {
     try {
         const response = await fetch('./common_words.txt');
         if (!response.ok) {
-            console.warn('Could not load common_words.txt file, using base dictionary only');
             return;
         }
         const text = await response.text();
@@ -105,15 +109,12 @@ async function initializeDictionary() {
             dictionarySet.add(word);
         });
 
-        console.log(`Loaded ${commonWords.length} additional words from common_words.txt`);
     } catch (error) {
-        console.warn('Error loading common_words.txt:', error.message);
     }
 
     // Initialize TrieDictionary with all words
-    console.log(`Initializing TrieDictionary with ${dictionary.length} words...`);
     trieDictionary = new TrieDictionary(0.4, dictionary);
-    console.log('TrieDictionary initialized successfully!');
+
 }
 
 let currentPromptIndex = 0;
@@ -130,6 +131,13 @@ let previousInputValue = '';
 let lastWordCorrected = false;
 let suppressAutocorrect = false;
 
+// Cache the last tooltip suggestion to avoid re-computation
+let lastTooltipSuggestion = null;
+let lastTooltipWord = null;
+
+// Simple autocorrect suppression: if user backspaces, suppress until they type 2+ new chars
+let charsTypedSinceLastBackspace = 0;
+
 const sampleTextElement = document.getElementById('sample-text');
 const currentPromptElement = document.getElementById('current-prompt');
 const inputArea = document.getElementById('input-area');
@@ -138,6 +146,8 @@ const wpmElement = document.getElementById('wpm');
 const accuracyElement = document.getElementById('accuracy');
 const leaderboardList = document.getElementById('leaderboard-list');
 const restartButtonFinal = document.getElementById('restart-button-final');
+const autocorrectTooltip = document.getElementById('autocorrect-tooltip');
+const correctionText = document.getElementById('correction-text');
 
 // Initialize the first prompt
 function initializeTest() {
@@ -168,7 +178,12 @@ function areNeighboringKeys(char1, char2) {
     const c1 = char1.toLowerCase();
     const c2 = char2.toLowerCase();
 
-    if (c1 === c2) return false; // Same character, not a substitution
+    if (c1 === c2) return false;
+
+    // Check if keyboardNeighbors is available
+    if (typeof keyboardNeighbors === 'undefined') {
+        return false;
+    }
 
     return keyboardNeighbors[c1] && keyboardNeighbors[c1].includes(c2);
 }
@@ -227,8 +242,33 @@ function levenshteinDistance(a, b, maxEditDist = 2) {
     return matrix[b.length][a.length];
 }
 
-// Find the closest word in the dictionary using TrieDictionary
+// Find the closest word in the dictionary (original logic for actual autocorrect)
 function findClosestWord(word) {
+    // If the word is already in the dictionary, return it (using Set for O(1) lookup)
+    if (dictionarySet.has(word)) {
+        return word;
+    }
+
+    let closestWord = null;
+    let minDistance = Infinity;
+
+    // Find words with edit distance of up to 2
+    for (const dictWord of dictionary) {
+        const distance = levenshteinDistance(word, dictWord);
+
+        // Consider words with edit distance of 1 or 2
+        if (distance <= 2 && distance < minDistance) {
+            minDistance = distance;
+            closestWord = dictWord;
+        }
+    }
+
+    // Return the closest word if found, otherwise return the original word
+    return closestWord || word;
+}
+
+// Separate function for tooltip preview using TrieDictionary (faster for real-time)
+function findClosestWordForPreview(word) {
     return trieDictionary.findClosestWord(word);
 }
 
@@ -238,6 +278,125 @@ function extractWords(text) {
     return text.toLowerCase()
         .split(/[\s.,!?;:"()]+/)
         .filter(word => word.length > 0);
+}
+
+// Autocorrect tooltip functions
+function getCurrentIncompleteWord() {
+    const currentValue = inputArea.value;
+    if (!currentValue) return '';
+
+    // Split by spaces and get the last word (currently being typed)
+    const words = currentValue.split(/\s+/);
+    const lastWord = words[words.length - 1];
+
+    // Remove any trailing punctuation for correction checking
+    return lastWord.replace(/[.,!?;:"()]+$/, '');
+}
+
+function getCaretPosition() {
+    const element = inputArea;
+    const position = element.selectionStart;
+
+    // Create mirror div to measure text position
+    const div = document.createElement('div');
+    const computed = getComputedStyle(element);
+
+    // Copy essential styles that affect text layout
+    const properties = [
+        'width', 'height', 'overflowY', 'overflowX',
+        'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+        'fontSize', 'fontFamily', 'fontWeight', 'lineHeight',
+        'letterSpacing', 'wordSpacing', 'textIndent', 'textAlign',
+        'boxSizing', 'borderTopWidth', 'borderRightWidth',
+        'borderBottomWidth', 'borderLeftWidth'
+    ];
+
+    properties.forEach(prop => {
+        div.style[prop] = computed[prop];
+    });
+
+    // Position off-screen
+    div.style.position = 'absolute';
+    div.style.visibility = 'hidden';
+    div.style.top = '-9999px';
+    div.style.left = '-9999px';
+    div.style.whiteSpace = 'pre-wrap';
+    div.style.wordWrap = 'break-word';
+
+    document.body.appendChild(div);
+
+    // Add text up to caret position
+    const textBeforeCaret = element.value.substring(0, position);
+    div.textContent = textBeforeCaret;
+
+    // Add a span to mark where caret would be
+    const span = document.createElement('span');
+    span.textContent = '|';
+    div.appendChild(span);
+
+    // Get the span position
+    const coordinates = {
+        top: span.offsetTop,
+        left: span.offsetLeft
+    };
+
+    document.body.removeChild(div);
+
+    // Convert to viewport coordinates
+    const elementRect = element.getBoundingClientRect();
+    const x = elementRect.left + coordinates.left - element.scrollLeft;
+    const y = elementRect.top + coordinates.top - element.scrollTop;
+
+    return { x, y };
+}
+
+function showAutocorrectTooltip(originalWord, correctedWord) {
+    if (originalWord === correctedWord) {
+        hideAutocorrectTooltip();
+        return;
+    }
+
+    // Cache the suggestion for use in actual autocorrect
+    lastTooltipWord = originalWord.toLowerCase();
+    lastTooltipSuggestion = correctedWord;
+
+    // Set only the corrected word as tooltip content
+    correctionText.textContent = correctedWord;
+
+    // Position tooltip above and to the left of the caret
+    // Use setTimeout to ensure DOM is updated after keystroke
+    setTimeout(() => {
+        const caretPos = getCaretPosition();
+        autocorrectTooltip.style.position = 'fixed';
+        autocorrectTooltip.style.visibility = 'hidden';
+        autocorrectTooltip.style.display = 'block';
+
+        // Get tooltip width to position it to the left of cursor
+        const tooltipRect = autocorrectTooltip.getBoundingClientRect();
+        autocorrectTooltip.style.left = (caretPos.x - tooltipRect.width + 10) + 'px';
+
+        // Use line height to calculate vertical offset
+        const computedStyle = window.getComputedStyle(inputArea);
+        const lineHeight = parseInt(computedStyle.lineHeight) || parseInt(computedStyle.fontSize) * 1.2;
+        autocorrectTooltip.style.top = (caretPos.y - lineHeight - 10) + 'px';
+        autocorrectTooltip.style.zIndex = '10000';
+        autocorrectTooltip.style.visibility = 'visible';
+    }, 0);
+
+    // Show tooltip with animation
+    autocorrectTooltip.classList.add('show');
+}
+
+function hideAutocorrectTooltip() {
+    autocorrectTooltip.classList.remove('show');
+    // Clear cached suggestion when tooltip is hidden
+    lastTooltipWord = null;
+    lastTooltipSuggestion = null;
+}
+
+// Simple autocorrect suppression logic
+function shouldSuppressAutocorrect() {
+    return charsTypedSinceLastBackspace < 2;
 }
 
 
@@ -266,11 +425,18 @@ function performAutocorrect(currentText, appendChar) {
 
             // Skip very short words (1-2 characters)
             if (lastWord.length > 2) {
-                // Find the closest word in the dictionary
-                const correctedWord = findClosestWord(lastWord);
+                let correctedWord;
+
+                // Use cached suggestion if available and matches current word
+                if (lastTooltipWord === lastWord && lastTooltipSuggestion) {
+                    correctedWord = lastTooltipSuggestion;
+                } else {
+                    // Fallback to computing the correction
+                    correctedWord = findClosestWord(lastWord);
+                }
 
                 // If a correction was found and it's different from the original word
-                if (correctedWord !== originalLastWord) {
+                if (correctedWord !== originalLastWord.toLowerCase() && correctedWord !== lastWord) {
                     // Capitalize the corrected word if the original word was capitalized
                     const finalCorrectedWord = isCapitalized ?
                         correctedWord.charAt(0).toUpperCase() + correctedWord.slice(1) :
@@ -290,8 +456,11 @@ function performAutocorrect(currentText, appendChar) {
                             inputArea.selectionEnd = inputArea.value.length;
                         } catch (e) {
                             // Some browsers might not support selection manipulation
-                            console.log("Selection adjustment not supported");
                         }
+
+                        // Clear cache after successful correction
+                        lastTooltipWord = null;
+                        lastTooltipSuggestion = null;
 
                         return true; // Correction was made
                     }
@@ -428,6 +597,8 @@ function endTest() {
 
 function restartTest() {
     shufflePrompts(); // Shuffle prompts each time the test is restarted
+    hideAutocorrectTooltip(); // Hide tooltip on restart
+    charsTypedSinceLastBackspace = 0; // Reset suppression counter
     initializeTest();
 }
 
@@ -445,11 +616,13 @@ inputArea.addEventListener('input', function() {
     const currentValue = inputArea.value;
     const currentLength = currentValue.length;
 
-    // If input field is empty, restart the timer
+    // If input field is empty, restart the timer and hide tooltip
     if (currentLength === 0) {
         promptTimingStarted = false;
         startTime = 0;
         endTime = 0;
+        hideAutocorrectTooltip();
+        charsTypedSinceLastBackspace = 0; // Reset suppression counter
         return;
     }
 
@@ -464,33 +637,65 @@ inputArea.addEventListener('input', function() {
     if (currentLength > previousInputLength) {
         lastWordCorrected = false;
 
-        // Count the difference as key presses (not backspace)
+        // Count characters typed, but handle space separately
         const charsAdded = currentLength - previousInputLength;
+        const lastChar = currentValue.slice(-1);
+        const isSpaceOrPunct = /[\s.,.!?;:"()]/.test(lastChar);
+
+        // Only count non-space characters toward backspace penalty
+        if (!isSpaceOrPunct) {
+            charsTypedSinceLastBackspace += charsAdded;
+        }
+
         keyPressCount += charsAdded;
 
-        // Check if a space or punctuation was added for autocorrect
-        const lastChar = currentValue.slice(-1);
-        if (/[\s.,.!?;:"()]/.test(lastChar) && !lastWordCorrected) {
-            // Check if autocorrect is suppressed
-            if (suppressAutocorrect) {
-                // Skip autocorrect this time and re-enable it for next time
-                suppressAutocorrect = false;
+        // Real-time autocorrect preview (only for non-space chars)
+        if (!isSpaceOrPunct) {
+            const incompleteWord = getCurrentIncompleteWord();
+
+            if (incompleteWord.length > 2) {
+                if (shouldSuppressAutocorrect()) {
+                    hideAutocorrectTooltip();
+                } else {
+                    const suggestion = findClosestWordForPreview(incompleteWord.toLowerCase());
+                    if (suggestion !== incompleteWord.toLowerCase()) {
+                        showAutocorrectTooltip(incompleteWord, suggestion);
+                    } else {
+                        hideAutocorrectTooltip();
+                    }
+                }
             } else {
+                hideAutocorrectTooltip();
+            }
+        }
+
+        // Handle space/punctuation for autocorrect
+        if (isSpaceOrPunct && !lastWordCorrected) {
+            hideAutocorrectTooltip();
+
+            // Check suppression using current counter (space doesn't count!)
+            const shouldSuppress = shouldSuppressAutocorrect();
+
+            // Reset counter after space (new word starts)
+            charsTypedSinceLastBackspace = 0;
+
+            // Apply suppression logic
+            if (suppressAutocorrect) {
+                suppressAutocorrect = false;
+            } else if (!shouldSuppress) {
                 performAutocorrect(previousInputValue, lastChar);
             }
         }
     }
     // If length decreased, count as corrected error (backspace)
     else if (currentLength < previousInputLength) {
-        // Count as one corrected error regardless of how many characters were deleted
         correctedErrorCount += 1;
-        // Check if user backspaced over a space - suppress autocorrect next time
-        if (previousInputLength > 0 && currentLength >= 0) {
-            const deletedChar = previousInputValue.charAt(currentLength);
-            if (/\s/.test(deletedChar)) {
-                suppressAutocorrect = true;
-            }
-        }
+
+        // Reset counter on backspace (suppresses autocorrect until 2+ new chars typed)
+        charsTypedSinceLastBackspace = 0;
+
+        // Always hide tooltip after backspace
+        hideAutocorrectTooltip();
     }
 
     // Update previous values for next comparison
@@ -527,8 +732,12 @@ inputArea.addEventListener('keydown', function(e) {
             updateCurrentPrompt();
             inputArea.value = '';
             promptTimingStarted = false; // Reset timing flag for new prompt
+            hideAutocorrectTooltip(); // Hide tooltip when moving to next prompt
+            charsTypedSinceLastBackspace = 0; // Reset suppression counter for new prompt
         } else {
             // End the test after 4 prompts are completed
+            hideAutocorrectTooltip(); // Hide tooltip when test ends
+            charsTypedSinceLastBackspace = 0; // Reset suppression counter
             endTest();
         }
     }
