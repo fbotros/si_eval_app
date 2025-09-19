@@ -634,7 +634,8 @@ function calculatePromptResult() {
     const minutes = timeSpentMs / 60000; // Convert ms to minutes
 
     // Calculate WPM (assuming average word is 5 characters)
-    const characters = typedLength;
+    // Subtract 1 because WPM measures time between keystrokes, not total characters
+    const characters = Math.max(0, typedLength - 1);
     const words = characters / 5;
     const wpm = minutes > 0 ? words / minutes : 0;
 
@@ -647,20 +648,30 @@ function calculatePromptResult() {
     };
 }
 
-// Calculate average results across all completed prompts
+// Calculate weighted average results across all completed prompts
 function calculateAverageResults() {
     if (promptResults.length === 0) return;
 
-    let totalWpm = 0;
-    let totalAccuracy = 0;
+    let totalEffectiveChars = 0; // For WPM weighting (typedLength - 1)
+    let totalTypedChars = 0;     // For accuracy weighting (typedLength)
+    let weightedWpmSum = 0;
+    let weightedAccuracySum = 0;
 
     promptResults.forEach(result => {
-        totalWpm += result.wpm;
-        totalAccuracy += result.accuracy;
+        const typedLength = result.typedText.length;
+        const effectiveChars = Math.max(0, typedLength - 1);
+
+        // Weight WPM by effective characters (typedLength - 1)
+        totalEffectiveChars += effectiveChars;
+        weightedWpmSum += result.wpm * effectiveChars;
+
+        // Weight accuracy by typed characters (typedLength)
+        totalTypedChars += typedLength;
+        weightedAccuracySum += result.accuracy * typedLength;
     });
 
-    const avgWpm = totalWpm / promptResults.length;
-    const avgAccuracy = totalAccuracy / promptResults.length;
+    const avgWpm = totalEffectiveChars > 0 ? weightedWpmSum / totalEffectiveChars : 0;
+    const avgAccuracy = totalTypedChars > 0 ? weightedAccuracySum / totalTypedChars : 0;
 
     // Update results display
     wpmElement.textContent = Math.round(avgWpm);
@@ -672,18 +683,28 @@ function generateLeaderboard() {
     let currentWpm = 0;
     let currentAccuracy = 0;
 
-    // If we have completed prompts, calculate current stats
+    // If we have completed prompts, calculate current stats using weighted averages
     if (promptResults.length > 0) {
-        let totalWpm = 0;
-        let totalAccuracy = 0;
+        let totalEffectiveChars = 0; // For WPM weighting (typedLength - 1)
+        let totalTypedChars = 0;     // For accuracy weighting (typedLength)
+        let weightedWpmSum = 0;
+        let weightedAccuracySum = 0;
 
         promptResults.forEach(result => {
-            totalWpm += result.wpm;
-            totalAccuracy += result.accuracy;
+            const typedLength = result.typedText.length;
+            const effectiveChars = Math.max(0, typedLength - 1);
+
+            // Weight WPM by effective characters (typedLength - 1)
+            totalEffectiveChars += effectiveChars;
+            weightedWpmSum += result.wpm * effectiveChars;
+
+            // Weight accuracy by typed characters (typedLength)
+            totalTypedChars += typedLength;
+            weightedAccuracySum += result.accuracy * typedLength;
         });
 
-        currentWpm = Math.round(totalWpm / promptResults.length);
-        currentAccuracy = Math.round(totalAccuracy / promptResults.length);
+        currentWpm = totalEffectiveChars > 0 ? Math.round(weightedWpmSum / totalEffectiveChars) : 0;
+        currentAccuracy = totalTypedChars > 0 ? Math.round(weightedAccuracySum / totalTypedChars) : 0;
     }
 
     // Create leaderboard entries with random results
