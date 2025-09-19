@@ -45,7 +45,7 @@ async function initializeAutocorrect() {
         'head', 'excellent', 'communicate', 'how', 'are', 'you', 'doing', 'today',
         'fine', 'thank', 'very', 'much', 'whats', 'with', 'lately', 'not',
         'just', 'hanging', 'out', 'hello', 'world', 'test', 'the', 'that',
-        'can', 'we', 'should', 'good', 'go', 'old', 'fantastic', 'arbitrary',
+        'can', 'we', 'should', 'good', 'go', 'old', 'fantastic', 'arbitrary', 'wow',
         "don't", "can't", "won't", "it's", "i'm", "you're", "we're", "they're"
     ];
 
@@ -104,6 +104,11 @@ let lastTooltipWord = null;
 // Simple autocorrect suppression: if user backspaces, suppress until they type 2+ new chars
 let charsTypedSinceLastBackspace = 0;
 
+// Helper function to reset backspace counter
+function resetBackspaceCounter(reason) {
+    charsTypedSinceLastBackspace = 0;
+}
+
 const sampleTextElement = document.getElementById('sample-text');
 const currentPromptElement = document.getElementById('current-prompt');
 const inputArea = document.getElementById('input-area');
@@ -142,13 +147,61 @@ function startTest() {
 
 function getCurrentIncompleteWord() {
     const currentValue = inputArea.value;
-    if (!currentValue) return '';
+    const cursorPos = inputArea.selectionStart;
 
-    const words = currentValue.split(/\s+/);
-    const lastWord = words[words.length - 1];
-    const match = lastWord.match(/^([^a-zA-Z]*)([a-zA-Z']+)([^a-zA-Z]*)$/);
+    if (!currentValue || cursorPos === undefined) return '';
 
-    return match ? match[2] : '';
+    // ONLY consider text before cursor - ignore everything after
+    const textBeforeCursor = currentValue.substring(0, cursorPos);
+    const wordAtCursor = getWordAtPosition(textBeforeCursor, cursorPos);
+    return wordAtCursor.word;
+}
+
+// Get the word at a specific cursor position with boundaries
+function getWordAtPosition(text, position) {
+    if (!text || position < 0 || position > text.length) {
+        return { word: '', start: position, end: position, beforeCursor: '', afterCursor: '' };
+    }
+
+    // Define word boundaries (letters, apostrophes, and hyphens are part of words)
+    const wordChar = /[a-zA-Z'\-]/;
+
+    // Find start of word (scan backwards from cursor)
+    let start = position;
+    while (start > 0 && wordChar.test(text[start - 1])) {
+        start--;
+    }
+
+    // Find end of word (scan forwards from cursor)
+    let end = position;
+    while (end < text.length && wordChar.test(text[end])) {
+        end++;
+    }
+
+    // Extract the word and surrounding context
+    const word = text.substring(start, end);
+    const beforeCursor = text.substring(0, position);
+    const afterCursor = text.substring(position);
+
+    return { word, start, end, beforeCursor, afterCursor };
+}
+
+// Check if cursor is at a word boundary (space, punctuation, start/end of text)
+function isAtWordBoundary(text, position) {
+    if (position <= 0 || position >= text.length) return true;
+
+    const charBefore = text[position - 1];
+    const charAfter = text[position];
+    const wordChar = /[a-zA-Z'\-]/;
+
+    // At boundary if either side is not a word character
+    return !wordChar.test(charBefore) || !wordChar.test(charAfter);
+}
+
+// Check if we're editing within an existing word
+function isEditingWithinWord(text, position) {
+    const wordInfo = getWordAtPosition(text, position);
+    return wordInfo.word.length > 0 && position > wordInfo.start && position < wordInfo.end;
 }
 
 // Cache for caret position calculations to reduce DOM operations
@@ -285,6 +338,8 @@ function hideAutocorrectTooltip() {
 
 // Simple autocorrect suppression logic
 function shouldSuppressAutocorrect() {
+    // Only suppress if we recently used backspace AND haven't typed enough since
+    // Don't suppress based on cursor positioning or clicking
     return charsTypedSinceLastBackspace < 2;
 }
 
@@ -304,6 +359,22 @@ function scheduleAutocorrectPreview() {
 }
 
 function performAutocorrectPreview() {
+    const currentValue = inputArea.value;
+    const cursorPos = inputArea.selectionStart;
+
+    // ONLY consider text before cursor for word detection
+    const textBeforeCursor = currentValue.substring(0, cursorPos);
+
+    // Check if we're editing within an existing word using the correct position relative to textBeforeCursor
+    const wordInfo = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
+    const isWithinWord = wordInfo.word.length > 0 && textBeforeCursor.length > wordInfo.start && textBeforeCursor.length < wordInfo.end;
+
+    // Don't show preview if editing within an existing word
+    if (isWithinWord) {
+        hideAutocorrectTooltip();
+        return;
+    }
+
     const incompleteWord = getCurrentIncompleteWord();
 
     if (incompleteWord.length > 2) {
@@ -341,113 +412,124 @@ function triggerAutocorrect(terminatingChar = ' ') {
 
     hideAutocorrectTooltip();
 
-    // Check suppression using current counter
+    // Check suppression using CURRENT counter value (before resetting)
     const shouldSuppress = shouldSuppressAutocorrect();
 
-    // Reset counter after word termination (new word starts)
-    charsTypedSinceLastBackspace = 0;
+    // Reset counter after word termination (new word starts) - AFTER checking suppression
+    resetBackspaceCounter('word termination');
 
     // Apply suppression logic
     if (suppressAutocorrect) {
         suppressAutocorrect = false;
         return false;
     } else if (!shouldSuppress) {
-        // Get the current input value before the terminating character
+        // Get current cursor position and text
         const currentText = inputArea.value;
-        // Remove the terminating character from the end for autocorrect processing
-        const textForCorrection = currentText.endsWith(terminatingChar)
-            ? currentText.slice(0, -1)
-            : currentText;
+        const cursorPos = inputArea.selectionStart;
 
-        return performAutocorrect(textForCorrection, terminatingChar);
+        // Don't autocorrect if we were editing within an existing word before the terminating char
+        // We need to check the state BEFORE the terminating character was added
+        const textBeforeTerminatingChar = currentText.substring(0, cursorPos - 1);
+        const positionBeforeTerminatingChar = textBeforeTerminatingChar.length;
+
+        // If we were in the middle of a word (not at the end), skip autocorrect
+        if (textBeforeTerminatingChar.length > 0) {
+            const wordInfo = getWordAtPosition(textBeforeTerminatingChar, positionBeforeTerminatingChar);
+            const wasInMiddle = wordInfo.word.length > 0 && positionBeforeTerminatingChar > wordInfo.start && positionBeforeTerminatingChar < wordInfo.end;
+
+            if (wasInMiddle) {
+                return false; // We were in the middle of a word
+            }
+        }
+
+        return performCursorAwareAutocorrect(terminatingChar);
     }
 
     return false;
 }
 
 
-// Autocorrect function
-function performAutocorrect(currentText, appendChar) {
+// Cursor-aware autocorrect function - only considers text before cursor
+function performCursorAwareAutocorrect(appendChar) {
     try {
-        const text = currentText;
-        if (text.length > 0 && appendChar.length == 1) {
+        const currentText = inputArea.value;
+        const cursorPos = inputArea.selectionStart;
 
-            let words = text.trim().split(/\s+/);
+        // ONLY work with text before the cursor - ignore everything after
+        const textBeforeCursor = currentText.substring(0, cursorPos - 1); // -1 to exclude the terminating char
+        const textAfterCursor = currentText.substring(cursorPos); // Everything after cursor (including terminating char)
 
-            // filter out empty strings
-            words = words.filter(word => word.length > 0);
-            if (words.length === 0) return false;
+        // Get word that was just completed at the end of the "before cursor" text
+        const wordInfo = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
 
-            const originalLastWord = words[words.length - 1];
-
-            // Extract word core and surrounding punctuation
-            const wordPattern = /^([^a-zA-Z]*)([a-zA-Z']+)([^a-zA-Z]*)$/;
-            const match = originalLastWord.match(wordPattern);
-
-            if (!match) return false; // No alphabetic content to correct
-
-            const [, prefixPunct, wordCore, suffixPunct] = match;
-
-
-            // Check if the word core is capitalized (first character only)
-            const isCapitalized = wordCore.length > 0 &&
-                                wordCore[0] >= 'A' && wordCore[0] <= 'Z';
-
-            const lastWord = wordCore.toLowerCase();
-
-            // Skip very short words (1-2 characters)
-            if (lastWord.length > 2) {
-                let correctedWord;
-
-                // Use cached suggestion if available and matches current word
-                if (lastTooltipWord === lastWord && lastTooltipSuggestion) {
-                    correctedWord = lastTooltipSuggestion;
-                } else {
-                    // Fallback to computing the correction
-                    correctedWord = autocorrectEngine.findClosestWord(lastWord);
-                }
-
-
-                // If a correction was found and it's different from the word core
-                if (correctedWord !== wordCore.toLowerCase() && correctedWord !== lastWord) {
-                    // Capitalize the corrected word if the original word core was capitalized
-                    const finalCorrectedWordCore = isCapitalized ?
-                        correctedWord.charAt(0).toUpperCase() + correctedWord.slice(1) :
-                        correctedWord;
-
-                    // Reconstruct with original punctuation
-                    const finalCorrectedWord = prefixPunct + finalCorrectedWordCore + suffixPunct;
-
-                    // Replace the last word with the corrected one
-                    const lastIndex = text.lastIndexOf(originalLastWord);
-                    if (lastIndex !== -1) {
-                        const newText = text.substring(0, lastIndex) + finalCorrectedWord;
-
-                        // Direct update approach for better cross-browser compatibility
-                        inputArea.value = newText + appendChar;
-
-                        // Try to move cursor to the end
-                        try {
-                            inputArea.selectionStart = inputArea.value.length;
-                            inputArea.selectionEnd = inputArea.value.length;
-                        } catch (e) {
-                            // Some browsers might not support selection manipulation
-                        }
-
-                        // Clear cache after successful correction
-                        lastTooltipWord = null;
-                        lastTooltipSuggestion = null;
-
-                        return true; // Correction was made
-                    }
-                }
-            }
+        if (!wordInfo.word || wordInfo.word.length <= 2) {
+            return false; // No word or too short to correct
         }
+
+        // Extract word core and check for capitalization
+        const wordPattern = /^([^a-zA-Z]*)([a-zA-Z']+)([^a-zA-Z]*)$/;
+        const match = wordInfo.word.match(wordPattern);
+
+        if (!match) return false; // No alphabetic content to correct
+
+        const [, prefixPunct, wordCore, suffixPunct] = match;
+        const isCapitalized = wordCore.length > 0 && wordCore[0] >= 'A' && wordCore[0] <= 'Z';
+        const lowerWord = wordCore.toLowerCase();
+
+        let correctedWord;
+
+        // Use cached suggestion if available and matches current word
+        if (lastTooltipWord === lowerWord && lastTooltipSuggestion) {
+            correctedWord = lastTooltipSuggestion;
+        } else {
+            // Fallback to computing the correction
+            correctedWord = autocorrectEngine.findClosestWord(lowerWord);
+        }
+
+        // If a correction was found and it's different from the original
+        if (correctedWord !== wordCore.toLowerCase() && correctedWord !== lowerWord) {
+            // Capitalize the corrected word if the original was capitalized
+            const finalCorrectedWordCore = isCapitalized ?
+                correctedWord.charAt(0).toUpperCase() + correctedWord.slice(1) :
+                correctedWord;
+
+            // Reconstruct with original punctuation
+            const finalCorrectedWord = prefixPunct + finalCorrectedWordCore + suffixPunct;
+
+            // Rebuild text: [text before word] + [corrected word] + [terminating char] + [text after cursor]
+            const beforeWord = textBeforeCursor.substring(0, wordInfo.start);
+            const newText = beforeWord + finalCorrectedWord + appendChar + textAfterCursor;
+
+            // Update text area with corrected word
+            inputArea.value = newText;
+
+            // Position cursor after the corrected word and terminating character
+            const newCursorPos = beforeWord.length + finalCorrectedWord.length + 1;
+            try {
+                inputArea.selectionStart = newCursorPos;
+                inputArea.selectionEnd = newCursorPos;
+            } catch (e) {
+                // Some browsers might not support selection manipulation
+            }
+
+            // Clear cache after successful correction
+            lastTooltipWord = null;
+            lastTooltipSuggestion = null;
+
+            return true; // Correction was made
+        }
+
         return false; // No correction was made
     } catch (error) {
-        console.error("Autocorrect error:", error);
+        console.error("Cursor-aware autocorrect error:", error);
         return false; // Error occurred, don't attempt correction
     }
+}
+
+// Legacy autocorrect function (kept for compatibility)
+function performAutocorrect(currentText, appendChar) {
+    // Redirect to cursor-aware version
+    return performCursorAwareAutocorrect(appendChar);
 }
 
 // Calculate results for the current prompt
@@ -595,7 +677,7 @@ function endTest() {
 function restartTest() {
     shufflePrompts(); // Shuffle prompts each time the test is restarted
     hideAutocorrectTooltip(); // Hide tooltip on restart
-    charsTypedSinceLastBackspace = 0; // Reset suppression counter
+    resetBackspaceCounter('restart test'); // Reset suppression counter
     initializeTest();
 }
 
@@ -613,13 +695,14 @@ inputArea.addEventListener('input', function() {
     const currentValue = inputArea.value;
     const currentLength = currentValue.length;
 
+
     // If input field is empty, restart the timer and hide tooltip
     if (currentLength === 0) {
         promptTimingStarted = false;
         startTime = 0;
         endTime = 0;
         hideAutocorrectTooltip();
-        charsTypedSinceLastBackspace = 0; // Reset suppression counter
+        resetBackspaceCounter('empty input'); // Reset suppression counter
         return;
     }
 
@@ -636,8 +719,12 @@ inputArea.addEventListener('input', function() {
 
         // Count characters typed, but handle space separately
         const charsAdded = currentLength - previousInputLength;
-        const lastChar = currentValue.slice(-1);
-        const isSpaceOrPunct = /[\s.,.!?;:"()]/.test(lastChar);
+        const cursorPos = inputArea.selectionStart;
+
+        // Get the character that was actually just typed (at cursor position - 1)
+        const actualTypedChar = currentValue.charAt(cursorPos - 1);
+        const isSpaceOrPunct = /[\s.,.!?;:"()]/.test(actualTypedChar);
+
 
         // Only count non-space characters toward backspace penalty
         if (!isSpaceOrPunct) {
@@ -654,7 +741,7 @@ inputArea.addEventListener('input', function() {
 
         // Handle space/punctuation for autocorrect
         if (isSpaceOrPunct) {
-            triggerAutocorrect(lastChar);
+            triggerAutocorrect(actualTypedChar);
         }
     }
     // If length decreased, count as corrected error (backspace)
@@ -662,7 +749,7 @@ inputArea.addEventListener('input', function() {
         correctedErrorCount += 1;
 
         // Reset counter on backspace (suppresses autocorrect until 2+ new chars typed)
-        charsTypedSinceLastBackspace = 0;
+        resetBackspaceCounter('backspace detected');
 
         // Always hide tooltip after backspace (non-blocking)
         hideAutocorrectTooltip();
@@ -680,6 +767,41 @@ inputArea.addEventListener('input', function() {
         caretPositionCache.lastResult = null;
     }
 });
+
+// Handle cursor position changes (clicks, arrow keys, etc.)
+inputArea.addEventListener('selectionchange', function() {
+    // Hide tooltip when cursor moves to prevent confusion
+    hideAutocorrectTooltip();
+
+    // Invalidate caret position cache
+    if (caretPositionCache.lastResult) {
+        caretPositionCache.lastResult = null;
+    }
+});
+
+// Handle clicks in the text area
+inputArea.addEventListener('click', function() {
+    // Hide tooltip when user clicks to position cursor
+    hideAutocorrectTooltip();
+
+    // Invalidate caret position cache
+    if (caretPositionCache.lastResult) {
+        caretPositionCache.lastResult = null;
+    }
+});
+
+// Handle arrow key navigation (capture phase to run before other handlers)
+inputArea.addEventListener('keydown', function(e) {
+    // Hide tooltip when user navigates with arrow keys
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+        hideAutocorrectTooltip();
+
+        // Invalidate caret position cache
+        if (caretPositionCache.lastResult) {
+            caretPositionCache.lastResult = null;
+        }
+    }
+}, true);
 
 // Handle Enter key to move to next prompt
 inputArea.addEventListener('keydown', function(e) {
@@ -714,11 +836,11 @@ inputArea.addEventListener('keydown', function(e) {
             inputArea.value = '';
             promptTimingStarted = false; // Reset timing flag for new prompt
             hideAutocorrectTooltip(); // Hide tooltip when moving to next prompt
-            charsTypedSinceLastBackspace = 0; // Reset suppression counter for new prompt
+            resetBackspaceCounter('new prompt'); // Reset suppression counter for new prompt
         } else {
             // End the test after 4 prompts are completed
             hideAutocorrectTooltip(); // Hide tooltip when test ends
-            charsTypedSinceLastBackspace = 0; // Reset suppression counter
+            resetBackspaceCounter('test end'); // Reset suppression counter
             endTest();
         }
     }
