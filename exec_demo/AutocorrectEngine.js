@@ -403,10 +403,17 @@ class AutocorrectEngine {
 
             // Check if the two-word split uses any override corrections
             const usesOverrideCorrection = this.splitUsesOverrideCorrection(word);
+              
+            // Check if both words in the split are very common (top 50 words)
+            const splitWords = twoWordSplit.toLowerCase().split(' ');
+            const bothWordsVeryCommon = splitWords.length === 2 && 
+                this.getWordFrequencyScore(splitWords[0]) < 50 && 
+                this.getWordFrequencyScore(splitWords[1]) < 50;
 
             if (twoWordDistance <= this.maxEditDistance &&
                 (twoWordDistance < singleWordDistance ||
-                 (twoWordDistance === singleWordDistance && usesOverrideCorrection))) {
+                 (twoWordDistance === singleWordDistance && usesOverrideCorrection) ||
+                 (bothWordsVeryCommon && twoWordDistance <= singleWordDistance + 1))) {
                 return twoWordSplit;
             }
         }
