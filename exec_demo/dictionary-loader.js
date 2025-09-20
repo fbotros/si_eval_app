@@ -24,18 +24,40 @@ async function loadDictionary() {
     dictionaryLoadPromise = (async () => {
         try {
             console.log('Loading dictionary from comprehensive_dictionary.txt...');
-            // Try multiple paths to handle different subdirectory locations
+            
+            // Smart path detection - determine likely path based on current location
+            const currentPath = window.location.pathname;
+            let possiblePaths;
+            
+            if (currentPath.includes('/typing_test/') || currentPath.includes('/document_editor/')) {
+                // We're in a subdirectory, try parent directory first
+                possiblePaths = [
+                    '../comprehensive_dictionary.txt',     // Most likely for subdirectories
+                    './comprehensive_dictionary.txt'       // Fallback
+                ];
+            } else {
+                // We're likely in the main exec_demo directory
+                possiblePaths = [
+                    './comprehensive_dictionary.txt',      // Most likely for main directory
+                    '../comprehensive_dictionary.txt'      // Fallback
+                ];
+            }
+            
             let response;
-            const possiblePaths = [
-                './comprehensive_dictionary.txt',     // For pages in exec_demo/
-                '../comprehensive_dictionary.txt'     // For pages in exec_demo/subdirectory/
-            ];
+            let lastError;
             
             for (const path of possiblePaths) {
                 try {
+                    console.log(`Trying to load dictionary from: ${path}`);
                     response = await fetch(path);
-                    if (response.ok) break;
+                    if (response.ok) {
+                        console.log(`✅ Successfully found dictionary at: ${path}`);
+                        break;
+                    } else {
+                        lastError = `${response.status} ${response.statusText}`;
+                    }
                 } catch (error) {
+                    lastError = error.message;
                     // Continue to next path
                 }
             }
