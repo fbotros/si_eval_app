@@ -637,7 +637,7 @@
 
             return {
                 x: rect.left,
-                y: rect.top - 5 // Position tooltip just above cursor
+                y: rect.top // Position tooltip at cursor level
             };
         }
 
@@ -667,7 +667,7 @@
                 // Use line height to calculate vertical offset - position closer to text
                 const computedStyle = window.getComputedStyle(editor);
                 const lineHeight = parseInt(computedStyle.lineHeight) || parseInt(computedStyle.fontSize) * 1.2;
-                tooltip.style.top = (caretPos.y - 35) + 'px';
+                tooltip.style.top = (caretPos.y - 30) + 'px';
                 tooltip.style.zIndex = '10000';
                 tooltip.style.visibility = 'visible';
 
