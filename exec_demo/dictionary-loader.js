@@ -48,17 +48,28 @@ async function loadDictionary() {
             
             for (const path of possiblePaths) {
                 try {
-                    console.log(`Trying to load dictionary from: ${path}`);
+                    // Only log the attempt if it's the first path (most likely to succeed)
+                    if (path === possiblePaths[0]) {
+                        console.log(`Loading dictionary from: ${path}`);
+                    }
+                    
                     response = await fetch(path);
                     if (response.ok) {
-                        console.log(`✅ Successfully found dictionary at: ${path}`);
+                        console.log(`✅ Dictionary loaded from: ${path}`);
                         break;
                     } else {
                         lastError = `${response.status} ${response.statusText}`;
+                        // Only log the failure if this was our best guess
+                        if (path === possiblePaths[0]) {
+                            console.log(`Trying alternative path...`);
+                        }
                     }
                 } catch (error) {
                     lastError = error.message;
-                    // Continue to next path
+                    // Only log the failure if this was our best guess  
+                    if (path === possiblePaths[0]) {
+                        console.log(`Trying alternative path...`);
+                    }
                 }
             }
 
