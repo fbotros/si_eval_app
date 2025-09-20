@@ -471,13 +471,9 @@ function performCursorAwareAutocorrect(appendChar) {
 
         // If a correction was found and it's different from the original
         if (correctedWord !== wordCore.toLowerCase() && correctedWord !== lowerWord) {
-            // Capitalize the corrected word if the original was capitalized
-            const finalCorrectedWordCore = isCapitalized ?
-                correctedWord.charAt(0).toUpperCase() + correctedWord.slice(1) :
-                correctedWord;
-
-            // Reconstruct with original punctuation
-            const finalCorrectedWord = prefixPunct + finalCorrectedWordCore + suffixPunct;
+            // AutocorrectEngine now handles capitalization preservation internally
+            // Just reconstruct with original punctuation
+            const finalCorrectedWord = prefixPunct + correctedWord + suffixPunct;
 
             // Rebuild text: [text before word] + [corrected word] + [terminating char] + [text after cursor]
             const beforeWord = textBeforeCursor.substring(0, wordInfo.start);
