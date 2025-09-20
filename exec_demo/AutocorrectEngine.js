@@ -434,23 +434,7 @@ class AutocorrectEngine {
         }
 
         // Use the same logic as findClosestWord for consistency
-        const result = this.findClosestWord(word).toLowerCase();
-          
-        // Debug logging for "thisis" case
-        if (lowerWord === 'thisis') {
-            console.log('DEBUG thisis preview:');
-            console.log('  Single word correction:', this.findBestCorrectionForPart(lowerWord));
-            console.log('  Two word split:', this.findTwoWordSplit(word));
-            console.log('  Final result:', result);
-              
-            // Check frequency scores for "this" and "is"
-            console.log('  "this" frequency score:', this.getWordFrequencyScore('this'));
-            console.log('  "is" frequency score:', this.getWordFrequencyScore('is'));
-            console.log('  Both words very common?:', 
-                this.getWordFrequencyScore('this') <= 150 && this.getWordFrequencyScore('is') <= 150);
-        }
-          
-        return result;
+        return this.findClosestWord(word).toLowerCase();
     }
 
     /**
