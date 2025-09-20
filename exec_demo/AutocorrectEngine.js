@@ -272,6 +272,25 @@ class AutocorrectEngine {
     }
 
     /**
+     * Check if a two-word split would use any override corrections
+     */
+    splitUsesOverrideCorrection(word) {
+        const lowerWord = word.toLowerCase();
+
+        for (let i = 2; i <= lowerWord.length - 2; i++) {
+            const firstPart = lowerWord.substring(0, i);
+            const secondPart = lowerWord.substring(i);
+
+            // Check if either part would use an override correction
+            if (this.correctionOverrides[firstPart] || this.correctionOverrides[secondPart]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Find two-word split for concatenated words
      */
     findTwoWordSplit(word) {
@@ -381,7 +400,13 @@ class AutocorrectEngine {
 
         if (twoWordSplit) {
             const twoWordDistance = this.getTwoWordSplitDistance(word);
-            if (twoWordDistance <= this.maxEditDistance && twoWordDistance < singleWordDistance) {
+            
+            // Check if the two-word split uses any override corrections
+            const usesOverrideCorrection = this.splitUsesOverrideCorrection(word);
+            
+            if (twoWordDistance <= this.maxEditDistance && 
+                (twoWordDistance < singleWordDistance || 
+                 (twoWordDistance === singleWordDistance && usesOverrideCorrection))) {
                 return twoWordSplit;
             }
         }
