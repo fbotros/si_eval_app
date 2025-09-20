@@ -24,11 +24,11 @@ async function loadDictionary() {
     dictionaryLoadPromise = (async () => {
         try {
             console.log('Loading dictionary from comprehensive_dictionary.txt...');
-            
+
             // Smart path detection - determine correct path based on current location
             const currentPath = window.location.pathname;
             let dictionaryPath;
-            
+
             if (currentPath.includes('/typing_test/') || currentPath.includes('/document_editor/')) {
                 // We're in a subdirectory - use parent directory
                 dictionaryPath = '../comprehensive_dictionary.txt';
@@ -36,14 +36,14 @@ async function loadDictionary() {
                 // We're in the main exec_demo directory
                 dictionaryPath = './comprehensive_dictionary.txt';
             }
-            
+
             console.log(`Loading dictionary from: ${dictionaryPath}`);
             const response = await fetch(dictionaryPath);
-            
+
             if (!response.ok) {
                 throw new Error(`Failed to load dictionary from ${dictionaryPath}: ${response.status} ${response.statusText}`);
             }
-            
+
             console.log(`✅ Dictionary loaded from: ${dictionaryPath}`);
 
             const text = await response.text();

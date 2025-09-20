@@ -199,10 +199,17 @@
             { input: 'a', expected: 'a' },       // Very short word
             { input: 'jumpe', expected: 'jumped' }, // Should find "jumped" in our enhanced dictionary
             { input: 'walkin', expected: 'walking' }, // Should find "walking"
-
+            
+            // Capitalization preservation tests
+            { input: 'Helo', expected: 'Hello' },    // First letter capitalized
+            { input: 'WROLD', expected: 'WORLD' },   // All caps
+            { input: 'tEH', expected: 'tHE' },       // Mixed case (preserve pattern)
+            { input: 'Hello', expected: 'Hello' },   // Already correct, preserve case
+            
             // Two-word splits
             { input: 'helloworld', expected: 'hello world' },
             { input: 'thequick', expected: 'the quick' },
+            { input: 'Helloworld', expected: 'Hello world' }, // Capitalized two-word split
         ];
 
         async function initializeSystem() {

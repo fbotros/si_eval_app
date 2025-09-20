@@ -201,6 +201,7 @@ class AutocorrectEngine {
             const secondPart = lowerWord.substring(i);
 
             if (this.dictionarySet.has(firstPart) && this.dictionarySet.has(secondPart)) {
+                // Preserve capitalization for two-word splits
                 const result = isCapitalized ?
                     firstPart.charAt(0).toUpperCase() + firstPart.slice(1) + ' ' + secondPart :
                     firstPart + ' ' + secondPart;
@@ -216,6 +217,7 @@ class AutocorrectEngine {
 
                 if (totalDistance <= this.maxEditDistance && totalDistance < bestScore) {
                     bestScore = totalDistance;
+                    // Preserve capitalization for corrected two-word splits
                     bestSplit = isCapitalized ?
                         firstCorrected.charAt(0).toUpperCase() + firstCorrected.slice(1) + ' ' + secondCorrected :
                         firstCorrected + ' ' + secondCorrected;
@@ -224,6 +226,26 @@ class AutocorrectEngine {
         }
 
         return bestSplit;
+    }
+
+    /**
+     * Preserve original capitalization in the corrected word
+     */
+    preserveCapitalization(originalWord, correctedWord) {
+        if (!originalWord || !correctedWord) return correctedWord;
+        
+        // If original is all uppercase, make correction all uppercase
+        if (originalWord === originalWord.toUpperCase()) {
+            return correctedWord.toUpperCase();
+        }
+        
+        // If original starts with capital, capitalize first letter of correction
+        if (originalWord[0] === originalWord[0].toUpperCase()) {
+            return correctedWord.charAt(0).toUpperCase() + correctedWord.slice(1);
+        }
+        
+        // Otherwise, keep correction lowercase
+        return correctedWord;
     }
 
     /**
@@ -258,7 +280,8 @@ class AutocorrectEngine {
             }
         }
 
-        return singleWordCorrection;
+        // Preserve original capitalization in the single word correction
+        return this.preserveCapitalization(word, singleWordCorrection);
     }
 
     /**
