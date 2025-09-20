@@ -24,6 +24,36 @@ class AutocorrectEngine {
         this.correctionCache = new Map();
         this.maxCacheSize = 1000;
 
+        // Common typo correction overrides - these get checked first for instant corrections
+        this.correctionOverrides = options.correctionOverrides || {
+            'teh': 'the',
+            'tehm': 'them', 
+            'tehn': 'then',
+            'adn': 'and',
+            'nad': 'and',
+            'cna': 'can',
+            'nac': 'can',
+            'taht': 'that',
+            'thta': 'that', 
+            'htat': 'that',
+            'waht': 'what',
+            'whta': 'what',
+            'hwat': 'what',
+            'yuo': 'you',
+            'yuor': 'your',
+            'youa': 'you a',
+            'doenst': 'doesn\'t',
+            'doesnt': 'doesn\'t',
+            'wont': 'won\'t',
+            'cant': 'can\'t',
+            'didnt': 'didn\'t',
+            'hasnt': 'hasn\'t',
+            'isnt': 'isn\'t',
+            'werent': 'weren\'t',
+            'wouldnt': 'wouldn\'t',
+            'shouldnt': 'shouldn\'t'
+        };
+
         // Word frequency list (most common words first) - shared across all methods
         this.commonWords = [
             'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at',
@@ -157,6 +187,11 @@ class AutocorrectEngine {
      * Made public for testing purposes
      */
     findBestCorrectionForPart(part) {
+        // Check for exact override matches first (highest priority)
+        if (this.correctionOverrides[part]) {
+            return this.correctionOverrides[part];
+        }
+
         if (this.dictionarySet.has(part)) return part;
 
         // For very short words, be more conservative about corrections
@@ -314,12 +349,19 @@ class AutocorrectEngine {
      * Find closest word correction (used for actual autocorrect)
      */
     findClosestWord(word) {
-        if (this.dictionarySet.has(word.toLowerCase())) {
+        const lowerWord = word.toLowerCase();
+        
+        // Check for exact override matches first (highest priority)
+        if (this.correctionOverrides[lowerWord]) {
+            return this.preserveCapitalization(word, this.correctionOverrides[lowerWord]);
+        }
+
+        if (this.dictionarySet.has(lowerWord)) {
             return word;
         }
 
         // Always use our own best correction logic for more reliable results
-        const singleWordCorrection = this.findBestCorrectionForPart(word.toLowerCase());
+        const singleWordCorrection = this.findBestCorrectionForPart(lowerWord);
 
         if (!singleWordCorrection || singleWordCorrection === word.toLowerCase()) {
             // Try two-word split if single word correction failed
@@ -352,8 +394,15 @@ class AutocorrectEngine {
      * Find closest word for preview (optimized for real-time use)
      */
     findClosestWordForPreview(word) {
+        const lowerWord = word.toLowerCase();
+        
+        // Check for exact override matches first (highest priority)
+        if (this.correctionOverrides[lowerWord]) {
+            return this.correctionOverrides[lowerWord].toLowerCase(); // Return lowercase for preview
+        }
+
         // Use the same logic as findClosestWord for consistency
-        return this.findClosestWord(word);
+        return this.findClosestWord(word).toLowerCase();
     }
 
     /**
