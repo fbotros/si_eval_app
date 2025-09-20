@@ -952,14 +952,14 @@
                     const plainNewText = beforeWord + finalCorrectedWord + appendCharToAdd + textAfterCursor;
                     const finalNewText = denormalizeText(plainNewText);
 
+                    // Position cursor after the corrected word and terminating character (in plain text coordinates)
+                    const newCursorPos = beforeWord.length + finalCorrectedWord.length + (appendChar === '\n' ? 0 : 1);
+
                     // Reconstruct with formatting preserved
                     const formattedContent = reconstructFormattedContent(finalNewText, formattingRanges);
                     editor.innerHTML = formattedContent;
 
-                    // Position cursor after the corrected word and terminating character
-                    const newCursorPos = beforeWord.length + finalCorrectedWord.length + (appendChar === '\n' ? 0 : 1);
-
-                    // Set cursor position in contentEditable - handle multi-line structure
+                    // Set cursor position in contentEditable - this function handles mapping plain text position to DOM
                     try {
                         setCursorPositionInContentEditable(editor, newCursorPos);
                     } catch (e) {
