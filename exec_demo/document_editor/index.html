@@ -543,9 +543,9 @@
                 return { word: '', start: position, end: position, beforeCursor: '', afterCursor: '' };
             }
 
-            // Define word boundaries (letters, apostrophes, and hyphens are part of words)
-            // Treat § (newline placeholder) as whitespace delimiter
-            const wordChar = /[a-zA-Z'\-]/;
+            // Define word boundaries (letters and apostrophes are part of words)
+            // Treat § (newline placeholder) and hyphens as whitespace/punctuation delimiters
+            const wordChar = /[a-zA-Z']/;
 
             // Find start of word (scan backwards from cursor)
             let start = position;
