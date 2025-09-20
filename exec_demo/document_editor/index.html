@@ -952,16 +952,43 @@
                     const plainNewText = beforeWord + finalCorrectedWord + appendCharToAdd + textAfterCursor;
                     const finalNewText = denormalizeText(plainNewText);
 
-                    // Position cursor after the corrected word and terminating character (in plain text coordinates)
-                    const newCursorPos = beforeWord.length + finalCorrectedWord.length + (appendChar === '\n' ? 0 : 1);
-
                     // Reconstruct with formatting preserved
                     const formattedContent = reconstructFormattedContent(finalNewText, formattingRanges);
                     editor.innerHTML = formattedContent;
 
-                    // Set cursor position in contentEditable - this function handles mapping plain text position to DOM
+                    // Use a much simpler cursor positioning approach: position at the very end
+                    // This avoids coordinate system confusion between plain text and HTML DOM
                     try {
-                        setCursorPositionInContentEditable(editor, newCursorPos);
+                        const range = document.createRange();
+                        const selection = window.getSelection();
+                        
+                        // Find the last text node in the editor
+                        const walker = document.createTreeWalker(
+                            editor,
+                            NodeFilter.SHOW_TEXT,
+                            null,
+                            false
+                        );
+                        
+                        let lastTextNode = null;
+                        let node;
+                        while (node = walker.nextNode()) {
+                            lastTextNode = node;
+                        }
+                        
+                        if (lastTextNode) {
+                            // Position cursor at the end of the last text node
+                            range.setStart(lastTextNode, lastTextNode.textContent.length);
+                            range.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        } else {
+                            // Fallback: position at end of editor element
+                            range.selectNodeContents(editor);
+                            range.collapse(false);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        }
                     } catch (e) {
                         console.log('Cursor positioning error:', e);
                         // Some browsers might not support selection manipulation
