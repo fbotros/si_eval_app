@@ -37,7 +37,12 @@ async function initializeAutocorrect() {
         baseWords: baseDictionary,
         keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {},
         maxEditDistance: 2,
-        adjacentKeyMultiplier: 0.4
+        adjacentKeyMultiplier: 0.9,        // Much less aggressive - almost same as regular substitution
+        insertionCost: 0.5,                // Cheaper to make insertions more favorable
+        deletionCost: 1.0,                 // Keep deletions expensive
+        substitutionCost: 1.0,             // Keep substitutions at normal cost
+        apostropheInsertionCost: 0.2,      // Very cheap to add missing apostrophes
+        apostropheDeletionCost: 0.3        // Cheap to remove extra apostrophes
     });
 
     // Add words from prompts
@@ -136,7 +141,10 @@ function getCurrentIncompleteWord() {
 
     // ONLY consider text before cursor - ignore everything after
     const textBeforeCursor = currentValue.substring(0, cursorPos);
-    const wordAtCursor = getWordAtPosition(textBeforeCursor, cursorPos);
+
+    // Use textBeforeCursor.length as the position (end of text before cursor)
+    const wordAtCursor = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
+
     return wordAtCursor.word;
 }
 
@@ -438,9 +446,19 @@ function performCursorAwareAutocorrect(appendChar) {
         const currentText = inputArea.value;
         const cursorPos = inputArea.selectionStart;
 
+        // Check if the terminating character was actually added to the text
+        // For Enter key, no character is added, so don't subtract from cursor position
+        let adjustedCursorPos = cursorPos;
+        const actualLastChar = currentText.charAt(cursorPos - 1);
+
+        // Only subtract 1 if the terminating character is actually in the text
+        if (appendChar !== '\n' && actualLastChar === appendChar) {
+            adjustedCursorPos = cursorPos - 1;
+        }
+
         // ONLY work with text before the cursor - ignore everything after
-        const textBeforeCursor = currentText.substring(0, cursorPos - 1); // -1 to exclude the terminating char
-        const textAfterCursor = currentText.substring(cursorPos); // Everything after cursor (including terminating char)
+        const textBeforeCursor = currentText.substring(0, adjustedCursorPos);
+        const textAfterCursor = currentText.substring(cursorPos); // Everything after cursor
 
         // Get word that was just completed at the end of the "before cursor" text
         const wordInfo = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);

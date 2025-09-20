@@ -4,7 +4,14 @@
  */
 class AutocorrectEngine {
     constructor(options = {}) {
-        this.adjacentKeyMultiplier = options.adjacentKeyMultiplier || 0.4;
+        this.adjacentKeyMultiplier = options.adjacentKeyMultiplier || 0.9;
+        this.insertionCost = options.insertionCost || 0.5; // Cheaper than deletion/substitution
+        this.deletionCost = options.deletionCost || 1.0;
+        this.substitutionCost = options.substitutionCost || 1.0;
+
+        // Character-specific costs for common punctuation
+        this.apostropheInsertionCost = options.apostropheInsertionCost || 0.2; // Very cheap to add apostrophes
+        this.apostropheDeletionCost = options.apostropheDeletionCost || 0.3;   // Cheap to remove apostrophes
         this.maxEditDistance = options.maxEditDistance || 2;
         this.keyboardNeighbors = options.keyboardNeighbors || {};
 
@@ -17,6 +24,22 @@ class AutocorrectEngine {
         this.correctionCache = new Map();
         this.maxCacheSize = 1000;
 
+        // Word frequency list (most common words first) - shared across all methods
+        this.commonWords = [
+            'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at',
+            'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her', 'she', 'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 'their',
+            'what', 'so', 'up', 'out', 'if', 'about', 'who', 'get', 'which', 'go', 'me', 'when', 'make', 'can', 'like', 'time', 'no', 'just', 'him',
+            'know', 'take', 'people', 'into', 'year', 'your', 'good', 'some', 'could', 'them', 'see', 'other', 'than', 'then', 'now', 'look', 'only',
+            'come', 'its', 'over', 'think', 'also', 'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way', 'even', 'new', 'want',
+            'because', 'any', 'these', 'give', 'day', 'most', 'us', 'is', 'was', 'are', 'been', 'has', 'had', 'were', 'said', 'each', 'which', 'their',
+            'time', 'will', 'about', 'if', 'up', 'out', 'many', 'then', 'them', 'would', 'so', 'what', 'her', 'make', 'like', 'him', 'into', 'over',
+            'think', 'thanks', 'thank', 'really', 'great', 'good', 'right', 'still', 'should', 'after', 'being', 'now', 'made', 'before', 'here', 'through',
+            'when', 'where', 'much', 'go', 'me', 'back', 'with', 'well', 'were', 'been', 'have', 'had', 'has', 'his', 'that', 'but', 'not', 'what', 'all',
+            'any', 'can', 'our', 'out', 'day', 'get', 'use', 'man', 'new', 'now', 'way', 'may', 'say', 'each', 'which', 'she', 'how', 'its', 'our', 'out',
+            'up', 'time', 'there', 'year', 'work', 'down', 'come', 'did', 'get', 'has', 'him', 'his', 'how', 'man', 'new', 'now', 'number', 'oil', 'part',
+            'people', 'right', 'she', 'some', 'take', 'than', 'that', 'the', 'them', 'well', 'were'
+        ];
+
         // Add base words if provided
         if (options.baseWords) {
             this.addWords(options.baseWords);
@@ -24,6 +47,21 @@ class AutocorrectEngine {
 
         // Initialize TrieDictionary if available
         this.initializeTrieDictionary();
+    }
+
+    /**
+     * Get word frequency score - lower score means more common word
+     */
+    getWordFrequencyScore(word) {
+        const index = this.commonWords.indexOf(word.toLowerCase());
+        return index === -1 ? 1000 : index; // Lower index = more common = lower penalty
+    }
+
+    /**
+     * Extract words from text using punctuation and space delimiters
+     */
+    extractWords(text) {
+        return text.toLowerCase().split(/[\s.,!?;:"()]+/).filter(word => word.length > 0);
     }
 
     /**
@@ -60,6 +98,7 @@ class AutocorrectEngine {
         return c1 !== c2 && this.keyboardNeighbors[c1]?.includes(c2) || false;
     }
 
+
     /**
      * Calculate Damerau-Levenshtein distance with keyboard-aware substitution costs
      * Supports transpositions which makes "teh" -> "the" distance = 1
@@ -81,12 +120,22 @@ class AutocorrectEngine {
                 if (b[i - 1] === a[j - 1]) {
                     matrix[i][j] = matrix[i - 1][j - 1]; // no operation needed
                 } else {
-                    const substitutionCost = this.areNeighboringKeys(a[j - 1], b[i - 1]) ? 0.4 : 1.0;
+                    const substitutionCost = this.areNeighboringKeys(a[j - 1], b[i - 1]) ?
+                        this.adjacentKeyMultiplier : this.substitutionCost;
+
+                    // Character-specific insertion/deletion costs
+                    const charToInsert = b[i - 1];
+                    const charToDelete = a[j - 1];
+
+                    const insertionCost = (charToInsert === "'") ?
+                        this.apostropheInsertionCost : this.insertionCost;
+                    const deletionCost = (charToDelete === "'") ?
+                        this.apostropheDeletionCost : this.deletionCost;
 
                     matrix[i][j] = Math.min(
                         matrix[i - 1][j - 1] + substitutionCost, // substitution
-                        matrix[i][j - 1] + 1,                   // insertion
-                        matrix[i - 1][j] + 1                    // deletion
+                        matrix[i - 1][j] + insertionCost,        // insertion (character-specific) - Fixed
+                        matrix[i][j - 1] + deletionCost          // deletion (character-specific) - Fixed
                     );
 
                     // Check for transposition (Damerau-Levenshtein)
@@ -102,12 +151,6 @@ class AutocorrectEngine {
         return matrix[b.length][a.length];
     }
 
-    /**
-     * Extract words from text using punctuation and space delimiters
-     */
-    extractWords(text) {
-        return text.toLowerCase().split(/[\s.,!?;:"()]+/).filter(word => word.length > 0);
-    }
 
     /**
      * Find best correction for a word part using cached lookups and trie optimization
@@ -137,12 +180,20 @@ class AutocorrectEngine {
         // instead of checking all 9,919 words
         const candidates = this.trieDictionary.search(part, this.maxEditDistance);
 
+
+        let bestFrequencyScore = Infinity;
+
         // Now only run expensive Levenshtein on the small candidate set
         for (const candidate of candidates) {
             const candidateWord = candidate.word;
             const distance = this.levenshteinDistance(part, candidateWord);
-            if (distance <= this.maxEditDistance && distance < bestDistance) {
+            const frequencyScore = this.getWordFrequencyScore(candidateWord);
+
+            // Prefer lower distance first, then lower frequency score (more common words) as tiebreaker
+            if (distance <= this.maxEditDistance &&
+                (distance < bestDistance || (distance === bestDistance && frequencyScore < bestFrequencyScore))) {
                 bestDistance = distance;
+                bestFrequencyScore = frequencyScore;
                 bestMatch = candidateWord;
             }
         }
@@ -195,15 +246,22 @@ class AutocorrectEngine {
         const isCapitalized = word[0] === word[0].toUpperCase();
         let bestSplit = null;
         let bestScore = Infinity;
+        let bestCommonScore = Infinity;
 
         for (let i = 2; i <= lowerWord.length - 2; i++) {
             const firstPart = lowerWord.substring(0, i);
             const secondPart = lowerWord.substring(i);
 
             if (this.dictionarySet.has(firstPart) && this.dictionarySet.has(secondPart)) {
-                // Use the preserveCapitalization function for consistent handling
-                const twoWordResult = firstPart + ' ' + secondPart;
-                return this.preserveCapitalization(word, twoWordResult);
+                // Perfect match - calculate commonality score for tie-breaking
+                const commonScore = this.getWordFrequencyScore(firstPart) + this.getWordFrequencyScore(secondPart);
+
+                if (bestScore > 1 || (bestScore === 1 && commonScore < bestCommonScore)) {
+                    bestScore = 1;
+                    bestCommonScore = commonScore;
+                    const twoWordResult = firstPart + ' ' + secondPart;
+                    bestSplit = this.preserveCapitalization(word, twoWordResult);
+                }
             }
 
             const firstCorrected = this.findBestCorrectionForPart(firstPart);
@@ -213,11 +271,18 @@ class AutocorrectEngine {
                 const totalDistance = this.levenshteinDistance(firstPart, firstCorrected) +
                                     this.levenshteinDistance(secondPart, secondCorrected);
 
-                if (totalDistance <= this.maxEditDistance && totalDistance < bestScore) {
-                    bestScore = totalDistance;
-                    // Use the preserveCapitalization function for consistent handling
-                    const twoWordResult = firstCorrected + ' ' + secondCorrected;
-                    bestSplit = this.preserveCapitalization(word, twoWordResult);
+                if (totalDistance <= this.maxEditDistance) {
+                    // Calculate commonality score for the corrected words
+                    const commonScore = this.getWordFrequencyScore(firstCorrected) + this.getWordFrequencyScore(secondCorrected);
+
+                    // Prefer lower distance first, then lower commonality score as tiebreaker
+                    if (totalDistance < bestScore ||
+                        (totalDistance === bestScore && commonScore < bestCommonScore)) {
+                        bestScore = totalDistance;
+                        bestCommonScore = commonScore;
+                        const twoWordResult = firstCorrected + ' ' + secondCorrected;
+                        bestSplit = this.preserveCapitalization(word, twoWordResult);
+                    }
                 }
             }
         }
@@ -249,7 +314,9 @@ class AutocorrectEngine {
      * Find closest word correction (used for actual autocorrect)
      */
     findClosestWord(word) {
-        if (this.dictionarySet.has(word.toLowerCase())) return word;
+        if (this.dictionarySet.has(word.toLowerCase())) {
+            return word;
+        }
 
         // Always use our own best correction logic for more reliable results
         const singleWordCorrection = this.findBestCorrectionForPart(word.toLowerCase());

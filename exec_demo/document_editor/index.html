@@ -363,7 +363,12 @@
                 baseWords: baseDictionary,
                 keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {},
                 maxEditDistance: 2,
-                adjacentKeyMultiplier: 0.4
+                adjacentKeyMultiplier: 0.9,        // Much less aggressive - almost same as regular substitution
+                insertionCost: 0.5,                // Cheaper to make insertions more favorable
+                deletionCost: 1.0,                 // Keep deletions expensive
+                substitutionCost: 1.0,             // Keep substitutions at normal cost
+                apostropheInsertionCost: 0.2,      // Very cheap to add missing apostrophes
+                apostropheDeletionCost: 0.3        // Cheap to remove extra apostrophes
             });
         }
 
@@ -397,16 +402,27 @@
             }
         }
 
-        // Helper function to get text offset in contenteditable
+        // Helper function to normalize text by replacing newlines with a special token
+        function normalizeText(text) {
+            return text.replace(/\n/g, '§');
+        }
+
+        // Helper function to denormalize text by replacing special token back to newlines
+        function denormalizeText(text) {
+            return text.replace(/§/g, '\n');
+        }
+
+        // Helper function to get text offset in contenteditable, accounting for line breaks
         function getTextOffset(node, offset) {
             if (!node || !editor.contains(node)) {
                 return 0;
             }
 
+            // Walk through all nodes (including elements) to account for line breaks
             let textOffset = 0;
             const walker = document.createTreeWalker(
                 editor,
-                NodeFilter.SHOW_TEXT,
+                NodeFilter.SHOW_ALL,
                 null,
                 false
             );
@@ -414,13 +430,22 @@
             let currentNode;
             while (currentNode = walker.nextNode()) {
                 if (currentNode === node) {
-                    return textOffset + Math.min(offset, currentNode.textContent.length);
+                    return textOffset + Math.min(offset, currentNode.textContent ? currentNode.textContent.length : 0);
                 }
-                textOffset += currentNode.textContent.length;
+
+                if (currentNode.nodeType === Node.TEXT_NODE) {
+                    textOffset += currentNode.textContent.length;
+                } else if (currentNode.nodeType === Node.ELEMENT_NODE) {
+                    // Check if this element creates a line break (like div, br, p, etc.)
+                    const tagName = currentNode.tagName ? currentNode.tagName.toLowerCase() : '';
+                    if (tagName === 'br' || tagName === 'div' || tagName === 'p') {
+                        textOffset += 1; // Add 1 for the newline character
+                    }
+                }
             }
 
-            // If node not found, return current text length
-            return editor.textContent ? editor.textContent.length : 0;
+            // If node not found, return current innerText length for consistency
+            return editor.innerText ? editor.innerText.length : 0;
         }
 
 
@@ -457,6 +482,7 @@
                 end++;
             }
             const word = text.substring(start, end);
+
             return { word, start, end };
         }
 
@@ -501,10 +527,20 @@
 
             const range = selection.getRangeAt(0);
             const cursorPos = getTextOffset(range.startContainer, range.startOffset);
-            const currentValue = editor.textContent || '';
+
+            // Use innerText to preserve line breaks (consistent with tree walker that accounts for BR/DIV)
+            const currentValue = editor.innerText || editor.textContent || '';
             const textBeforeCursor = currentValue.substring(0, cursorPos);
 
-            const { word } = getWordAtPosition(textBeforeCursor, cursorPos);
+            // Get word at END of text before cursor (like autocorrect does)
+            const { word } = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
+
+
+            // Skip preview for very short words and common single letters
+            if (!word || word.length < 2 || word.toLowerCase() === 'i' || word.toLowerCase() === 'a') {
+                hideTooltip();
+                return;
+            }
 
             if (word && word.length > 1) {
                 const correction = editorAutocorrectEngine.findClosestWord(word);
@@ -541,6 +577,7 @@
             tooltip.classList.remove('show');
         }
 
+
         function performAutocorrectInEditor() {
             if (!editorAutocorrectEngine) {
                 return;
@@ -564,7 +601,10 @@
 
             const range = selection.getRangeAt(0);
             const cursorPos = getTextOffset(range.startContainer, range.startOffset);
-            const currentValue = editor.textContent || '';
+
+            // Use innerText instead of textContent to respect line breaks!
+            // This prevents "arrival\nI" from becoming "arrivalI"
+            const currentValue = editor.innerText || editor.textContent || '';
 
             // Find the word before the space/punctuation that just triggered autocorrect
             // We need to look before the trigger character
@@ -574,13 +614,21 @@
 
             const { word, start } = getWordAtPosition(textToAnalyze, textToAnalyze.length);
 
+            // Skip autocorrect for very short words and common single letters
+            if (!word || word.length < 2 || word.toLowerCase() === 'i' || word.toLowerCase() === 'a') {
+                return false;
+            }
+
             if (word && word.length > 1) {
                 const correction = editorAutocorrectEngine.findClosestWord(word);
                 if (correction && correction !== word) {
-                    // Find the word in the current selection and replace it
-                    const selection = window.getSelection();
-                    if (selection.rangeCount > 0) {
-                        const range = selection.getRangeAt(0);
+                    // Store current cursor position BEFORE any DOM manipulation
+                    const originalSelection = window.getSelection();
+                    const originalRange = originalSelection.rangeCount > 0 ? originalSelection.getRangeAt(0).cloneRange() : null;
+
+                    try {
+                        // Use document.execCommand for cleaner contenteditable manipulation
+                        // This preserves undo history and handles cursor positioning better
 
                         // Create a range that selects the word to replace
                         const wordRange = document.createRange();
@@ -606,27 +654,28 @@
                             textOffset += nodeLength;
                         }
 
-                        if (targetNode) {
-                            // Select the word and replace it
+                        if (targetNode && wordStartInNode >= 0) {
+                            // Select the word to replace
                             wordRange.setStart(targetNode, wordStartInNode);
                             wordRange.setEnd(targetNode, Math.min(wordStartInNode + word.length, targetNode.textContent.length));
 
-                            // Replace the selected text with correction + space
-                            wordRange.deleteContents();
-                            const correctionWithSpace = document.createTextNode(correction + ' ');
-                            wordRange.insertNode(correctionWithSpace);
+                            // Select the word
+                            originalSelection.removeAllRanges();
+                            originalSelection.addRange(wordRange);
 
-                            // Position cursor after the correction and space
-                            const newRange = document.createRange();
-                            newRange.setStartAfter(correctionWithSpace);
-                            newRange.collapse(true);
-                            selection.removeAllRanges();
-                            selection.addRange(newRange);
+                            // Replace with correction using execCommand (preserves undo and cursor positioning)
+                            document.execCommand('insertText', false, correction);
+
+                            updateWordCount();
+                            return true;
+                        }
+                    } catch (error) {
+                        // If DOM manipulation fails, restore original cursor position
+                        if (originalRange && originalSelection) {
+                            originalSelection.removeAllRanges();
+                            originalSelection.addRange(originalRange);
                         }
                     }
-
-                    updateWordCount();
-                    return true;
                 }
             }
             return false;
@@ -728,15 +777,111 @@
             // Title changed
         });
 
-        documentTitle.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                this.blur();
+        // Perform autocorrect specifically for Enter key (before newline insertion)
+        function performAutocorrectOnEnter() {
+            if (!editorAutocorrectEngine) {
+                return false;
             }
-        });
 
-        // Keyboard shortcuts
+            // Check suppression using CURRENT counter value (before resetting)
+            const shouldSuppress = shouldSuppressAutocorrect();
+
+            // Reset counter after word termination (new word starts) - AFTER checking suppression
+            resetBackspaceCounter('word termination');
+
+            // Apply suppression logic
+            if (shouldSuppress) {
+                return false;
+            }
+
+            const selection = window.getSelection();
+            if (selection.rangeCount === 0) {
+                return false;
+            }
+
+            const range = selection.getRangeAt(0);
+            const cursorPos = getTextOffset(range.startContainer, range.startOffset);
+
+            // Use innerText instead of textContent to respect line breaks!
+            const currentValue = editor.innerText || editor.textContent || '';
+
+            // For Enter key, we DON'T remove trailing characters since none were added yet
+            // Just get the word at the current cursor position
+            const textToAnalyze = currentValue.substring(0, cursorPos);
+            const { word, start } = getWordAtPosition(textToAnalyze, textToAnalyze.length);
+
+            // Skip autocorrect for very short words and common single letters
+            if (!word || word.length < 2 || word.toLowerCase() === 'i' || word.toLowerCase() === 'a') {
+                return false;
+            }
+
+            if (word && word.length > 1) {
+                const correction = editorAutocorrectEngine.findClosestWord(word);
+                if (correction && correction !== word) {
+                    // Store current cursor position BEFORE any DOM manipulation
+                    const originalSelection = window.getSelection();
+                    const originalRange = originalSelection.rangeCount > 0 ? originalSelection.getRangeAt(0).cloneRange() : null;
+
+                    try {
+                        // Create a range that selects the word to replace
+                        const wordRange = document.createRange();
+
+                        // Find the text node containing the word
+                        const walker = document.createTreeWalker(
+                            editor,
+                            NodeFilter.SHOW_TEXT,
+                            null,
+                            false
+                        );
+
+                        let textOffset = 0;
+                        let targetNode = null;
+                        let wordStartInNode = 0;
+
+                        while (targetNode = walker.nextNode()) {
+                            const nodeLength = targetNode.textContent.length;
+                            if (textOffset + nodeLength > start) {
+                                wordStartInNode = start - textOffset;
+                                break;
+                            }
+                            textOffset += nodeLength;
+                        }
+
+                        if (targetNode && wordStartInNode >= 0) {
+                            // Select the word to replace
+                            wordRange.setStart(targetNode, wordStartInNode);
+                            wordRange.setEnd(targetNode, Math.min(wordStartInNode + word.length, targetNode.textContent.length));
+
+                            // Select the word
+                            originalSelection.removeAllRanges();
+                            originalSelection.addRange(wordRange);
+
+                            // Replace with correction using execCommand (preserves undo and cursor positioning)
+                            document.execCommand('insertText', false, correction);
+
+                            updateWordCount();
+                            return true;
+                        }
+                    } catch (error) {
+                        // If DOM manipulation fails, restore original cursor position
+                        if (originalRange && originalSelection) {
+                            originalSelection.removeAllRanges();
+                            originalSelection.addRange(originalRange);
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Keyboard shortcuts and Enter key handling
         editor.addEventListener('keydown', function (e) {
+            // Handle Enter key to trigger autocorrect BEFORE the newline is inserted
+            if (e.key === 'Enter') {
+                hideTooltip();
+                performAutocorrectOnEnter(); // Use specialized function for Enter key
+            }
+
             if (e.ctrlKey || e.metaKey) {
                 switch (e.key) {
                     case 'b':
