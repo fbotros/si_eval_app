@@ -25,60 +25,29 @@ async function loadDictionary() {
         try {
             console.log('Loading dictionary from comprehensive_dictionary.txt...');
             
-            // Smart path detection - determine likely path based on current location
+            // Smart path detection - determine correct path based on current location
             const currentPath = window.location.pathname;
-            let possiblePaths;
+            let dictionaryPath;
             
             if (currentPath.includes('/typing_test/') || currentPath.includes('/document_editor/')) {
-                // We're in a subdirectory, try parent directory first
-                possiblePaths = [
-                    '../comprehensive_dictionary.txt',     // Most likely for subdirectories
-                    './comprehensive_dictionary.txt'       // Fallback
-                ];
+                // We're in a subdirectory - use parent directory
+                dictionaryPath = '../comprehensive_dictionary.txt';
             } else {
-                // We're likely in the main exec_demo directory
-                possiblePaths = [
-                    './comprehensive_dictionary.txt',      // Most likely for main directory
-                    '../comprehensive_dictionary.txt'      // Fallback
-                ];
+                // We're in the main exec_demo directory
+                dictionaryPath = './comprehensive_dictionary.txt';
             }
             
-            let response;
-            let lastError;
+            console.log(`Loading dictionary from: ${dictionaryPath}`);
+            const response = await fetch(dictionaryPath);
             
-            for (const path of possiblePaths) {
-                try {
-                    // Only log the attempt if it's the first path (most likely to succeed)
-                    if (path === possiblePaths[0]) {
-                        console.log(`Loading dictionary from: ${path}`);
-                    }
-                    
-                    response = await fetch(path);
-                    if (response.ok) {
-                        console.log(`✅ Dictionary loaded from: ${path}`);
-                        break;
-                    } else {
-                        lastError = `${response.status} ${response.statusText}`;
-                        // Only log the failure if this was our best guess
-                        if (path === possiblePaths[0]) {
-                            console.log(`Trying alternative path...`);
-                        }
-                    }
-                } catch (error) {
-                    lastError = error.message;
-                    // Only log the failure if this was our best guess  
-                    if (path === possiblePaths[0]) {
-                        console.log(`Trying alternative path...`);
-                    }
-                }
+            if (!response.ok) {
+                throw new Error(`Failed to load dictionary from ${dictionaryPath}: ${response.status} ${response.statusText}`);
             }
-
-            if (!response || !response.ok) {
-                throw new Error(`Failed to load dictionary from all paths. Last error: ${response ? response.status + ' ' + response.statusText : 'No response'}`);
-            }
+            
+            console.log(`✅ Dictionary loaded from: ${dictionaryPath}`);
 
             const text = await response.text();
-            
+
             // Split by lines and filter out empty lines
             sharedDictionary = text
                 .split('\n')
@@ -87,12 +56,12 @@ async function loadDictionary() {
 
             dictionaryLoaded = true;
             console.log(`Dictionary loaded successfully: ${sharedDictionary.length} words`);
-            
+
             return sharedDictionary;
-            
+
         } catch (error) {
             console.error('Critical Error: Failed to load dictionary:', error);
-            
+
             // FAIL HARD - no fallback dictionary since TrieDictionary requires proper dictionary
             throw new Error(`Dictionary loading failed and no fallback is allowed for performance. Error: ${error.message}`);
         }

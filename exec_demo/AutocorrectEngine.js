@@ -136,7 +136,7 @@ class AutocorrectEngine {
         // Get candidates from trie - this should return a small set (50-200 words)
         // instead of checking all 9,919 words
         const candidates = this.trieDictionary.search(part, this.maxEditDistance);
-        
+
         // Now only run expensive Levenshtein on the small candidate set
         for (const candidate of candidates) {
             const candidateWord = candidate.word;
@@ -326,17 +326,17 @@ class AutocorrectEngine {
      */
     measurePerformanceForWord(word) {
         const lowerWord = word.toLowerCase();
-        
+
         // Without optimization: would check entire dictionary
         const bruteForceCount = this.dictionary.length;
-        
+
         // With optimization: only check trie candidates
         let trieCount = 0;
         if (this.trieDictionary) {
             const candidates = this.trieDictionary.search(lowerWord, this.maxEditDistance);
             trieCount = candidates.length;
         }
-        
+
         return {
             word: word,
             bruteForceCalculations: bruteForceCount,

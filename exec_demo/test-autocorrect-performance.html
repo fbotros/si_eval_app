@@ -179,27 +179,27 @@
             { input: 'teh', expected: 'the' },
             { input: 'adn', expected: 'and' },
             { input: 'wiht', expected: 'with' },
-            
+
             // Keyboard adjacent errors
             { input: 'gello', expected: 'hello' }, // g->h (adjacent keys)
-            { input: 'workd', expected: 'world' }, // k->l (adjacent keys)  
+            { input: 'workd', expected: 'world' }, // k->l (adjacent keys)
             { input: 'yhe', expected: 'the' },     // y->t (adjacent keys)
-            
+
             // Longer words
             { input: 'improtant', expected: 'important' },
             { input: 'seperate', expected: 'separate' },
             { input: 'recieve', expected: 'receive' },
-            
+
             // Words that should not be corrected
             { input: 'hello', expected: 'hello' },
             { input: 'world', expected: 'world' },
             { input: 'the', expected: 'the' },
-            
+
             // Edge cases
             { input: 'a', expected: 'a' },       // Very short word
             { input: 'jumpe', expected: 'jumped' }, // Should find "jumped" in our enhanced dictionary
             { input: 'walkin', expected: 'walking' }, // Should find "walking"
-            
+
             // Two-word splits
             { input: 'helloworld', expected: 'hello world' },
             { input: 'thequick', expected: 'the quick' },
@@ -208,13 +208,13 @@
         async function initializeSystem() {
             const resultsDiv = document.getElementById('init-results');
             const statsDiv = document.getElementById('system-stats');
-            
+
             resultsDiv.innerHTML = '<div class="test-result">Loading dictionary and initializing engines...</div>';
 
             try {
                 // Load dictionary
                 const dictionary = await loadDictionary();
-                
+
                 // Create optimized engine (with TrieDictionary)
                 testAutocorrectEngine = new AutocorrectEngine({
                     baseWords: dictionary,
@@ -234,16 +234,16 @@
                 legacyAutocorrectEngine.trieDictionary = null;
 
                 const stats = testAutocorrectEngine.getStats();
-                
+
                 resultsDiv.innerHTML = '<div class="test-result test-pass">✅ System initialized successfully!</div>';
-                
+
                 // Update stats
                 document.getElementById('dict-size').textContent = stats.dictionarySize.toLocaleString();
                 document.getElementById('trie-available').textContent = stats.hasTrieDictionary ? '✅' : '❌';
                 document.getElementById('keyboard-neighbors').textContent = stats.keyboardNeighborsCount;
-                
+
                 statsDiv.style.display = 'grid';
-                
+
             } catch (error) {
                 resultsDiv.innerHTML = `<div class="test-result test-fail">❌ Initialization failed: ${error.message}</div>`;
             }
@@ -251,7 +251,7 @@
 
         function runUnitTests() {
             const resultsDiv = document.getElementById('unit-test-results');
-            
+
             if (!testAutocorrectEngine) {
                 resultsDiv.innerHTML = '<div class="test-result test-fail">❌ Please initialize system first</div>';
                 return;
@@ -263,23 +263,23 @@
 
             // Test basic correction functionality
             results += '<h3>🔤 Basic Correction Tests</h3>';
-            
+
             testWords.forEach((test, index) => {
                 totalTests++;
                 const correction = testAutocorrectEngine.findClosestWord(test.input);
                 const passed = correction === test.expected;
-                
+
                 if (passed) passCount++;
-                
+
                 const className = passed ? 'test-pass' : 'test-fail';
                 const icon = passed ? '✅' : '❌';
-                
+
                 results += `<div class="test-result ${className}">${icon} Test ${index + 1}: "${test.input}" → "${correction}" (expected: "${test.expected}")</div>`;
             });
 
             // Test TrieDictionary integration
             results += '<h3>🌳 TrieDictionary Integration Tests</h3>';
-            
+
             // Test that TrieDictionary is being used
             totalTests++;
             const hasTrieDict = testAutocorrectEngine.getStats().hasTrieDictionary;
@@ -295,7 +295,7 @@
             if (testAutocorrectEngine.trieDictionary) {
                 const candidates = testAutocorrectEngine.trieDictionary.search('hello', 2);
                 const candidateCount = candidates.length;
-                
+
                 if (candidateCount > 0 && candidateCount < 500) { // Should be much less than full dictionary
                     passCount++;
                     results += `<div class="test-result test-pass">✅ TrieDictionary generates reasonable candidate count: ${candidateCount} candidates for "hello"</div>`;
@@ -309,17 +309,17 @@
             // Test caching
             results += '<h3>💾 Caching Tests</h3>';
             totalTests++;
-            
+
             // Clear cache and test
             testAutocorrectEngine.clearCache();
             const firstCall = performance.now();
             testAutocorrectEngine.findClosestWord('helo');
             const firstCallTime = performance.now() - firstCall;
-            
+
             const secondCall = performance.now();
             testAutocorrectEngine.findClosestWord('helo');
             const secondCallTime = performance.now() - secondCall;
-            
+
             if (secondCallTime < firstCallTime * 0.8) { // Cache should make it faster
                 passCount++;
                 results += `<div class="test-result test-pass">✅ Caching works: First call ${firstCallTime.toFixed(2)}ms, Second call ${secondCallTime.toFixed(2)}ms</div>`;
@@ -330,7 +330,7 @@
             // Test keyboard-aware corrections
             results += '<h3>⌨️ Keyboard-Aware Correction Tests</h3>';
             totalTests++;
-            
+
             const keyboardTest = testAutocorrectEngine.findClosestWord('gello'); // g->h are adjacent
             if (keyboardTest === 'hello') {
                 passCount++;
@@ -352,7 +352,7 @@
             const resultsDiv = document.getElementById('performance-results');
             const progressDiv = document.getElementById('perf-progress');
             const progressBar = document.getElementById('perf-progress-bar');
-            
+
             if (!testAutocorrectEngine || !legacyAutocorrectEngine) {
                 resultsDiv.innerHTML = '<div class="test-result test-fail">❌ Please initialize system first</div>';
                 return;
@@ -386,7 +386,7 @@
             for (let i = 0; i < testCases.length; i++) {
                 const word = testCases[i];
                 testCount++;
-                
+
                 // Update progress
                 const progress = ((i + 1) / testCases.length) * 100;
                 progressBar.style.width = progress + '%';
@@ -397,7 +397,7 @@
                 const optimizedTime = performance.now() - optimizedStart;
                 totalOptimizedTime += optimizedTime;
 
-                // Test legacy (brute force) approach  
+                // Test legacy (brute force) approach
                 const legacyStart = performance.now();
                 const legacyResult = legacyAutocorrectEngine.findClosestWord(word);
                 const legacyTime = performance.now() - legacyStart;
@@ -406,9 +406,9 @@
                 // Verify both approaches give same result
                 const sameResult = optimizedResult === legacyResult;
                 const resultIcon = sameResult ? '✅' : '⚠️';
-                
+
                 results += `<div class="test-result ${sameResult ? 'test-pass' : 'performance-result'}">
-                    ${resultIcon} "${word}": Optimized ${optimizedTime.toFixed(2)}ms vs Legacy ${legacyTime.toFixed(2)}ms 
+                    ${resultIcon} "${word}": Optimized ${optimizedTime.toFixed(2)}ms vs Legacy ${legacyTime.toFixed(2)}ms
                     (${(legacyTime / optimizedTime).toFixed(1)}x faster) → "${optimizedResult}"
                 </div>`;
 
@@ -446,14 +446,14 @@
 
         async function runTypingSimulation() {
             const resultsDiv = document.getElementById('typing-results');
-            
+
             if (!testAutocorrectEngine) {
                 resultsDiv.innerHTML = '<div class="test-result test-fail">❌ Please initialize system first</div>';
                 return;
             }
 
             let results = '<h3>⌨️ Real-World Typing Simulation</h3>';
-            
+
             // Simulate a user typing a sentence with typos
             const typingScenario = [
                 { typed: 'h', expected: null },
@@ -461,19 +461,19 @@
                 { typed: 'hel', expected: null },
                 { typed: 'helo', expected: 'hello' },
                 { typed: 'helo ', corrected: 'hello ' },
-                
+
                 { typed: 'hello w', expected: null },
                 { typed: 'hello wo', expected: null },
                 { typed: 'hello wor', expected: null },
                 { typed: 'hello worl', expected: null },
                 { typed: 'hello wrold', expected: 'world' },
                 { typed: 'hello wrold ', corrected: 'hello world ' },
-                
+
                 { typed: 'hello world t', expected: null },
                 { typed: 'hello world th', expected: null },
                 { typed: 'hello world teh', expected: 'the' },
                 { typed: 'hello world teh ', corrected: 'hello world the ' },
-                
+
                 { typed: 'hello world the q', expected: null },
                 { typed: 'hello world the qu', expected: null },
                 { typed: 'hello world the qui', expected: null },
@@ -494,18 +494,18 @@
                     const lastWord = words[words.length - 1];
                     const suggestion = testAutocorrectEngine.findClosestWordForPreview(lastWord);
                     const time = performance.now() - start;
-                    
+
                     totalPreviewTime += time;
                     previewCount++;
-                    
+
                     const expectedSuggestion = scenario.expected || lastWord;
                     const correct = suggestion === expectedSuggestion;
                     const icon = correct ? '✅' : '❌';
-                    
+
                     results += `<div class="test-result ${correct ? 'test-pass' : 'test-fail'}">
                         ${icon} Preview: "${lastWord}" → "${suggestion}" in ${time.toFixed(2)}ms
                     </div>`;
-                    
+
                 } else if (scenario.corrected !== undefined) {
                     // This is a correction scenario (user hit space)
                     const start = performance.now();
@@ -513,15 +513,15 @@
                     const lastWord = words[words.length - 1];
                     const correction = testAutocorrectEngine.findClosestWord(lastWord);
                     const time = performance.now() - start;
-                    
+
                     totalCorrectionTime += time;
                     correctionCount++;
-                    
+
                     results += `<div class="test-result performance-result">
                         🔄 Correction: "${lastWord}" → "${correction}" in ${time.toFixed(2)}ms
                     </div>`;
                 }
-                
+
                 // Small delay to simulate real typing
                 await new Promise(resolve => setTimeout(resolve, 1));
             }
