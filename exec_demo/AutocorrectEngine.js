@@ -27,14 +27,14 @@ class AutocorrectEngine {
         // Common typo correction overrides - these get checked first for instant corrections
         this.correctionOverrides = options.correctionOverrides || {
             'teh': 'the',
-            'tehm': 'them', 
+            'tehm': 'them',
             'tehn': 'then',
             'adn': 'and',
             'nad': 'and',
             'cna': 'can',
             'nac': 'can',
             'taht': 'that',
-            'thta': 'that', 
+            'thta': 'that',
             'htat': 'that',
             'waht': 'what',
             'whta': 'what',
@@ -369,7 +369,7 @@ class AutocorrectEngine {
      */
     findClosestWord(word) {
         const lowerWord = word.toLowerCase();
-        
+
         // Check for exact override matches first (highest priority)
         if (this.correctionOverrides[lowerWord]) {
             return this.preserveCapitalization(word, this.correctionOverrides[lowerWord]);
@@ -400,12 +400,12 @@ class AutocorrectEngine {
 
         if (twoWordSplit) {
             const twoWordDistance = this.getTwoWordSplitDistance(word);
-            
+
             // Check if the two-word split uses any override corrections
             const usesOverrideCorrection = this.splitUsesOverrideCorrection(word);
-            
-            if (twoWordDistance <= this.maxEditDistance && 
-                (twoWordDistance < singleWordDistance || 
+
+            if (twoWordDistance <= this.maxEditDistance &&
+                (twoWordDistance < singleWordDistance ||
                  (twoWordDistance === singleWordDistance && usesOverrideCorrection))) {
                 return twoWordSplit;
             }
@@ -420,7 +420,7 @@ class AutocorrectEngine {
      */
     findClosestWordForPreview(word) {
         const lowerWord = word.toLowerCase();
-        
+
         // Check for exact override matches first (highest priority)
         if (this.correctionOverrides[lowerWord]) {
             return this.correctionOverrides[lowerWord].toLowerCase(); // Return lowercase for preview
