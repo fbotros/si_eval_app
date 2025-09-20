@@ -404,11 +404,11 @@ class AutocorrectEngine {
             // Check if the two-word split uses any override corrections
             const usesOverrideCorrection = this.splitUsesOverrideCorrection(word);
               
-            // Check if both words in the split are very common (top 50 words)
+            // Check if both words in the split are very common (top 100 words)
             const splitWords = twoWordSplit.toLowerCase().split(' ');
             const bothWordsVeryCommon = splitWords.length === 2 && 
-                this.getWordFrequencyScore(splitWords[0]) < 50 && 
-                this.getWordFrequencyScore(splitWords[1]) < 50;
+                this.getWordFrequencyScore(splitWords[0]) < 100 && 
+                this.getWordFrequencyScore(splitWords[1]) < 100;
 
             if (twoWordDistance <= this.maxEditDistance &&
                 (twoWordDistance < singleWordDistance ||
@@ -434,7 +434,23 @@ class AutocorrectEngine {
         }
 
         // Use the same logic as findClosestWord for consistency
-        return this.findClosestWord(word).toLowerCase();
+        const result = this.findClosestWord(word).toLowerCase();
+          
+        // Debug logging for "thisis" case
+        if (lowerWord === 'thisis') {
+            console.log('DEBUG thisis preview:');
+            console.log('  Single word correction:', this.findBestCorrectionForPart(lowerWord));
+            console.log('  Two word split:', this.findTwoWordSplit(word));
+            console.log('  Final result:', result);
+              
+            // Check frequency scores for "this" and "is"
+            console.log('  "this" frequency score:', this.getWordFrequencyScore('this'));
+            console.log('  "is" frequency score:', this.getWordFrequencyScore('is'));
+            console.log('  Both words very common?:', 
+                this.getWordFrequencyScore('this') < 100 && this.getWordFrequencyScore('is') < 100);
+        }
+          
+        return result;
     }
 
     /**
