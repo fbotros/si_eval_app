@@ -637,7 +637,7 @@
 
             return {
                 x: rect.left,
-                y: rect.top - 35 // Position tooltip above cursor
+                y: rect.top - 5 // Position tooltip just above cursor
             };
         }
 
@@ -664,10 +664,10 @@
                 const tooltipRect = tooltip.getBoundingClientRect();
                 tooltip.style.left = (caretPos.x - tooltipRect.width + 10) + 'px';
 
-                // Use line height to calculate vertical offset
+                // Use line height to calculate vertical offset - position closer to text
                 const computedStyle = window.getComputedStyle(editor);
                 const lineHeight = parseInt(computedStyle.lineHeight) || parseInt(computedStyle.fontSize) * 1.2;
-                tooltip.style.top = (caretPos.y - lineHeight - 10) + 'px';
+                tooltip.style.top = (caretPos.y - 35) + 'px';
                 tooltip.style.zIndex = '10000';
                 tooltip.style.visibility = 'visible';
 
