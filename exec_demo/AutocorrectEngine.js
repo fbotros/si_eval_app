@@ -201,10 +201,13 @@ class AutocorrectEngine {
             const secondPart = lowerWord.substring(i);
 
             if (this.dictionarySet.has(firstPart) && this.dictionarySet.has(secondPart)) {
-                // Preserve capitalization for two-word splits
-                const result = isCapitalized ?
-                    firstPart.charAt(0).toUpperCase() + firstPart.slice(1) + ' ' + secondPart :
-                    firstPart + ' ' + secondPart;
+                // Preserve capitalization for two-word splits - apply to BOTH words if needed
+                let result;
+                if (isCapitalized) {
+                    result = firstPart.charAt(0).toUpperCase() + firstPart.slice(1) + ' ' + secondPart;
+                } else {
+                    result = firstPart + ' ' + secondPart;
+                }
                 return result;
             }
 
