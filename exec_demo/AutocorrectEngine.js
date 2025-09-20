@@ -201,14 +201,9 @@ class AutocorrectEngine {
             const secondPart = lowerWord.substring(i);
 
             if (this.dictionarySet.has(firstPart) && this.dictionarySet.has(secondPart)) {
-                // Preserve capitalization for two-word splits - apply to BOTH words if needed
-                let result;
-                if (isCapitalized) {
-                    result = firstPart.charAt(0).toUpperCase() + firstPart.slice(1) + ' ' + secondPart;
-                } else {
-                    result = firstPart + ' ' + secondPart;
-                }
-                return result;
+                // Use the preserveCapitalization function for consistent handling
+                const twoWordResult = firstPart + ' ' + secondPart;
+                return this.preserveCapitalization(word, twoWordResult);
             }
 
             const firstCorrected = this.findBestCorrectionForPart(firstPart);
@@ -220,10 +215,9 @@ class AutocorrectEngine {
 
                 if (totalDistance <= this.maxEditDistance && totalDistance < bestScore) {
                     bestScore = totalDistance;
-                    // Preserve capitalization for corrected two-word splits
-                    bestSplit = isCapitalized ?
-                        firstCorrected.charAt(0).toUpperCase() + firstCorrected.slice(1) + ' ' + secondCorrected :
-                        firstCorrected + ' ' + secondCorrected;
+                    // Use the preserveCapitalization function for consistent handling
+                    const twoWordResult = firstCorrected + ' ' + secondCorrected;
+                    bestSplit = this.preserveCapitalization(word, twoWordResult);
                 }
             }
         }

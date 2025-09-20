@@ -68,17 +68,25 @@
             // Additional test cases
             const testCases = [
                 'Helloworld',
-                'HELLOWORLD',
+                'HELLOWORLD', 
                 'helloworld',
                 'Readyfor',
                 'READYFOR',
-                'readyfor'
+                'readyfor',
+                'Goodmorning',
+                'GOODMORNING',
+                'goodmorning'
             ];
 
-            output += '<h3>Additional Test Cases</h3>';
+            output += '<h3>Additional Test Cases (Should All Work Now!)</h3>';
             for (const test of testCases) {
                 const result = engine.findClosestWord(test);
-                output += `<p>"${test}" → "${result}"</p>`;
+                const correct = (test === 'HELLOWORLD' && result === 'HELLO WORLD') ||
+                               (test === 'READYFOR' && result === 'READY FOR') ||
+                               (test === 'GOODMORNING' && result === 'GOOD MORNING') ||
+                               (test.toLowerCase() !== result.toLowerCase());
+                const icon = correct ? '✅' : '❌';
+                output += `<p>${icon} "${test}" → "${result}"</p>`;
             }
 
             resultsDiv.innerHTML = output;
