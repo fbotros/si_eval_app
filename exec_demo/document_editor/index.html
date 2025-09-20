@@ -793,21 +793,25 @@
                     const appendCharToAdd = appendChar === '\n' ? '' : appendChar;
                     let newNormalizedText = beforeWord + finalCorrectedWord + appendCharToAdd + textAfterCursor;
 
-                    // Convert back to real newlines for display
-                    const newText = denormalizeText(newNormalizedText);
+                    // Use formatting-aware word replacement instead of replacing entire content
+                    const wasReplaced = replaceWordPreservingFormatting(
+                        wordInfo.start, 
+                        wordInfo.end, 
+                        finalCorrectedWord, 
+                        appendChar
+                    );
 
-                    // Update contentEditable with corrected word
-                    editor.innerText = newText;
+                    if (wasReplaced) {
+                        // Position cursor after the corrected word and terminating character
+                        const newCursorPos = beforeWord.length + finalCorrectedWord.length + (appendChar === '\n' ? 0 : 1);
 
-                    // Position cursor after the corrected word and terminating character
-                    const newCursorPos = beforeWord.length + finalCorrectedWord.length + 1;
-
-                    // Set cursor position in contentEditable - handle multi-line structure
-                    try {
-                        setCursorPositionInContentEditable(editor, newCursorPos);
-                    } catch (e) {
-                        console.log('Cursor positioning error:', e);
-                        // Some browsers might not support selection manipulation
+                        // Set cursor position in contentEditable - handle multi-line structure
+                        try {
+                            setCursorPositionInContentEditable(editor, newCursorPos);
+                        } catch (e) {
+                            console.log('Cursor positioning error:', e);
+                            // Some browsers might not support selection manipulation
+                        }
                     }
 
                     updateWordCount();
@@ -985,6 +989,87 @@
                 }
             }
         });
+
+        // Format-preserving word replacement function
+        function replaceWordPreservingFormatting(wordStart, wordEnd, correctedWord, appendChar) {
+            try {
+                const selection = window.getSelection();
+                if (selection.rangeCount === 0) return false;
+
+                // Find the text node and offset that contains the word to replace
+                const walker = document.createTreeWalker(
+                    editor,
+                    NodeFilter.SHOW_TEXT,
+                    null,
+                    false
+                );
+
+                let currentPos = 0;
+                let targetNode = null;
+                let targetStartOffset = 0;
+                let targetEndOffset = 0;
+
+                // Walk through all text nodes to find the one containing our word
+                let node;
+                while (node = walker.nextNode()) {
+                    const nodeText = node.textContent;
+                    const nodeLength = nodeText.length;
+
+                    // Check if word starts within this node
+                    if (currentPos <= wordStart && wordStart < currentPos + nodeLength) {
+                        targetNode = node;
+                        targetStartOffset = wordStart - currentPos;
+
+                        // Check if word also ends within this node
+                        if (wordEnd <= currentPos + nodeLength) {
+                            targetEndOffset = wordEnd - currentPos;
+                            break;
+                        }
+                    }
+
+                    currentPos += nodeLength;
+
+                    // Account for newlines between elements
+                    if (node.parentNode && node.parentNode !== editor) {
+                        currentPos += 1;
+                    }
+                }
+
+                if (!targetNode) return false;
+
+                // Create a range to select the word to replace
+                const range = document.createRange();
+                range.setStart(targetNode, targetStartOffset);
+                range.setEnd(targetNode, targetEndOffset);
+
+                // Get the current formatting by checking the parent elements
+                const parentElement = targetNode.parentNode;
+                const isBold = parentElement.tagName === 'B' || parentElement.tagName === 'STRONG' || 
+                              window.getComputedStyle(parentElement).fontWeight === 'bold' ||
+                              window.getComputedStyle(parentElement).fontWeight >= '700';
+                const isItalic = parentElement.tagName === 'I' || parentElement.tagName === 'EM' ||
+                               window.getComputedStyle(parentElement).fontStyle === 'italic';
+                const isUnderline = parentElement.tagName === 'U' ||
+                                  window.getComputedStyle(parentElement).textDecoration.includes('underline');
+
+                // Replace the selected text with corrected word
+                range.deleteContents();
+                
+                // Create the replacement text with terminating character
+                const replacementText = correctedWord + (appendChar === '\n' ? '' : appendChar);
+                const textNode = document.createTextNode(replacementText);
+                
+                range.insertNode(textNode);
+
+                // If we're in a formatted context, the formatting is already preserved
+                // because we're replacing text within the same parent element
+
+                return true;
+            } catch (error) {
+                console.log('Error in format-preserving replacement:', error);
+                return false;
+            }
+        }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function () {
