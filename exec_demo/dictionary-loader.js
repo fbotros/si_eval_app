@@ -24,14 +24,28 @@ async function loadDictionary() {
     dictionaryLoadPromise = (async () => {
         try {
             console.log('Loading dictionary from comprehensive_dictionary.txt...');
-            const response = await fetch('./comprehensive_dictionary.txt');
+            // Try multiple paths to handle different subdirectory locations
+            let response;
+            const possiblePaths = [
+                './comprehensive_dictionary.txt',     // For pages in exec_demo/
+                '../comprehensive_dictionary.txt'     // For pages in exec_demo/subdirectory/
+            ];
+            
+            for (const path of possiblePaths) {
+                try {
+                    response = await fetch(path);
+                    if (response.ok) break;
+                } catch (error) {
+                    // Continue to next path
+                }
+            }
 
-            if (!response.ok) {
-                throw new Error(`Failed to load dictionary: ${response.status} ${response.statusText}`);
+            if (!response || !response.ok) {
+                throw new Error(`Failed to load dictionary from all paths. Last error: ${response ? response.status + ' ' + response.statusText : 'No response'}`);
             }
 
             const text = await response.text();
-
+            
             // Split by lines and filter out empty lines
             sharedDictionary = text
                 .split('\n')
@@ -40,58 +54,14 @@ async function loadDictionary() {
 
             dictionaryLoaded = true;
             console.log(`Dictionary loaded successfully: ${sharedDictionary.length} words`);
-
+            
             return sharedDictionary;
-
+            
         } catch (error) {
-            console.error('Failed to load dictionary:', error);
-
-            // Fallback to a minimal dictionary
-            sharedDictionary = [
-                'the', 'and', 'to', 'a', 'of', 'in', 'is', 'you', 'that', 'it',
-                'he', 'was', 'for', 'on', 'are', 'as', 'with', 'his', 'they',
-                'i', 'at', 'be', 'this', 'have', 'from', 'or', 'one', 'had',
-                'by', 'word', 'but', 'not', 'what', 'all', 'were', 'we', 'when',
-                'your', 'can', 'said', 'there', 'each', 'which', 'she', 'do',
-                'how', 'their', 'if', 'will', 'up', 'other', 'about', 'out',
-                'many', 'then', 'them', 'these', 'so', 'some', 'her', 'would',
-                'make', 'like', 'into', 'him', 'time', 'has', 'two', 'more',
-                'very', 'after', 'words', 'long', 'than', 'first', 'been',
-                'call', 'who', 'its', 'now', 'find', 'could', 'made', 'may',
-                'down', 'side', 'did', 'get', 'come', 'way', 'use', 'man',
-                'new', 'write', 'our', 'me', 'right', 'see', 'him', 'two',
-                'how', 'its', 'our', 'out', 'day', 'had', 'his', 'her',
-                'old', 'see', 'now', 'way', 'who', 'boy', 'did', 'its',
-                'let', 'put', 'end', 'why', 'try', 'kind', 'hand', 'picture',
-                'again', 'change', 'off', 'play', 'spell', 'air', 'away',
-                'animal', 'house', 'point', 'page', 'letter', 'mother',
-                'answer', 'found', 'study', 'still', 'learn', 'should',
-                'america', 'world', 'high', 'every', 'near', 'add', 'food',
-                'between', 'own', 'below', 'country', 'plant', 'last',
-                'school', 'father', 'keep', 'tree', 'never', 'start',
-                'city', 'earth', 'eye', 'light', 'thought', 'head', 'under',
-                'story', 'saw', 'left', 'dont', 'few', 'while', 'along',
-                'might', 'close', 'something', 'seem', 'next', 'hard',
-                'open', 'example', 'begin', 'life', 'always', 'those',
-                'both', 'paper', 'together', 'got', 'group', 'often',
-                'run', 'important', 'until', 'children', 'side', 'feet',
-                'car', 'mile', 'night', 'walk', 'white', 'sea', 'began',
-                'grow', 'took', 'river', 'four', 'carry', 'state', 'once',
-                'book', 'hear', 'stop', 'without', 'second', 'later',
-                'miss', 'idea', 'enough', 'eat', 'face', 'watch', 'far',
-                'indian', 'really', 'almost', 'let', 'above', 'girl',
-                'sometimes', 'mountain', 'cut', 'young', 'talk', 'soon',
-                'list', 'song', 'being', 'leave', 'family', 'its',
-
-                // Add common typing test words
-                'quick', 'brown', 'fox', 'jumps', 'over', 'lazy', 'dog',
-                'jumped', 'walking', 'running', 'typing', 'test', 'practice'
-            ];
-
-            dictionaryLoaded = true;
-            console.log(`Using fallback dictionary: ${sharedDictionary.length} words`);
-
-            return sharedDictionary;
+            console.error('Critical Error: Failed to load dictionary:', error);
+            
+            // FAIL HARD - no fallback dictionary since TrieDictionary requires proper dictionary
+            throw new Error(`Dictionary loading failed and no fallback is allowed for performance. Error: ${error.message}`);
         }
     })();
 

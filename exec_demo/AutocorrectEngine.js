@@ -110,7 +110,7 @@ class AutocorrectEngine {
     }
 
     /**
-     * Find best correction for a word part using cached lookups
+     * Find best correction for a word part using cached lookups and trie optimization
      * Made public for testing purposes
      */
     findBestCorrectionForPart(part) {
@@ -125,17 +125,25 @@ class AutocorrectEngine {
         }
 
         let result = null;
-
-        // Always use our own reliable dictionary iteration for accurate results
-        // The TrieDictionary may not use the same distance calculation
         let bestMatch = null;
         let bestDistance = Infinity;
 
-        for (const dictWord of this.dictionary) {
-            const distance = this.levenshteinDistance(part, dictWord);
+        // REQUIRE TrieDictionary for performance - fail hard if not available
+        if (!this.trieDictionary) {
+            throw new Error('TrieDictionary is required for performance. Cannot proceed with brute force approach.');
+        }
+
+        // Get candidates from trie - this should return a small set (50-200 words)
+        // instead of checking all 9,919 words
+        const candidates = this.trieDictionary.search(part, this.maxEditDistance);
+        
+        // Now only run expensive Levenshtein on the small candidate set
+        for (const candidate of candidates) {
+            const candidateWord = candidate.word;
+            const distance = this.levenshteinDistance(part, candidateWord);
             if (distance <= this.maxEditDistance && distance < bestDistance) {
                 bestDistance = distance;
-                bestMatch = dictWord;
+                bestMatch = candidateWord;
             }
         }
         result = bestMatch;
@@ -309,6 +317,31 @@ class AutocorrectEngine {
             maxEditDistance: this.maxEditDistance,
             hasTrieDictionary: !!this.trieDictionary,
             keyboardNeighborsCount: Object.keys(this.keyboardNeighbors).length
+        };
+    }
+
+    /**
+     * Performance measurement: Count how many Levenshtein calculations would be needed
+     * with and without TrieDictionary optimization
+     */
+    measurePerformanceForWord(word) {
+        const lowerWord = word.toLowerCase();
+        
+        // Without optimization: would check entire dictionary
+        const bruteForceCount = this.dictionary.length;
+        
+        // With optimization: only check trie candidates
+        let trieCount = 0;
+        if (this.trieDictionary) {
+            const candidates = this.trieDictionary.search(lowerWord, this.maxEditDistance);
+            trieCount = candidates.length;
+        }
+        
+        return {
+            word: word,
+            bruteForceCalculations: bruteForceCount,
+            trieCalculations: trieCount,
+            improvement: bruteForceCount > 0 ? (bruteForceCount / Math.max(trieCount, 1)) : 1
         };
     }
 
