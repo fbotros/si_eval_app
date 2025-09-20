@@ -404,11 +404,11 @@ class AutocorrectEngine {
             // Check if the two-word split uses any override corrections
             const usesOverrideCorrection = this.splitUsesOverrideCorrection(word);
               
-            // Check if both words in the split are very common (top 100 words)
+            // Check if both words in the split are very common (top 150 words)
             const splitWords = twoWordSplit.toLowerCase().split(' ');
             const bothWordsVeryCommon = splitWords.length === 2 && 
-                this.getWordFrequencyScore(splitWords[0]) < 100 && 
-                this.getWordFrequencyScore(splitWords[1]) < 100;
+                this.getWordFrequencyScore(splitWords[0]) <= 150 && 
+                this.getWordFrequencyScore(splitWords[1]) <= 150;
 
             if (twoWordDistance <= this.maxEditDistance &&
                 (twoWordDistance < singleWordDistance ||
@@ -447,7 +447,7 @@ class AutocorrectEngine {
             console.log('  "this" frequency score:', this.getWordFrequencyScore('this'));
             console.log('  "is" frequency score:', this.getWordFrequencyScore('is'));
             console.log('  Both words very common?:', 
-                this.getWordFrequencyScore('this') < 100 && this.getWordFrequencyScore('is') < 100);
+                this.getWordFrequencyScore('this') <= 150 && this.getWordFrequencyScore('is') <= 150);
         }
           
         return result;
