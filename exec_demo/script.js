@@ -449,14 +449,13 @@ function performCursorAwareAutocorrect(appendChar) {
             return false; // No word or too short to correct
         }
 
-        // Extract word core and check for capitalization
+        // Extract word core - keep original capitalization for the autocorrect engine
         const wordPattern = /^([^a-zA-Z]*)([a-zA-Z']+)([^a-zA-Z]*)$/;
         const match = wordInfo.word.match(wordPattern);
 
         if (!match) return false; // No alphabetic content to correct
 
         const [, prefixPunct, wordCore, suffixPunct] = match;
-        const isCapitalized = wordCore.length > 0 && wordCore[0] >= 'A' && wordCore[0] <= 'Z';
         const lowerWord = wordCore.toLowerCase();
 
         let correctedWord;
@@ -465,14 +464,14 @@ function performCursorAwareAutocorrect(appendChar) {
         if (lastTooltipWord === lowerWord && lastTooltipSuggestion) {
             correctedWord = lastTooltipSuggestion;
         } else {
-            // Fallback to computing the correction
-            correctedWord = autocorrectEngine.findClosestWord(lowerWord);
+            // Pass the original word with capitalization to the autocorrect engine
+            // The engine handles capitalization preservation internally
+            correctedWord = autocorrectEngine.findClosestWord(wordCore);
         }
 
         // If a correction was found and it's different from the original
-        if (correctedWord !== wordCore.toLowerCase() && correctedWord !== lowerWord) {
-            // AutocorrectEngine now handles capitalization preservation internally
-            // Just reconstruct with original punctuation
+        if (correctedWord !== wordCore && correctedWord !== lowerWord) {
+            // Reconstruct with original punctuation
             const finalCorrectedWord = prefixPunct + correctedWord + suffixPunct;
 
             // Rebuild text: [text before word] + [corrected word] + [terminating char] + [text after cursor]
@@ -500,7 +499,6 @@ function performCursorAwareAutocorrect(appendChar) {
 
         return false; // No correction was made
     } catch (error) {
-        console.error("Cursor-aware autocorrect error:", error);
         return false; // Error occurred, don't attempt correction
     }
 }

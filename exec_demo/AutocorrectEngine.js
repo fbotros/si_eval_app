@@ -230,17 +230,17 @@ class AutocorrectEngine {
      */
     preserveCapitalization(originalWord, correctedWord) {
         if (!originalWord || !correctedWord) return correctedWord;
-        
+
         // If original is all uppercase, make correction all uppercase
         if (originalWord === originalWord.toUpperCase()) {
             return correctedWord.toUpperCase();
         }
-        
+
         // If original starts with capital, capitalize first letter of correction
         if (originalWord[0] === originalWord[0].toUpperCase()) {
             return correctedWord.charAt(0).toUpperCase() + correctedWord.slice(1);
         }
-        
+
         // Otherwise, keep correction lowercase
         return correctedWord;
     }
