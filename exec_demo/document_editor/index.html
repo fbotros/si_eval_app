@@ -394,11 +394,11 @@
                 if (node.nodeType === Node.TEXT_NODE) {
                     const parent = node.parentNode;
                     const text = node.textContent;
-                      
+
                     if (parent !== editor) {
                         // Check what formatting this text has
                         const formats = [];
-                        if (parent.tagName === 'B' || parent.tagName === 'STRONG' || 
+                        if (parent.tagName === 'B' || parent.tagName === 'STRONG' ||
                             window.getComputedStyle(parent).fontWeight === 'bold' ||
                             window.getComputedStyle(parent).fontWeight >= '700') {
                             formats.push('bold');
@@ -423,7 +423,7 @@
                     }
 
                     currentPos += text.length;
-                } else if (node.nodeType === Node.ELEMENT_NODE && 
+                } else if (node.nodeType === Node.ELEMENT_NODE &&
                           (node.tagName === 'DIV' || node.tagName === 'BR')) {
                     // Account for newlines
                     currentPos += 1;
@@ -436,7 +436,7 @@
         // Adjust formatting indices when text changes
         function adjustFormattingRanges(ranges, changePos, oldLength, newLength) {
             const delta = newLength - oldLength;
-              
+
             return ranges.map(range => {
                 // If change is before this range, shift the entire range
                 if (changePos <= range.start) {
@@ -468,7 +468,7 @@
 
             // Sort ranges by start position
             const sortedRanges = [...ranges].sort((a, b) => a.start - b.start);
-              
+
             let result = '';
             let currentPos = 0;
             const openTags = new Map(); // Track which tags are currently open
@@ -477,7 +477,7 @@
             for (let i = 0; i <= plainText.length; i++) {
                 // Close any tags that end at this position
                 for (const [type, tag] of openTags) {
-                    const shouldClose = sortedRanges.some(range => 
+                    const shouldClose = sortedRanges.some(range =>
                         range.type === type && range.end === i
                     );
                     if (shouldClose) {
@@ -489,7 +489,7 @@
                 // Open any tags that start at this position
                 sortedRanges.forEach(range => {
                     if (range.start === i && !openTags.has(range.type)) {
-                        const tag = range.type === 'bold' ? 'b' : 
+                        const tag = range.type === 'bold' ? 'b' :
                                    range.type === 'italic' ? 'i' : 'u';
                         result += `<${tag}>`;
                         openTags.set(range.type, tag);
@@ -942,9 +942,9 @@
 
                     // Adjust formatting ranges to account for the text change
                     formattingRanges = adjustFormattingRanges(
-                        formattingRanges, 
-                        changePos, 
-                        oldWordLength, 
+                        formattingRanges,
+                        changePos,
+                        oldWordLength,
                         newWordLength
                     );
 
@@ -961,7 +961,7 @@
                     try {
                         const range = document.createRange();
                         const selection = window.getSelection();
-                        
+
                         // Find the last text node in the editor
                         const walker = document.createTreeWalker(
                             editor,
@@ -969,13 +969,13 @@
                             null,
                             false
                         );
-                        
+
                         let lastTextNode = null;
                         let node;
                         while (node = walker.nextNode()) {
                             lastTextNode = node;
                         }
-                        
+
                         if (lastTextNode) {
                             // Position cursor at the end of the last text node
                             range.setStart(lastTextNode, lastTextNode.textContent.length);
