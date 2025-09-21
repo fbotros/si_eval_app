@@ -463,7 +463,8 @@
         // Reconstruct formatted content from plain text and formatting ranges
         function reconstructFormattedContent(plainText, ranges) {
             if (ranges.length === 0) {
-                return plainText;
+                // If no formatting, handle newlines directly
+                return plainText.replace(/\n/g, '<br>');
             }
 
             // Sort ranges by start position
@@ -473,33 +474,48 @@
             let currentPos = 0;
             const openTags = new Map(); // Track which tags are currently open
 
-            // Process each character position
-            for (let i = 0; i <= plainText.length; i++) {
-                // Close any tags that end at this position
-                for (const [type, tag] of openTags) {
-                    const shouldClose = sortedRanges.some(range =>
-                        range.type === type && range.end === i
-                    );
-                    if (shouldClose) {
-                        result += `</${tag}>`;
-                        openTags.delete(type);
+            // Split text into lines to handle newlines properly in formatting context
+            const lines = plainText.split('\n');
+
+            let charIndex = 0;
+            for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+                const line = lines[lineIndex];
+
+                // Process each character in the line
+                for (let charInLine = 0; charInLine <= line.length; charInLine++) {
+                    const currentCharIndex = charIndex + charInLine;
+
+                    // Close any tags that end at this position
+                    for (const [type, tag] of openTags) {
+                        const shouldClose = sortedRanges.some(range =>
+                            range.type === type && range.end === currentCharIndex
+                        );
+                        if (shouldClose) {
+                            result += `</${tag}>`;
+                            openTags.delete(type);
+                        }
+                    }
+
+                    // Open any tags that start at this position
+                    sortedRanges.forEach(range => {
+                        if (range.start === currentCharIndex && !openTags.has(range.type)) {
+                            const tag = range.type === 'bold' ? 'b' :
+                                       range.type === 'italic' ? 'i' : 'u';
+                            result += `<${tag}>`;
+                            openTags.set(range.type, tag);
+                        }
+                    });
+
+                    // Add the actual character (if not past end of line)
+                    if (charInLine < line.length) {
+                        result += line[charInLine];
                     }
                 }
 
-                // Open any tags that start at this position
-                sortedRanges.forEach(range => {
-                    if (range.start === i && !openTags.has(range.type)) {
-                        const tag = range.type === 'bold' ? 'b' :
-                                   range.type === 'italic' ? 'i' : 'u';
-                        result += `<${tag}>`;
-                        openTags.set(range.type, tag);
-                    }
-                });
-
-                // Add the actual character (if not past end)
-                if (i < plainText.length) {
-                    const char = plainText[i];
-                    result += char === '\n' ? '<br>' : char;
+                // Add line break between lines (except after the last line)
+                if (lineIndex < lines.length - 1) {
+                    charIndex += line.length + 1; // +1 for the newline character
+                    result += '<br>';
                 }
             }
 
