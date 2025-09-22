@@ -1137,20 +1137,23 @@
 
             updateWordCount();
 
-            // Get the current input value and length
-            const currentValue = editor.innerText || '';
+            // QUEST BROWSER FIX: Use textContent instead of innerText for consistent length
+            // Quest browser adds extra spaces to innerText, causing length mismatches
+            const currentValue = getCleanTextFromEditor(editor);
             const currentLength = currentValue.length;
+              
+            addDebugLog(`QUEST FIX: Using textContent-based extraction instead of innerText`);
 
             // Enhanced length debugging for Quest browser compatibility
             const textContent = editor.textContent || '';
             const innerText = editor.innerText || '';
             const innerHTML = editor.innerHTML || '';
-              
+
             addDebugLog(`INPUT text change: length ${previousInputLength} -> ${currentLength}`);
             addDebugLog(`  innerText: "${currentValue.slice(-5)}" (len=${currentValue.length})`);
             addDebugLog(`  textContent: "${textContent.slice(-5)}" (len=${textContent.length})`);
             addDebugLog(`  innerHTML chars: "${innerHTML.slice(-10)}"`);
-              
+
             // Check for discrepancies between different text extraction methods
             if (currentValue.length !== textContent.length) {
                 addDebugLog(`  ⚠️ LENGTH MISMATCH: innerText=${currentValue.length} vs textContent=${textContent.length}`);
