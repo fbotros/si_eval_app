@@ -54,17 +54,19 @@ async function initializeAutocorrect() {
         });
     });
 
-    // Load additional words from common_words.txt
+    // Load additional words from comprehensive_dictionary.txt
     try {
-        const response = await fetch('./common_words.txt');
+        const response = await fetch('./comprehensive_dictionary.txt');
         if (response.ok) {
             const text = await response.text();
-            const commonWords = text.split('\n')
+            const dictionaryWords = text.split('\n')
                 .map(word => word.trim().toLowerCase())
                 .filter(word => word.length > 0);
-            allWords.push(...commonWords);
+            allWords.push(...dictionaryWords);
         }
-    } catch (error) {}
+    } catch (error) {
+        console.log('Could not load comprehensive dictionary:', error);
+    }
 
     // Add all words to the autocorrect engine
     if (allWords.length > 0) {

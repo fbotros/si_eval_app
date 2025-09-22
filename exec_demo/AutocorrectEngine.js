@@ -323,8 +323,8 @@ class AutocorrectEngine {
             const secondCorrected = this.findBestCorrectionForPart(secondPart);
 
             if (firstCorrected && secondCorrected) {
-                const totalDistance = this.levenshteinDistance(firstPart, firstCorrected) +
-                                    this.levenshteinDistance(secondPart, secondCorrected);
+                const totalDistance = this.levenshteinCost(firstPart, firstCorrected) +
+                                    this.levenshteinCost(secondPart, secondCorrected);
 
                 if (totalDistance <= this.maxEditDistance) {
                     // Calculate commonality score for the corrected words
@@ -396,7 +396,7 @@ class AutocorrectEngine {
         }
 
         // Check if two-word split is better than single word correction
-        const singleWordDistance = this.levenshteinDistance(word.toLowerCase(), singleWordCorrection);
+        const singleWordDistance = this.levenshteinCost(word.toLowerCase(), singleWordCorrection);
         const twoWordSplit = this.findTwoWordSplit(word);
 
         if (twoWordSplit) {
