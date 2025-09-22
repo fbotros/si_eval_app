@@ -304,6 +304,20 @@
             font-size: 1.1rem;
         }
 
+        .difficulty-card {
+            background-color: #f8f9fa;
+            padding: 1rem 1.25rem;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            display: inline-block;
+        }
+
+        .difficulty-card.results-variant {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
         @media (max-width: 768px) {
             .main-layout {
                 flex-direction: column;
@@ -426,20 +440,26 @@
             </div>
 
             <!-- Difficulty toggle - always visible during test -->
-            <div id="difficulty-container" style="display: flex; justify-content: center; align-items: center; margin-bottom: 1rem;">
-                <div class="difficulty-toggle" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
-                    <div style="font-weight: 600; color: #2c3e50; margin-bottom: 4px;">Difficulty:</div>
-                    <div style="display: flex; flex-direction: column; gap: 6px;">
-                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 1rem; color: #2c3e50;">
-                            <input type="radio" name="difficulty" value="easy" id="difficulty-easy" 
-                                   style="margin-right: 8px; transform: scale(1.2);" checked>
-                            Easy
-                        </label>
-                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 1rem; color: #2c3e50;">
-                            <input type="radio" name="difficulty" value="hard" id="difficulty-hard" 
-                                   style="margin-right: 8px; transform: scale(1.2);">
-                            Hard
-                        </label>
+            <div id="difficulty-container"
+                style="display: flex; justify-content: center; align-items: center; margin-bottom: 1rem;">
+                <div class="difficulty-card">
+                    <div class="difficulty-toggle"
+                        style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                        <div style="font-weight: 600; color: #2c3e50; margin-bottom: 4px;">Difficulty:</div>
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label
+                                style="display: flex; align-items: center; cursor: pointer; font-size: 1rem; color: #2c3e50;">
+                                <input type="radio" name="difficulty" value="easy" id="difficulty-easy"
+                                    style="margin-right: 8px; transform: scale(1.2);" checked>
+                                Easy
+                            </label>
+                            <label
+                                style="display: flex; align-items: center; cursor: pointer; font-size: 1rem; color: #2c3e50;">
+                                <input type="radio" name="difficulty" value="hard" id="difficulty-hard"
+                                    style="margin-right: 8px; transform: scale(1.2);">
+                                Hard
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -457,19 +477,25 @@
                     </div>
                 </div>
                 <div style="display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 1rem;">
-                    <div class="difficulty-toggle" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
-                        <div style="font-weight: 600; color: white; margin-bottom: 4px;">Difficulty:</div>
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label style="display: flex; align-items: center; cursor: pointer; font-size: 1rem; color: white;">
-                                <input type="radio" name="difficulty-results" value="easy" id="difficulty-easy-results" 
-                                       style="margin-right: 8px; transform: scale(1.2);" checked>
-                                Easy
-                            </label>
-                            <label style="display: flex; align-items: center; cursor: pointer; font-size: 1rem; color: white;">
-                                <input type="radio" name="difficulty-results" value="hard" id="difficulty-hard-results" 
-                                       style="margin-right: 8px; transform: scale(1.2);">
-                                Hard
-                            </label>
+                    <div class="difficulty-card results-variant">
+                        <div class="difficulty-toggle"
+                            style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                            <div style="font-weight: 600; color: white; margin-bottom: 4px;">Difficulty:</div>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label
+                                    style="display: flex; align-items: center; cursor: pointer; font-size: 1rem; color: white;">
+                                    <input type="radio" name="difficulty-results" value="easy"
+                                        id="difficulty-easy-results" style="margin-right: 8px; transform: scale(1.2);"
+                                        checked>
+                                    Easy
+                                </label>
+                                <label
+                                    style="display: flex; align-items: center; cursor: pointer; font-size: 1rem; color: white;">
+                                    <input type="radio" name="difficulty-results" value="hard"
+                                        id="difficulty-hard-results" style="margin-right: 8px; transform: scale(1.2);">
+                                    Hard
+                                </label>
+                            </div>
                         </div>
                     </div>
                     <button class="button" id="restart-button-final">Restart Test</button>
