@@ -324,14 +324,6 @@
             <div class="word-count" id="word-count">
                 1 word, 6 characters
             </div>
-
-            <!-- Debug Window -->
-            <div id="debug-window"
-                style="position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; max-width: 300px; z-index: 9999;">
-                <div><strong>Event Debug</strong></div>
-                <div id="debug-events" style="max-height: 200px; overflow-y: auto;"></div>
-                <button onclick="clearDebugLog()" style="margin-top: 5px; font-size: 10px;">Clear</button>
-            </div>
         </div>
 
         <div class="status-bar">
@@ -440,7 +432,7 @@
 
                     currentPos += text.length;
                 } else if (node.nodeType === Node.ELEMENT_NODE &&
-                    (node.tagName === 'DIV' || node.tagName === 'BR')) {
+                          (node.tagName === 'DIV' || node.tagName === 'BR')) {
                     // Account for newlines
                     currentPos += 1;
                 }
@@ -516,7 +508,7 @@
                     sortedRanges.forEach(range => {
                         if (range.start === currentCharIndex && !openTags.has(range.type)) {
                             const tag = range.type === 'bold' ? 'b' :
-                                range.type === 'italic' ? 'i' : 'u';
+                                       range.type === 'italic' ? 'i' : 'u';
                             result += `<${tag}>`;
                             openTags.set(range.type, tag);
                         }
@@ -1051,23 +1043,8 @@
             }, 16); // ~1 frame at 60fps for smooth typing
         }
 
-        // Debug logging function
-        function logDebug(event, details) {
-            const debugEvents = document.getElementById('debug-events');
-            const timestamp = new Date().toLocaleTimeString();
-            const logEntry = document.createElement('div');
-            logEntry.innerHTML = `<strong>${timestamp}</strong> ${event}: ${details}`;
-            debugEvents.appendChild(logEntry);
-            debugEvents.scrollTop = debugEvents.scrollHeight;
-        }
-
-        function clearDebugLog() {
-            document.getElementById('debug-events').innerHTML = '';
-        }
-
         // Event listeners - EXACT COPY FROM TYPING TEST
         editor.addEventListener('input', function (e) {
-            logDebug('INPUT', `type: ${e.inputType || 'unknown'}, data: "${e.data || 'null'}"`);
             updateWordCount();
 
             // Get the current input value and length
@@ -1125,9 +1102,7 @@
 
                 // Handle space/punctuation for autocorrect
                 if (isSpaceOrPunct) {
-                    logDebug('SPACE_DETECTED', `triggering autocorrect with char: "${actualTypedChar}"`);
-                    const correctionMade = triggerAutocorrect(actualTypedChar);
-                    logDebug('AUTOCORRECT_RESULT', `correction made: ${correctionMade}`);
+                    triggerAutocorrect(actualTypedChar);
                 }
             }
             // If length decreased, count as corrected error (backspace)
@@ -1195,8 +1170,6 @@
 
         // Keyboard shortcuts and Enter key handling
         editor.addEventListener('keydown', function (e) {
-            logDebug('KEYDOWN', `key: "${e.key}", code: "${e.code}", ctrlKey: ${e.ctrlKey}`);
-
             // Handle Enter key to trigger autocorrect BEFORE the newline is inserted
             if (e.key === 'Enter') {
                 hideAutocorrectTooltip();
