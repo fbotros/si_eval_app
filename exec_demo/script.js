@@ -726,7 +726,7 @@ function syncDifficultyRadios(selectedValue) {
         difficultyEasy.checked = false;
         difficultyHard.checked = true;
     }
-    
+
     // Update results difficulty radios
     if (selectedValue === 'easy') {
         difficultyEasyResults.checked = true;
