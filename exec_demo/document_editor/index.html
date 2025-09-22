@@ -1125,9 +1125,9 @@
             // DEBUG LOGGING FOR INPUT EVENT
             eventCount++;
             lastInputType = e.inputType || 'undefined';
-            
+
             addDebugLog(`INPUT: type="${e.inputType || 'undefined'}", data="${e.data || 'null'}", length=${editor.textContent.length}`);
-            
+
             // Update debug display
             if (debugEnabled) {
                 const inputTypeElement = document.getElementById('input-type');
@@ -1254,18 +1254,65 @@
             // Title changed
         });
 
+        // Cross-browser key detection with fallbacks for Quest/mobile browsers
+        function normalizeKeyEvent(event) {
+            const key = event.key;
+            const code = event.code || '';  // Quest browser sends empty string
+              
+            // Create normalized event info for cross-browser compatibility
+            const normalizedEvent = {
+                key: key,
+                code: code,
+                isEnter: false,
+                isSpace: false,
+                isPunctuation: false
+            };
+              
+            // Detect Enter key - use multiple detection methods for compatibility
+            if (key === 'Enter' || key === '\n' || key === '\r' || 
+                code === 'Enter' || code === 'NumpadEnter' ||
+                event.keyCode === 13 || event.which === 13) {
+                normalizedEvent.isEnter = true;
+            }
+              
+            // Detect space key
+            if (key === ' ' || key === 'Space' || code === 'Space' ||
+                event.keyCode === 32 || event.which === 32) {
+                normalizedEvent.isSpace = true;
+            }
+              
+            // Detect punctuation that should trigger autocorrect
+            if (key && /[.,.!?;:"()]/.test(key)) {
+                normalizedEvent.isPunctuation = true;
+            }
+              
+            return normalizedEvent;
+        }
+
         // Perform autocorrect specifically for Enter key (before newline insertion)
         function performAutocorrectOnEnter(event) {
+            addDebugLog(`ENTER KEY AUTOCORRECT: Triggered for normalized event`);
             // Trigger autocorrect for Enter key - let browser handle Enter normally
             return triggerAutocorrect('\n');
         }
 
-        // Keyboard shortcuts and Enter key handling
+        // Enhanced keyboard shortcuts and Enter key handling with Quest browser support
         editor.addEventListener('keydown', function (e) {
+            // Normalize the key event for cross-browser compatibility
+            const normalizedEvent = normalizeKeyEvent(e);
+              
+            addDebugLog(`NORMALIZED KEY: key="${e.key}", code="${e.code || 'MISSING'}", isEnter=${normalizedEvent.isEnter}, isSpace=${normalizedEvent.isSpace}`);
+              
             // Handle Enter key to trigger autocorrect BEFORE the newline is inserted
-            if (e.key === 'Enter') {
+            if (normalizedEvent.isEnter) {
+                addDebugLog('ENTER DETECTED: Hiding tooltip and triggering autocorrect');
                 hideAutocorrectTooltip();
                 performAutocorrectOnEnter(e);
+            }
+              
+            // Handle space key for autocorrect trigger (backup for input event)
+            if (normalizedEvent.isSpace) {
+                addDebugLog('SPACE DETECTED: Will trigger autocorrect on next input event');
             }
 
             if (e.ctrlKey || e.metaKey) {
@@ -1373,43 +1420,43 @@
         // Add comprehensive event listeners for debugging - REPLACE EXISTING HANDLERS
         function addDebugEventListeners() {
             // No duplicate input handlers - debug hooks directly into existing handlers
-              
+
             // Keydown debug handler (separate from main handler)
             editor.addEventListener('keydown', function (e) {
                 eventCount++;
                 lastKeyPressed = e.key;
-  
+
                 addDebugLog(`KEYDOWN: key="${e.key}", code="${e.code}", ctrl=${e.ctrlKey}, meta=${e.metaKey}`);
-  
+
                 if (debugEnabled) {
                     const lastKeyElement = document.getElementById('last-key');
                     if (lastKeyElement) lastKeyElement.textContent = lastKeyPressed;
                     updateDebugDisplay();
                 }
             });
-  
+
             // Keyup debug handler
             editor.addEventListener('keyup', function (e) {
                 eventCount++;
                 addDebugLog(`KEYUP: key="${e.key}", code="${e.code}"`);
             });
-  
+
             // Composition events (important for mobile/IME)
             editor.addEventListener('compositionstart', function (e) {
                 eventCount++;
                 addDebugLog(`COMPOSITION START: data="${e.data || 'null'}"`);
             });
-  
+
             editor.addEventListener('compositionupdate', function (e) {
                 eventCount++;
                 addDebugLog(`COMPOSITION UPDATE: data="${e.data || 'null'}"`);
             });
-  
+
             editor.addEventListener('compositionend', function (e) {
                 eventCount++;
                 addDebugLog(`COMPOSITION END: data="${e.data || 'null'}"`);
             });
-  
+
             // Before input event (newer browsers)
             editor.addEventListener('beforeinput', function (e) {
                 eventCount++;
