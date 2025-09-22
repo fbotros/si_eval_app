@@ -571,22 +571,10 @@ function calculatePromptResult() {
     // Use STANDARD Levenshtein distance for accuracy calculation (not weighted)
     const editDistance = standardLevenshteinDistance(typedText, promptText);
 
-    // DEBUG: Log accuracy calculation details
-    console.log('=== ACCURACY CALCULATION DEBUG ===');
-    console.log('Typed text:', JSON.stringify(typedText));
-    console.log('Target text:', JSON.stringify(promptText));
-    console.log('Typed length:', typedLength);
-    console.log('Target length:', promptLength);
-    console.log('Edit distance (STANDARD):', editDistance);
-    console.log('Normalized distance:', promptLength > 0 ? editDistance / promptLength : 0);
-
     // Calculate accuracy as 1 minus normalized edit distance
     // Normalize by prompt length only (the "correct" reference text)
     const normalizedDistance = promptLength > 0 ? editDistance / promptLength : 0;
     const accuracy = Math.max(0, (1 - normalizedDistance) * 100);
-
-    console.log('Final accuracy:', accuracy);
-    console.log('===================================');
 
     // Calculate time spent on this prompt in minutes
     const timeSpentMs = endTime - startTime;
