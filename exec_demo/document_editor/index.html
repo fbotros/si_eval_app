@@ -419,19 +419,202 @@
         // Initialize autocorrect engine for the document editor
         let editorAutocorrectEngine = null;
 
-        // Autocorrect suppression state (same as main typing test)
+        // Sophisticated autocorrect suppression state
         let charsTypedSinceLastBackspace = 0;
         let previousInputLength = 0;
         let inputEventCounter = 0;
 
+        // Advanced suppression tracking for editing scenarios
+        let autocorrectSuppressed = false; // Master suppression flag
+        let suppressionReason = ''; // Track why suppression is active
+
         // Helper function to reset backspace counter
         function resetBackspaceCounter(reason) {
             charsTypedSinceLastBackspace = 0;
+            addDebugLog(`RESET BACKSPACE: ${reason}`);
         }
 
-        // Simple autocorrect suppression logic
+        // Activate autocorrect suppression with reason
+        function activateSuppressionMode(reason) {
+            autocorrectSuppressed = true;
+            suppressionReason = reason;
+            addDebugLog(`🚫 SUPPRESSION ACTIVATED: ${reason}`);
+        }
+
+        // Deactivate autocorrect suppression
+        function deactivateSuppressionMode(reason) {
+            autocorrectSuppressed = false;
+            suppressionReason = '';
+            addDebugLog(`✅ SUPPRESSION DEACTIVATED: ${reason}`);
+        }
+
+        // Check if autocorrect should be suppressed
         function shouldSuppressAutocorrect() {
-            return charsTypedSinceLastBackspace < 2;
+            if (autocorrectSuppressed) {
+                addDebugLog(`AUTOCORRECT SUPPRESSED: ${suppressionReason}`);
+                return true;
+            }
+
+            // Legacy basic backspace protection (minimal)
+            const basicSuppression = charsTypedSinceLastBackspace < 1;
+            if (basicSuppression) {
+                addDebugLog(`BASIC SUPPRESSION: need ${1 - charsTypedSinceLastBackspace} more chars after backspace`);
+            }
+
+            return basicSuppression;
+        }
+
+        // Get character at position in editor text
+        function getCharAtPosition(text, position) {
+            if (position < 0 || position >= text.length) return '';
+            return text.charAt(position);
+        }
+
+        // Check if character is whitespace (space, tab, newline)
+        function isWhitespace(char) {
+            return /\s/.test(char) || char === '§'; // Include normalized newline placeholder
+        }
+
+        // Detect if backspace operation crossed whitespace boundary
+        function detectBackspaceCrossedWhitespace(oldText, newText, oldCursorPos, newCursorPos) {
+            addDebugLog(`🔍 BACKSPACE CHECK: oldLen=${oldText.length}, newLen=${newText.length}, oldCursor=${oldCursorPos}, newCursor=${newCursorPos}`);
+
+            // Check if we backspaced (text got shorter and cursor moved left)
+            if (newText.length >= oldText.length || newCursorPos >= oldCursorPos) {
+                addDebugLog(`❌ NOT BACKSPACE: text didn't get shorter or cursor didn't move left`);
+                return false;
+            }
+
+            // Check if any deleted characters included whitespace
+            const deletedStart = newCursorPos;
+            const deletedEnd = oldCursorPos;
+            const deletedText = oldText.substring(deletedStart, deletedEnd);
+
+            addDebugLog(`🔍 DELETED TEXT: "${deletedText}" (start=${deletedStart}, end=${deletedEnd})`);
+
+            const crossedWhitespace = /[\s.,.!?;:"()]/.test(deletedText) || deletedText.includes('§');
+            addDebugLog(`🔍 CROSSED WHITESPACE: ${crossedWhitespace} (contains whitespace or §)`);
+
+            if (crossedWhitespace) {
+                // Check if cursor is now positioned next to non-whitespace
+                const charAtCursor = getCharAtPosition(newText, newCursorPos);
+                const charBeforeCursor = getCharAtPosition(newText, newCursorPos - 1);
+                const charAfterCursor = getCharAtPosition(newText, newCursorPos);
+
+                addDebugLog(`🔍 CHARS AROUND CURSOR: before="${charBeforeCursor}", at="${charAtCursor}", after="${charAfterCursor}"`);
+
+                const nextToNonWhitespace = (!isWhitespace(charBeforeCursor) && charBeforeCursor !== '') ||
+                    (!isWhitespace(charAfterCursor) && charAfterCursor !== '');
+
+                addDebugLog(`🔍 NEXT TO NON-WHITESPACE: ${nextToNonWhitespace}`);
+
+                if (nextToNonWhitespace) {
+                    addDebugLog(`✅ BACKSPACE CROSSED WHITESPACE: deleted "${deletedText}", cursor at non-whitespace`);
+                    return true;
+                } else {
+                    addDebugLog(`❌ BACKSPACE CROSSED WHITESPACE BUT: cursor not at non-whitespace`);
+                }
+            }
+
+            addDebugLog(`❌ BACKSPACE NO WHITESPACE CROSSING`);
+            return false;
+        }
+
+        // Detect if cursor was clicked/positioned next to non-whitespace
+        function detectCursorClickedAtNonWhitespace() {
+            const currentText = normalizeText(getCleanTextFromEditor(editor));
+            const selection = window.getSelection();
+
+            addDebugLog(`🔍 CLICK CHECK: text="${currentText.slice(-10)}", selectionCount=${selection.rangeCount}`);
+
+            if (selection.rangeCount === 0) {
+                addDebugLog(`❌ CLICK CHECK: no selection range`);
+                return false;
+            }
+
+            // Get current cursor position
+            let cursorPos = 0;
+            try {
+                const range = selection.getRangeAt(0);
+                const preCaretRange = range.cloneRange();
+                preCaretRange.selectNodeContents(editor);
+                preCaretRange.setEnd(range.startContainer, range.startOffset);
+
+                const tempDiv = document.createElement('div');
+                tempDiv.appendChild(preCaretRange.cloneContents());
+                const preCaretText = getCleanTextFromEditor(tempDiv);
+                cursorPos = normalizeText(preCaretText).length;
+            } catch (error) {
+                addDebugLog(`❌ CLICK CHECK: error getting cursor position - ${error.message}`);
+                return false;
+            }
+
+            addDebugLog(`🔍 CLICK CURSOR POS: ${cursorPos}`);
+
+            // Check characters around cursor position
+            const charBeforeCursor = getCharAtPosition(currentText, cursorPos - 1);
+            const charAtCursor = getCharAtPosition(currentText, cursorPos);
+
+            addDebugLog(`🔍 CLICK CHARS: before="${charBeforeCursor}", at="${charAtCursor}"`);
+
+            // If cursor is positioned adjacent to non-whitespace characters
+            const nextToNonWhitespace = (!isWhitespace(charBeforeCursor) && charBeforeCursor !== '') ||
+                (!isWhitespace(charAtCursor) && charAtCursor !== '');
+
+            addDebugLog(`🔍 CLICK NEXT TO NON-WHITESPACE: ${nextToNonWhitespace}`);
+
+            if (nextToNonWhitespace) {
+                addDebugLog(`✅ CURSOR AT NON-WHITESPACE: before="${charBeforeCursor}", at="${charAtCursor}"`);
+                return true;
+            } else {
+                addDebugLog(`❌ CURSOR NOT AT NON-WHITESPACE`);
+            }
+
+            return false;
+        }
+
+        // Track cursor position changes for click detection
+        let lastKnownCursorPosition = 0;
+        let lastKnownTextContent = '';
+
+        function updateCursorTracking() {
+            const currentText = normalizeText(getCleanTextFromEditor(editor));
+            const selection = window.getSelection();
+
+            if (selection.rangeCount === 0) return;
+
+            let cursorPos = 0;
+            try {
+                const range = selection.getRangeAt(0);
+                const preCaretRange = range.cloneRange();
+                preCaretRange.selectNodeContents(editor);
+                preCaretRange.setEnd(range.startContainer, range.startOffset);
+
+                const tempDiv = document.createElement('div');
+                tempDiv.appendChild(preCaretRange.cloneContents());
+                const preCaretText = getCleanTextFromEditor(tempDiv);
+                cursorPos = normalizeText(preCaretText).length;
+            } catch (error) {
+                cursorPos = currentText.length;
+            }
+
+            // Check for manual cursor positioning (not from typing)
+            if (currentText === lastKnownTextContent && cursorPos !== lastKnownCursorPosition) {
+                addDebugLog(`CURSOR MOVED: ${lastKnownCursorPosition} -> ${cursorPos} (no text change)`);
+
+                if (detectCursorClickedAtNonWhitespace()) {
+                    activateSuppressionMode('cursor positioned next to non-whitespace');
+                }
+            }
+
+            lastKnownCursorPosition = cursorPos;
+            lastKnownTextContent = currentText;
+        }
+
+        // Simple placeholder for word suppression (future enhancement)
+        function isWordSuppressed(word) {
+            // For now, no words are suppressed - this is for future enhancement
+            return false;
         }
 
         async function initializeEditorAutocorrect() {
@@ -925,15 +1108,18 @@
             const incompleteWord = getCurrentIncompleteWord();
 
             if (incompleteWord.length > 2) {
-                if (shouldSuppressAutocorrect()) {
+                // CHECK SUPPRESSION FOR TOOLTIP PREVIEW TOO
+                if (autocorrectSuppressed) {
+                    addDebugLog(`TOOLTIP SUPPRESSED: ${suppressionReason}`);
                     hideAutocorrectTooltip();
+                    return;
+                }
+
+                const suggestion = editorAutocorrectEngine.findClosestWordForPreview(incompleteWord.toLowerCase());
+                if (suggestion !== incompleteWord.toLowerCase()) {
+                    showAutocorrectTooltip(incompleteWord, suggestion);
                 } else {
-                    const suggestion = editorAutocorrectEngine.findClosestWordForPreview(incompleteWord.toLowerCase());
-                    if (suggestion !== incompleteWord.toLowerCase()) {
-                        showAutocorrectTooltip(incompleteWord, suggestion);
-                    } else {
-                        hideAutocorrectTooltip();
-                    }
+                    hideAutocorrectTooltip();
                 }
             } else {
                 hideAutocorrectTooltip();
@@ -944,15 +1130,53 @@
         function triggerAutocorrect(terminatingChar = ' ') {
             hideAutocorrectTooltip();
 
-            // Check suppression using CURRENT counter value (before resetting)
-            const shouldSuppress = shouldSuppressAutocorrect();
+            // Check SOPHISTICATED suppression using suppression flag BEFORE any modifications
+            const wasSuppressionActive = autocorrectSuppressed;
+            const currentSuppressionReason = suppressionReason;
+
+            // Check basic suppression using CURRENT counter value (before resetting)
+            const basicSuppression = charsTypedSinceLastBackspace < 1;
 
             // Reset counter after word termination (new word starts) - AFTER checking suppression
             resetBackspaceCounter('word termination');
 
-            // Apply suppression logic
-            if (!shouldSuppress) {
+            // Apply suppression logic using the state BEFORE any deactivation
+            if (wasSuppressionActive) {
+                addDebugLog(`AUTOCORRECT SUPPRESSED: ${currentSuppressionReason}`);
+                return false;
+            }
+
+            if (!basicSuppression) {
+                addDebugLog(`AUTOCORRECT TRIGGERING: No suppression detected`);
                 return performCursorAwareAutocorrectForContentEditable(terminatingChar);
+            } else {
+                addDebugLog(`AUTOCORRECT SUPPRESSED: Basic backspace protection active (need ${1 - charsTypedSinceLastBackspace} more chars)`);
+            }
+
+            return false;
+        }
+
+        // Function to trigger autocorrect with pre-captured suppression state (fixes timing issues)
+        function triggerAutocorrectWithCapturedState(terminatingChar, capturedSuppressionState, capturedSuppressionReason) {
+            hideAutocorrectTooltip();
+
+            // Check basic suppression using CURRENT counter value (before resetting)
+            const basicSuppression = charsTypedSinceLastBackspace < 1;
+
+            // Reset counter after word termination (new word starts) - AFTER checking suppression
+            resetBackspaceCounter('word termination');
+
+            // Apply suppression logic using the CAPTURED state (before any deactivation occurred)
+            if (capturedSuppressionState) {
+                addDebugLog(`AUTOCORRECT SUPPRESSED: ${capturedSuppressionReason}`);
+                return false;
+            }
+
+            if (!basicSuppression) {
+                addDebugLog(`AUTOCORRECT TRIGGERING: No suppression detected`);
+                return performCursorAwareAutocorrectForContentEditable(terminatingChar);
+            } else {
+                addDebugLog(`AUTOCORRECT SUPPRESSED: Basic backspace protection active (need ${1 - charsTypedSinceLastBackspace} more chars)`);
             }
 
             return false;
@@ -1120,7 +1344,7 @@
             }, 16); // ~1 frame at 60fps for smooth typing
         }
 
-        // Event listeners - EXACT COPY FROM TYPING TEST
+        // Event listeners - ENHANCED WITH SOPHISTICATED SUPPRESSION
         editor.addEventListener('input', function (e) {
             // DEBUG LOGGING FOR INPUT EVENT
             eventCount++;
@@ -1137,11 +1361,15 @@
 
             updateWordCount();
 
+            // CAPTURE SUPPRESSION STATE IMMEDIATELY TO AVOID TIMING ISSUES
+            const capturedSuppressionState = autocorrectSuppressed;
+            const capturedSuppressionReason = suppressionReason;
+
             // QUEST BROWSER FIX: Use textContent instead of innerText for consistent length
             // Quest browser adds extra spaces to innerText, causing length mismatches
             const currentValue = getCleanTextFromEditor(editor);
             const currentLength = currentValue.length;
-              
+
             addDebugLog(`QUEST FIX: Using textContent-based extraction instead of innerText`);
 
             // Enhanced length debugging for Quest browser compatibility
@@ -1163,9 +1391,34 @@
             if (currentLength === 0) {
                 hideAutocorrectTooltip();
                 resetBackspaceCounter('empty input');
+                deactivateSuppressionMode('empty input');
                 previousInputLength = 0;
                 addDebugLog('INPUT: cleared - resetting state');
                 return;
+            }
+
+            // Store previous state for whitespace crossing detection
+            const oldText = normalizeText(lastKnownTextContent);
+            const newText = normalizeText(currentValue);
+            const oldCursorPos = lastKnownCursorPosition;
+
+            // Get current cursor position
+            const selection = window.getSelection();
+            let newCursorPos = 0;
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                try {
+                    const preCaretRange = range.cloneRange();
+                    preCaretRange.selectNodeContents(editor);
+                    preCaretRange.setEnd(range.startContainer, range.startOffset);
+
+                    const tempDiv = document.createElement('div');
+                    tempDiv.appendChild(preCaretRange.cloneContents());
+                    const preCaretText = getCleanTextFromEditor(tempDiv);
+                    newCursorPos = normalizeText(preCaretText).length;
+                } catch (error) {
+                    newCursorPos = newText.length;
+                }
             }
 
             // Reset the correction flag if the user is typing a new character
@@ -1173,29 +1426,14 @@
                 // Count characters typed, but handle space separately
                 const charsAdded = currentLength - previousInputLength;
 
-                // Get cursor position using consistent text extraction
-                const selection = window.getSelection();
-                let cursorPos = 0;
-                if (selection.rangeCount > 0) {
-                    const range = selection.getRangeAt(0);
-                    try {
-                        const preCaretRange = range.cloneRange();
-                        preCaretRange.selectNodeContents(editor);
-                        preCaretRange.setEnd(range.startContainer, range.startOffset);
-
-                        // Create temporary element to extract text consistently
-                        const tempDiv = document.createElement('div');
-                        tempDiv.appendChild(preCaretRange.cloneContents());
-                        const preCaretText = getCleanTextFromEditor(tempDiv);
-                        cursorPos = preCaretText.length;
-                    } catch (error) {
-                        cursorPos = currentLength;
-                    }
-                }
-
                 // Get the character that was actually just typed (at cursor position - 1)
-                const actualTypedChar = currentValue.charAt(cursorPos - 1);
+                const actualTypedChar = currentValue.charAt(newCursorPos - 1);
                 const isSpaceOrPunct = /[\s.,.!?;:"()]/.test(actualTypedChar);
+
+                // CHECK FOR WHITESPACE DEACTIVATION - typing whitespace reactivates autocorrect
+                if (isWhitespace(actualTypedChar) || actualTypedChar === '§') {
+                    deactivateSuppressionMode('whitespace character typed');
+                }
 
                 // Only count non-space characters toward backspace penalty
                 if (!isSpaceOrPunct) {
@@ -1208,19 +1446,28 @@
                     scheduleAutocorrectPreview();
                 }
 
-                // Handle space/punctuation for autocorrect
+                // Handle space/punctuation for autocorrect - USE CAPTURED STATE
                 if (isSpaceOrPunct) {
-                    triggerAutocorrect(actualTypedChar);
+                    triggerAutocorrectWithCapturedState(actualTypedChar, capturedSuppressionState, capturedSuppressionReason);
                 }
             }
             // If length decreased, count as corrected error (backspace)
             else if (currentLength < previousInputLength) {
+                // CHECK FOR BACKSPACE CROSSING WHITESPACE - but only if suppression not already active
+                if (!autocorrectSuppressed && detectBackspaceCrossedWhitespace(oldText, newText, oldCursorPos, newCursorPos)) {
+                    activateSuppressionMode('backspaced past whitespace and stopped at non-whitespace');
+                }
+
                 // Reset counter on backspace (suppresses autocorrect until 2+ new chars typed)
                 resetBackspaceCounter('backspace detected');
 
                 // Always hide tooltip after backspace (non-blocking)
                 hideAutocorrectTooltip();
             }
+
+            // Update cursor tracking for next comparison
+            lastKnownCursorPosition = newCursorPos;
+            lastKnownTextContent = currentValue;
 
             // Update previous values for next comparison
             previousInputLength = currentLength;
@@ -1242,6 +1489,9 @@
             updateCursorPosition();
             updateButtonStates();
             hideAutocorrectTooltip();
+
+            // Update cursor tracking and check for suppression
+            updateCursorTracking();
         });
 
         editor.addEventListener('mouseup', function () {
@@ -1405,7 +1655,9 @@
             if (eventCountElement) eventCountElement.textContent = eventCount;
             if (browserInfoElement) browserInfoElement.textContent = detectBrowser();
             if (inputTypeElement) inputTypeElement.textContent = typeof e !== 'undefined' ? e.inputType || 'undefined' : 'none';
-            if (suppressionElement) suppressionElement.textContent = shouldSuppressAutocorrect() ? 'yes' : 'no';
+
+            // FIXED: Don't call shouldSuppressAutocorrect() here as it causes infinite loop
+            if (suppressionElement) suppressionElement.textContent = autocorrectSuppressed ? 'yes' : 'no';
 
             // Update current word
             const currentWord = getCurrentIncompleteWord();
