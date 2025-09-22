@@ -21,8 +21,9 @@ function shufflePrompts() {
     prompts = shuffleArray(prompts);
 }
 
-async function loadPrompts() {
-    const response = await fetch('./conversational_easy.txt');
+async function loadPrompts(difficulty = 'easy') {
+    const filename = difficulty === 'hard' ? './hard_prompts.txt' : './prompts.txt';
+    const response = await fetch(filename);
     const text = await response.text();
     prompts = text.split('\n').map(p => p.trim()).filter(p => p.length > 0);
     shufflePrompts();
@@ -105,6 +106,9 @@ const wpmElement = document.getElementById('wpm');
 const accuracyElement = document.getElementById('accuracy');
 const leaderboardList = document.getElementById('leaderboard-list');
 const restartButtonFinal = document.getElementById('restart-button-final');
+const difficultyContainer = document.getElementById('difficulty-container');
+const difficultySelect = document.getElementById('difficulty-select');
+const difficultySelectResults = document.getElementById('difficulty-select-results');
 const autocorrectTooltip = document.getElementById('autocorrect-tooltip');
 const correctionText = document.getElementById('correction-text');
 
@@ -527,6 +531,34 @@ function performAutocorrect(currentText, appendChar) {
     return performCursorAwareAutocorrect(appendChar);
 }
 
+// Standard Levenshtein distance for accuracy calculation (uniform costs of 1)
+function standardLevenshteinDistance(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+
+    const matrix = Array(b.length + 1).fill().map(() => Array(a.length + 1).fill(0));
+
+    // Initialize first row and column
+    for (let i = 0; i <= b.length; i++) matrix[i][0] = i;
+    for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b[i - 1] === a[j - 1]) {
+                matrix[i][j] = matrix[i - 1][j - 1]; // no operation needed
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1, // substitution (cost = 1)
+                    matrix[i - 1][j] + 1,     // insertion (cost = 1)
+                    matrix[i][j - 1] + 1      // deletion (cost = 1)
+                );
+            }
+        }
+    }
+
+    return matrix[b.length][a.length];
+}
+
 // Calculate results for the current prompt
 function calculatePromptResult() {
     const typedText = inputArea.value.trim();
@@ -534,13 +566,25 @@ function calculatePromptResult() {
     const typedLength = typedText.length;
     const promptLength = promptText.length;
 
-    // Use Levenshtein distance to calculate edit distance
-    const editDistance = autocorrectEngine.levenshteinDistance(typedText, promptText, 1000);
+    // Use STANDARD Levenshtein distance for accuracy calculation (not weighted)
+    const editDistance = standardLevenshteinDistance(typedText, promptText);
+
+    // DEBUG: Log accuracy calculation details
+    console.log('=== ACCURACY CALCULATION DEBUG ===');
+    console.log('Typed text:', JSON.stringify(typedText));
+    console.log('Target text:', JSON.stringify(promptText));
+    console.log('Typed length:', typedLength);
+    console.log('Target length:', promptLength);
+    console.log('Edit distance (STANDARD):', editDistance);
+    console.log('Normalized distance:', promptLength > 0 ? editDistance / promptLength : 0);
 
     // Calculate accuracy as 1 minus normalized edit distance
-    const maxDistance = Math.max(typedLength, promptLength);
-    const normalizedDistance = maxDistance > 0 ? editDistance / maxDistance : 0;
+    // Normalize by prompt length only (the "correct" reference text)
+    const normalizedDistance = promptLength > 0 ? editDistance / promptLength : 0;
     const accuracy = Math.max(0, (1 - normalizedDistance) * 100);
+
+    console.log('Final accuracy:', accuracy);
+    console.log('===================================');
 
     // Calculate time spent on this prompt in minutes
     const timeSpentMs = endTime - startTime;
@@ -622,13 +666,10 @@ function generateLeaderboard() {
 
     // Create leaderboard entries with random results
     const leaderboardData = [
-        // { name: "Andrew Bosworth", wpm: 119, accuracy: 99, isCurrentUser: false },
-        // { name: "Susan Li", wpm: 127, accuracy: 98, isCurrentUser: false },
-        // { name: "Alex Himel", wpm: 117, accuracy: 97, isCurrentUser: false },
-        { name: "Andrew Bosworth", wpm: 95, accuracy: 99, isCurrentUser: false },
-        { name: "Susan Li", wpm: 101, accuracy: 98, isCurrentUser: false },
-        { name: "Alex Himel", wpm: 93, accuracy: 97, isCurrentUser: false },
-        { name: "You", wpm: currentWpm, accuracy: currentAccuracy, isCurrentUser: true }
+        { name: "Andrew Bosworth", year: "'24", wpm: 95, accuracy: 99, isCurrentUser: false },
+        { name: "Susan Li", year: "'24", wpm: 101, accuracy: 98, isCurrentUser: false },
+        { name: "Alex Himel", year: "'24", wpm: 93, accuracy: 97, isCurrentUser: false },
+        { name: "You", year: "'25", wpm: currentWpm, accuracy: currentAccuracy, isCurrentUser: true }
     ];
 
     // Sort by wpm * accuracy (descending)
@@ -647,6 +688,7 @@ function generateLeaderboard() {
         tableRow.innerHTML = `
             <td class="rank-cell">${index + 1}</td>
             <td class="name-cell">${entry.name}</td>
+            <td class="year-cell">${entry.year}</td>
             <td class="wpm-cell">${entry.wpm}</td>
             <td class="accuracy-cell">${entry.accuracy}%</td>
             <td class="score-cell">${score}</td>
@@ -667,13 +709,36 @@ function endTest() {
     calculateAverageResults();
     generateLeaderboard();
     results.style.display = 'block';
+    // Hide the main difficulty toggle when test ends (it's replaced by the one in results)
+    difficultyContainer.style.display = 'none';
+    // Sync the results difficulty selection with main selection
+    difficultySelectResults.value = difficultySelect.value;
 }
 
 function restartTest() {
     shufflePrompts(); // Shuffle prompts each time the test is restarted
     hideAutocorrectTooltip(); // Hide tooltip on restart
     resetBackspaceCounter('restart test'); // Reset suppression counter
+    // Show the main difficulty toggle when test restarts
+    difficultyContainer.style.display = 'flex';
     initializeTest();
+}
+
+// Sync difficulty selectors
+function syncDifficultySelectors(sourceSelect, targetSelect) {
+    targetSelect.value = sourceSelect.value;
+}
+
+// Handle difficulty change based on test state
+async function handleDifficultyChange(selectedDifficulty) {
+    // If test is active or not started (restart button not visible), restart immediately
+    if (testActive || results.style.display === 'none') {
+        await loadPrompts(selectedDifficulty);
+        await initializeAutocorrect();
+        restartTest();
+    }
+    // If test is complete (restart button visible), just sync the selectors but don't restart
+    // The restart will happen when the user clicks the restart button
 }
 
 // Track input value changes for autocorrect
@@ -854,8 +919,8 @@ function configureInputArea() {
 
 // Initialize the test on page load
 document.addEventListener('DOMContentLoaded', async function() {
-    // Load prompts from prompts.txt first
-    await loadPrompts();
+    // Load prompts from prompts.txt first (default to easy)
+    await loadPrompts('easy');
     // Initialize dictionary with prompt words and common words from file
     await initializeAutocorrect();
     // Configure input area
@@ -863,4 +928,30 @@ document.addEventListener('DOMContentLoaded', async function() {
     initializeTest();
     // Initialize leaderboard
     initializeLeaderboard();
+
+    // Add difficulty toggle event listeners
+    difficultySelect.addEventListener('change', async function() {
+        const selectedDifficulty = this.value;
+        // Sync the results selector
+        syncDifficultySelectors(this, difficultySelectResults);
+        // Handle the difficulty change with smart behavior
+        await handleDifficultyChange(selectedDifficulty);
+    });
+
+    difficultySelectResults.addEventListener('change', async function() {
+        const selectedDifficulty = this.value;
+        // Sync the main selector
+        syncDifficultySelectors(this, difficultySelect);
+        // Handle the difficulty change with smart behavior (won't restart since test is complete)
+        await handleDifficultyChange(selectedDifficulty);
+    });
+
+    // Restart button listener - when clicked, load the selected difficulty from results selector
+    restartButtonFinal.addEventListener('click', async function() {
+        // When restart is clicked, load the difficulty selected in the results area
+        const selectedDifficulty = difficultySelectResults.value;
+        await loadPrompts(selectedDifficulty);
+        await initializeAutocorrect();
+        restartTest();
+    });
 });

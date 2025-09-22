@@ -130,11 +130,12 @@ class AutocorrectEngine {
 
 
     /**
-     * Calculate Damerau-Levenshtein distance with keyboard-aware substitution costs
-     * Supports transpositions which makes "teh" -> "the" distance = 1
+     * Calculate Damerau-Levenshtein cost with keyboard-aware substitution costs
+     * Supports transpositions which makes "teh" -> "the" cost = 1
+     * NOTE: This is a weighted cost function, not standard edit distance
      */
-    levenshteinDistance(a, b, maxEditDist = null) {
-        const maxDist = maxEditDist || this.maxEditDistance;
+    levenshteinCost(a, b, maxEditCost = null) {
+        const maxCost = maxEditCost || this.maxEditDistance;
 
         if (a.length === 0) return b.length;
         if (b.length === 0) return a.length;
@@ -221,13 +222,13 @@ class AutocorrectEngine {
         // Now only run expensive Levenshtein on the small candidate set
         for (const candidate of candidates) {
             const candidateWord = candidate.word;
-            const distance = this.levenshteinDistance(part, candidateWord);
+            const cost = this.levenshteinCost(part, candidateWord);
             const frequencyScore = this.getWordFrequencyScore(candidateWord);
 
-            // Prefer lower distance first, then lower frequency score (more common words) as tiebreaker
-            if (distance <= this.maxEditDistance &&
-                (distance < bestDistance || (distance === bestDistance && frequencyScore < bestFrequencyScore))) {
-                bestDistance = distance;
+            // Prefer lower cost first, then lower frequency score (more common words) as tiebreaker
+            if (cost <= this.maxEditDistance &&
+                (cost < bestDistance || (cost === bestDistance && frequencyScore < bestFrequencyScore))) {
+                bestDistance = cost;
                 bestFrequencyScore = frequencyScore;
                 bestMatch = candidateWord;
             }
@@ -262,8 +263,8 @@ class AutocorrectEngine {
             const secondCorrected = this.findBestCorrectionForPart(secondPart);
 
             if (firstCorrected && secondCorrected) {
-                const totalDistance = this.levenshteinDistance(firstPart, firstCorrected) +
-                                    this.levenshteinDistance(secondPart, secondCorrected) + 1;
+                const totalDistance = this.levenshteinCost(firstPart, firstCorrected) +
+                                    this.levenshteinCost(secondPart, secondCorrected) + 1;
                 if (totalDistance < bestDistance) bestDistance = totalDistance;
             }
         }

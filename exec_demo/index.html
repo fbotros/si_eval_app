@@ -34,7 +34,7 @@
 
         .sidebar {
             flex: 1;
-            min-width: 350px;
+            min-width: 400px;
             position: sticky;
             top: 20px;
         }
@@ -293,6 +293,11 @@
             font-weight: 600;
         }
 
+        .year-cell {
+            color: #7f8c8d;
+            font-weight: normal;
+        }
+
         .score-cell {
             color: #e67e22;
             font-weight: bold;
@@ -403,13 +408,8 @@
         <div class="container">
             <h1>Typing Test</h1>
 
-            <div class="app-links">
-                🚀 <strong>Typing Test</strong> | <a href="document_editor/" class="app-link">📝 Document Editor</a>
-            </div>
-
             <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next
                 one.</p>
-
 
             <div class="progress-indicator">
                 Prompt <span id="current-prompt">1</span> of 4
@@ -425,7 +425,17 @@
                 </div>
             </div>
 
-            <button class="button" id="restart-button" style="display: none;">Restart Test</button>
+            <!-- Difficulty toggle - always visible during test -->
+            <div id="difficulty-container" style="display: flex; justify-content: center; align-items: center; margin-bottom: 1rem;">
+                <div class="difficulty-toggle">
+                    <label style="font-weight: 600; color: #2c3e50; margin-right: 10px;">Difficulty:</label>
+                    <select id="difficulty-select"
+                        style="padding: 8px 12px; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem; background-color: white; cursor: pointer;">
+                        <option value="easy">Easy</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+            </div>
 
             <div class="results" id="results">
                 <h2>🎉 Test Complete!</h2>
@@ -439,7 +449,17 @@
                         <div class="metric-label">Accuracy</div>
                     </div>
                 </div>
-                <button class="button" id="restart-button-final">Restart Test</button>
+                <div style="display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 1rem;">
+                    <div class="difficulty-toggle">
+                        <label style="font-weight: 600; color: white; margin-right: 10px;">Difficulty:</label>
+                        <select id="difficulty-select-results"
+                            style="padding: 8px 12px; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem; background-color: white; cursor: pointer;">
+                            <option value="easy">Easy</option>
+                            <option value="hard">Hard</option>
+                        </select>
+                    </div>
+                    <button class="button" id="restart-button-final">Restart Test</button>
+                </div>
             </div>
         </div>
 
@@ -451,6 +471,7 @@
                         <tr>
                             <th></th>
                             <th>Name</th>
+                            <th>Year</th>
                             <th>WPM</th>
                             <th>Accuracy</th>
                             <th>Score</th>
