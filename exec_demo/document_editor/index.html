@@ -225,6 +225,68 @@
             background: #bdc1c6;
         }
 
+        /* Debug window styles */
+        .debug-window {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 300px;
+            max-height: 400px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #00ff00;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10000;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .debug-window h4 {
+            margin: 0 0 10px 0;
+            color: #ffff00;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .debug-log {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            padding: 5px;
+            margin-bottom: 10px;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .debug-log div {
+            margin-bottom: 2px;
+            word-break: break-all;
+        }
+
+        .debug-info {
+            border-top: 1px solid #333;
+            padding-top: 10px;
+        }
+
+        .debug-info div {
+            margin-bottom: 3px;
+        }
+
+        .debug-toggle {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #333;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 11px;
+            z-index: 10001;
+            cursor: pointer;
+        }
+
         /* Autocorrect Tooltip Styles */
         .autocorrect-tooltip {
             position: fixed;
@@ -333,6 +395,21 @@
         </div>
     </div>
 
+    <!-- Debug window for cross-browser event debugging -->
+    <button class="debug-toggle" id="debug-toggle">Debug</button>
+    <div class="debug-window" id="debug-window">
+        <h4>Cross-Browser Autocorrect Debug</h4>
+        <div class="debug-log" id="debug-log"></div>
+        <div class="debug-info">
+            <div>Browser: <span id="browser-info"></span></div>
+            <div>Events: <span id="event-count">0</span></div>
+            <div>Last Key: <span id="last-key">none</span></div>
+            <div>Input Type: <span id="input-type">none</span></div>
+            <div>Current Word: <span id="current-word">none</span></div>
+            <div>Suppressed: <span id="suppression-status">no</span></div>
+        </div>
+    </div>
+
     <script src="../dictionary-loader.js"></script>
     <script src="../keyboard-layout.js"></script>
     <script src="../TrieDictionary.js"></script>
@@ -432,7 +509,7 @@
 
                     currentPos += text.length;
                 } else if (node.nodeType === Node.ELEMENT_NODE &&
-                          (node.tagName === 'DIV' || node.tagName === 'BR')) {
+                    (node.tagName === 'DIV' || node.tagName === 'BR')) {
                     // Account for newlines
                     currentPos += 1;
                 }
@@ -508,7 +585,7 @@
                     sortedRanges.forEach(range => {
                         if (range.start === currentCharIndex && !openTags.has(range.type)) {
                             const tag = range.type === 'bold' ? 'b' :
-                                       range.type === 'italic' ? 'i' : 'u';
+                                range.type === 'italic' ? 'i' : 'u';
                             result += `<${tag}>`;
                             openTags.set(range.type, tag);
                         }
@@ -1045,18 +1122,33 @@
 
         // Event listeners - EXACT COPY FROM TYPING TEST
         editor.addEventListener('input', function (e) {
+            // DEBUG LOGGING FOR INPUT EVENT
+            eventCount++;
+            lastInputType = e.inputType || 'undefined';
+            
+            addDebugLog(`INPUT: type="${e.inputType || 'undefined'}", data="${e.data || 'null'}", length=${editor.textContent.length}`);
+            
+            // Update debug display
+            if (debugEnabled) {
+                const inputTypeElement = document.getElementById('input-type');
+                if (inputTypeElement) inputTypeElement.textContent = lastInputType;
+                updateDebugDisplay();
+            }
+
             updateWordCount();
 
             // Get the current input value and length
             const currentValue = editor.innerText || '';
             const currentLength = currentValue.length;
 
+            addDebugLog(`INPUT text change: length ${previousInputLength} -> ${currentLength}, chars: "${currentValue.slice(-3)}"`);
 
             // If input field is empty, hide tooltip
             if (currentLength === 0) {
                 hideAutocorrectTooltip();
                 resetBackspaceCounter('empty input');
                 previousInputLength = 0;
+                addDebugLog('INPUT: cleared - resetting state');
                 return;
             }
 
@@ -1192,6 +1284,148 @@
                         break;
                 }
             }
+        });
+
+        // DEBUG WINDOW FUNCTIONALITY - FOR CROSS-BROWSER DEBUGGING
+        let debugEnabled = false;
+        let eventCount = 0;
+        let debugLogEntries = [];
+        const maxLogEntries = 50;
+
+        function detectBrowser() {
+            const userAgent = navigator.userAgent;
+            let browser = 'Unknown';
+
+            if (userAgent.includes('Chrome') && !userAgent.includes('Edge')) {
+                browser = 'Chrome';
+            } else if (userAgent.includes('Firefox')) {
+                browser = 'Firefox';
+            } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
+                browser = 'Safari';
+            } else if (userAgent.includes('Edge')) {
+                browser = 'Edge';
+            }
+
+            return browser + ' ' + (navigator.platform || 'Unknown Platform');
+        }
+
+        function addDebugLog(message) {
+            if (!debugEnabled) return;
+
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+
+            debugLogEntries.push(logEntry);
+            if (debugLogEntries.length > maxLogEntries) {
+                debugLogEntries.shift();
+            }
+
+            updateDebugDisplay();
+        }
+
+        function updateDebugDisplay() {
+            if (!debugEnabled) return;
+
+            const logElement = document.getElementById('debug-log');
+            const eventCountElement = document.getElementById('event-count');
+            const browserInfoElement = document.getElementById('browser-info');
+            const lastKeyElement = document.getElementById('last-key');
+            const inputTypeElement = document.getElementById('input-type');
+            const currentWordElement = document.getElementById('current-word');
+            const suppressionElement = document.getElementById('suppression-status');
+
+            if (logElement) {
+                logElement.innerHTML = debugLogEntries.map(entry => `<div>${entry}</div>`).join('');
+                logElement.scrollTop = logElement.scrollHeight;
+            }
+
+            if (eventCountElement) eventCountElement.textContent = eventCount;
+            if (browserInfoElement) browserInfoElement.textContent = detectBrowser();
+            if (inputTypeElement) inputTypeElement.textContent = typeof e !== 'undefined' ? e.inputType || 'undefined' : 'none';
+            if (suppressionElement) suppressionElement.textContent = shouldSuppressAutocorrect() ? 'yes' : 'no';
+
+            // Update current word
+            const currentWord = getCurrentIncompleteWord();
+            if (currentWordElement) currentWordElement.textContent = currentWord || 'none';
+        }
+
+        function toggleDebugWindow() {
+            debugEnabled = !debugEnabled;
+            const debugWindow = document.getElementById('debug-window');
+            const debugToggle = document.getElementById('debug-toggle');
+
+            if (debugEnabled) {
+                debugWindow.style.display = 'block';
+                debugToggle.textContent = 'Hide Debug';
+                addDebugLog('Debug window enabled');
+                updateDebugDisplay();
+            } else {
+                debugWindow.style.display = 'none';
+                debugToggle.textContent = 'Debug';
+            }
+        }
+
+        // ENHANCED EVENT HANDLING WITH CROSS-BROWSER COMPATIBILITY
+        // Track multiple event types to debug cross-browser issues
+        let lastKeyPressed = 'none';
+        let lastInputType = 'none';
+
+        // Add comprehensive event listeners for debugging - REPLACE EXISTING HANDLERS
+        function addDebugEventListeners() {
+            // No duplicate input handlers - debug hooks directly into existing handlers
+              
+            // Keydown debug handler (separate from main handler)
+            editor.addEventListener('keydown', function (e) {
+                eventCount++;
+                lastKeyPressed = e.key;
+  
+                addDebugLog(`KEYDOWN: key="${e.key}", code="${e.code}", ctrl=${e.ctrlKey}, meta=${e.metaKey}`);
+  
+                if (debugEnabled) {
+                    const lastKeyElement = document.getElementById('last-key');
+                    if (lastKeyElement) lastKeyElement.textContent = lastKeyPressed;
+                    updateDebugDisplay();
+                }
+            });
+  
+            // Keyup debug handler
+            editor.addEventListener('keyup', function (e) {
+                eventCount++;
+                addDebugLog(`KEYUP: key="${e.key}", code="${e.code}"`);
+            });
+  
+            // Composition events (important for mobile/IME)
+            editor.addEventListener('compositionstart', function (e) {
+                eventCount++;
+                addDebugLog(`COMPOSITION START: data="${e.data || 'null'}"`);
+            });
+  
+            editor.addEventListener('compositionupdate', function (e) {
+                eventCount++;
+                addDebugLog(`COMPOSITION UPDATE: data="${e.data || 'null'}"`);
+            });
+  
+            editor.addEventListener('compositionend', function (e) {
+                eventCount++;
+                addDebugLog(`COMPOSITION END: data="${e.data || 'null'}"`);
+            });
+  
+            // Before input event (newer browsers)
+            editor.addEventListener('beforeinput', function (e) {
+                eventCount++;
+                addDebugLog(`BEFORE INPUT: type="${e.inputType || 'undefined'}", data="${e.data || 'null'}"`);
+            });
+        }
+
+        // Initialize debug toggle
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('debug-toggle').addEventListener('click', toggleDebugWindow);
+
+            // Add debug event listeners
+            addDebugEventListeners();
+
+            // Initialize debug display
+            updateDebugDisplay();
         });
 
         // Initialize
