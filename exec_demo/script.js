@@ -108,11 +108,8 @@ const wpmElement = document.getElementById('wpm');
 const accuracyElement = document.getElementById('accuracy');
 const leaderboardList = document.getElementById('leaderboard-list');
 const restartButtonFinal = document.getElementById('restart-button-final');
-const difficultyContainer = document.getElementById('difficulty-container');
 const difficultyEasy = document.getElementById('difficulty-easy');
 const difficultyHard = document.getElementById('difficulty-hard');
-const difficultyEasyResults = document.getElementById('difficulty-easy-results');
-const difficultyHardResults = document.getElementById('difficulty-hard-results');
 const autocorrectTooltip = document.getElementById('autocorrect-tooltip');
 const correctionText = document.getElementById('correction-text');
 
@@ -701,18 +698,12 @@ function endTest() {
     calculateAverageResults();
     generateLeaderboard();
     results.style.display = 'block';
-    // Hide the main difficulty toggle when test ends (it's replaced by the one in results)
-    difficultyContainer.style.display = 'none';
-    // Sync the results difficulty selection with main selection
-    difficultySelectResults.value = difficultySelect.value;
 }
 
 function restartTest() {
     shufflePrompts(); // Shuffle prompts each time the test is restarted
     hideAutocorrectTooltip(); // Hide tooltip on restart
     resetBackspaceCounter('restart test'); // Reset suppression counter
-    // Show the main difficulty toggle when test restarts
-    difficultyContainer.style.display = 'flex';
     initializeTest();
 }
 
@@ -725,15 +716,6 @@ function syncDifficultyRadios(selectedValue) {
     } else {
         difficultyEasy.checked = false;
         difficultyHard.checked = true;
-    }
-
-    // Update results difficulty radios
-    if (selectedValue === 'easy') {
-        difficultyEasyResults.checked = true;
-        difficultyHardResults.checked = false;
-    } else {
-        difficultyEasyResults.checked = false;
-        difficultyHardResults.checked = true;
     }
 }
 
@@ -956,28 +938,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     });
 
-    difficultyEasyResults.addEventListener('change', async function() {
-        if (this.checked) {
-            // Sync radios
-            syncDifficultyRadios('easy');
-            // Handle the difficulty change with smart behavior (won't restart since test is complete)
-            await handleDifficultyChange('easy');
-        }
-    });
-
-    difficultyHardResults.addEventListener('change', async function() {
-        if (this.checked) {
-            // Sync radios
-            syncDifficultyRadios('hard');
-            // Handle the difficulty change with smart behavior (won't restart since test is complete)
-            await handleDifficultyChange('hard');
-        }
-    });
-
-    // Restart button listener - when clicked, load the selected difficulty from results area
+    // Restart button listener - when clicked, load the currently selected difficulty
     restartButtonFinal.addEventListener('click', async function() {
-        // When restart is clicked, load the difficulty selected in the results area
-        const selectedDifficulty = difficultyEasyResults.checked ? 'easy' : 'hard';
+        // When restart is clicked, load the difficulty selected in the sidebar
+        const selectedDifficulty = difficultyEasy.checked ? 'easy' : 'hard';
         await loadPrompts(selectedDifficulty);
         await initializeAutocorrect();
         restartTest();
