@@ -21,9 +21,8 @@ function shufflePrompts() {
     prompts = shuffleArray(prompts);
 }
 
-async function loadPrompts(difficulty = 'easy') {
-    const filename = difficulty === 'hard' ? './hard_prompts.txt' : './prompts.txt';
-    const response = await fetch(filename);
+async function loadPrompts() {
+    const response = await fetch('./prompts.txt');
     const text = await response.text();
     prompts = text.split('\n').map(p => p.trim()).filter(p => p.length > 0);
     shufflePrompts();
@@ -106,10 +105,7 @@ const inputArea = document.getElementById('input-area');
 const results = document.getElementById('results');
 const wpmElement = document.getElementById('wpm');
 const accuracyElement = document.getElementById('accuracy');
-const leaderboardList = document.getElementById('leaderboard-list');
 const restartButtonFinal = document.getElementById('restart-button-final');
-const difficultyEasy = document.getElementById('difficulty-easy');
-const difficultyHard = document.getElementById('difficulty-hard');
 const autocorrectTooltip = document.getElementById('autocorrect-tooltip');
 const correctionText = document.getElementById('correction-text');
 
@@ -624,79 +620,11 @@ function calculateAverageResults() {
     accuracyElement.textContent = Math.round(avgAccuracy) + '%';
 }
 
-// Generate leaderboard with random results and current user
-function generateLeaderboard() {
-    let currentWpm = 0;
-    let currentAccuracy = 0;
-
-    // If we have completed prompts, calculate current stats using weighted averages
-    if (promptResults.length > 0) {
-        let totalEffectiveChars = 0; // For WPM weighting (typedLength - 1)
-        let totalTypedChars = 0;     // For accuracy weighting (typedLength)
-        let weightedWpmSum = 0;
-        let weightedAccuracySum = 0;
-
-        promptResults.forEach(result => {
-            const typedLength = result.typedText.length;
-            const effectiveChars = Math.max(0, typedLength - 1);
-
-            // Weight WPM by effective characters (typedLength - 1)
-            totalEffectiveChars += effectiveChars;
-            weightedWpmSum += result.wpm * effectiveChars;
-
-            // Weight accuracy by typed characters (typedLength)
-            totalTypedChars += typedLength;
-            weightedAccuracySum += result.accuracy * typedLength;
-        });
-
-        currentWpm = totalEffectiveChars > 0 ? Math.round(weightedWpmSum / totalEffectiveChars) : 0;
-        currentAccuracy = totalTypedChars > 0 ? Math.round(weightedAccuracySum / totalTypedChars) : 0;
-    }
-
-    // Create leaderboard entries with random results
-    const leaderboardData = [
-        { name: "Andrew Bosworth", year: "'24", wpm: 95, accuracy: 99, isCurrentUser: false },
-        { name: "Susan Li", year: "'23", wpm: 101, accuracy: 98, isCurrentUser: false },
-        { name: "Alex Himel", year: "'23", wpm: 93, accuracy: 97, isCurrentUser: false },
-        { name: "You", year: "'25", wpm: currentWpm, accuracy: currentAccuracy, isCurrentUser: true }
-    ];
-
-    // Sort by wpm * accuracy (descending)
-    leaderboardData.sort((a, b) => (b.wpm * b.accuracy / 100) - (a.wpm * a.accuracy / 100));
-
-    // Clear existing leaderboard
-    leaderboardList.innerHTML = '';
-
-    // Create leaderboard rows
-    leaderboardData.forEach((entry, index) => {
-        const tableRow = document.createElement('tr');
-        tableRow.className = entry.isCurrentUser ? 'current-user' : '';
-
-        const score = Math.round(entry.wpm * entry.accuracy / 100);
-
-        tableRow.innerHTML = `
-            <td class="rank-cell">${index + 1}</td>
-            <td class="name-cell">${entry.name}</td>
-            <td class="year-cell">${entry.year}</td>
-            <td class="wpm-cell">${entry.wpm}</td>
-            <td class="accuracy-cell">${entry.accuracy}%</td>
-            <td class="score-cell">${score}</td>
-        `;
-
-        leaderboardList.appendChild(tableRow);
-    });
-}
-
-// Initialize leaderboard with default values
-function initializeLeaderboard() {
-    generateLeaderboard();
-}
 
 function endTest() {
     testActive = false;
     inputArea.disabled = true;
     calculateAverageResults();
-    generateLeaderboard();
     results.style.display = 'block';
 }
 
@@ -707,29 +635,6 @@ function restartTest() {
     initializeTest();
 }
 
-// Sync difficulty radio buttons
-function syncDifficultyRadios(selectedValue) {
-    // Update main difficulty radios
-    if (selectedValue === 'easy') {
-        difficultyEasy.checked = true;
-        difficultyHard.checked = false;
-    } else {
-        difficultyEasy.checked = false;
-        difficultyHard.checked = true;
-    }
-}
-
-// Handle difficulty change based on test state
-async function handleDifficultyChange(selectedDifficulty) {
-    // If test is active or not started (restart button not visible), restart immediately
-    if (testActive || results.style.display === 'none') {
-        await loadPrompts(selectedDifficulty);
-        await initializeAutocorrect();
-        restartTest();
-    }
-    // If test is complete (restart button visible), just sync the selectors but don't restart
-    // The restart will happen when the user clicks the restart button
-}
 
 // Track input value changes for autocorrect
 let previousInputLength = 0;
@@ -897,7 +802,11 @@ inputArea.addEventListener('keydown', function(e) {
 });
 
 // Restart button event listener
-restartButtonFinal.addEventListener('click', restartTest);
+restartButtonFinal.addEventListener('click', async function() {
+    await loadPrompts();
+    await initializeAutocorrect();
+    restartTest();
+});
 
 // Configure input area to disable browser autocorrect
 function configureInputArea() {
@@ -909,41 +818,11 @@ function configureInputArea() {
 
 // Initialize the test on page load
 document.addEventListener('DOMContentLoaded', async function() {
-    // Load prompts from prompts.txt first (default to easy)
-    await loadPrompts('easy');
+    // Load prompts from prompts.txt
+    await loadPrompts();
     // Initialize dictionary with prompt words and common words from file
     await initializeAutocorrect();
     // Configure input area
     configureInputArea();
     initializeTest();
-    // Initialize leaderboard
-    initializeLeaderboard();
-
-    // Add difficulty radio button event listeners
-    difficultyEasy.addEventListener('change', async function() {
-        if (this.checked) {
-            // Sync radios
-            syncDifficultyRadios('easy');
-            // Handle the difficulty change with smart behavior
-            await handleDifficultyChange('easy');
-        }
-    });
-
-    difficultyHard.addEventListener('change', async function() {
-        if (this.checked) {
-            // Sync radios
-            syncDifficultyRadios('hard');
-            // Handle the difficulty change with smart behavior
-            await handleDifficultyChange('hard');
-        }
-    });
-
-    // Restart button listener - when clicked, load the currently selected difficulty
-    restartButtonFinal.addEventListener('click', async function() {
-        // When restart is clicked, load the difficulty selected in the sidebar
-        const selectedDifficulty = difficultyEasy.checked ? 'easy' : 'hard';
-        await loadPrompts(selectedDifficulty);
-        await initializeAutocorrect();
-        restartTest();
-    });
 });

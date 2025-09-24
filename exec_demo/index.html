@@ -17,27 +17,19 @@
         }
 
         .main-layout {
-            display: flex;
-            gap: 20px;
             max-width: 1200px;
             margin: 0 auto;
-            align-items: flex-start;
         }
 
         .container {
-            flex: 2;
+            max-width: 800px;
+            margin: 0 auto;
             padding: 2rem;
             border-radius: 10px;
             background-color: white;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
 
-        .sidebar {
-            flex: 1;
-            min-width: 400px;
-            position: sticky;
-            top: 20px;
-        }
 
         h1 {
             text-align: center;
@@ -210,128 +202,9 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
-        .leaderboard {
-            margin-top: 0;
-            padding: 1.5rem;
-            background-color: #ecf0f1;
-            border-radius: 8px;
-            border: 2px solid #bdc3c7;
-        }
-
-        .leaderboard h3 {
-            margin-top: 0;
-            margin-bottom: 1rem;
-            color: #2c3e50;
-            text-align: center;
-        }
-
-        .leaderboard-table {
-            width: 100%;
-            border-collapse: collapse;
-            background-color: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-
-        .leaderboard-table th {
-            background-color: #34495e;
-            color: white;
-            padding: 0.75rem 0.5rem;
-            text-align: center;
-            font-weight: bold;
-            font-size: 0.9rem;
-        }
-
-        .leaderboard-table th:first-child {
-            text-align: center;
-            width: 50px;
-        }
-
-        .leaderboard-table th:nth-child(2) {
-            text-align: left;
-            width: auto;
-        }
-
-        .leaderboard-table td {
-            padding: 0.75rem 0.5rem;
-            text-align: center;
-            border-bottom: 1px solid #ecf0f1;
-        }
-
-        .leaderboard-table td:nth-child(2) {
-            text-align: left;
-            font-weight: 500;
-        }
-
-        .leaderboard-table tr.current-user {
-            background-color: #e8f4fd;
-            border-left: 4px solid #3498db;
-            font-weight: bold;
-        }
-
-        .leaderboard-table tr:hover:not(.current-user) {
-            background-color: #f8f9fa;
-        }
-
-        .rank-cell {
-            font-weight: bold;
-            color: #7f8c8d;
-        }
-
-        .name-cell {
-            color: #2c3e50;
-        }
-
-        .wpm-cell {
-            color: #3498db;
-            font-weight: 600;
-        }
-
-        .accuracy-cell {
-            color: #27ae60;
-            font-weight: 600;
-        }
-
-        .year-cell {
-            color: #7f8c8d;
-            font-weight: normal;
-        }
-
-        .score-cell {
-            color: #e67e22;
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
-
-        .difficulty-card {
-            background-color: #f8f9fa;
-            padding: 1rem 1.25rem;
-            border-radius: 8px;
-            border: 1px solid #dee2e6;
-            display: inline-block;
-        }
-
-        .difficulty-card.results-variant {
-            background: rgba(255, 255, 255, 0.15);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(10px);
-        }
-
         @media (max-width: 768px) {
-            .main-layout {
-                flex-direction: column;
-                gap: 15px;
-            }
-
-            .sidebar {
-                order: -1;
-                position: static;
-                min-width: unset;
-            }
-
-            .leaderboard {
-                margin-top: 0;
+            .container {
+                padding: 1.5rem;
             }
         }
 
@@ -456,46 +329,6 @@
             </div>
         </div>
 
-        <div class="sidebar">
-            <div class="leaderboard">
-                <h3>Leaderboard</h3>
-                <table class="leaderboard-table" id="leaderboard-table">
-                    <thead>
-                        <tr>
-                            <th></th>
-                            <th>Name</th>
-                            <th>Year</th>
-                            <th>WPM</th>
-                            <th>Accuracy</th>
-                            <th>Score</th>
-                        </tr>
-                    </thead>
-                    <tbody id="leaderboard-list">
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Difficulty setting - moved below leaderboard -->
-            <div class="leaderboard" style="margin-top: 1rem;">
-                <h3>Difficulty</h3>
-                <div style="display: flex; justify-content: center; padding: 1rem;">
-                    <div style="display: flex; gap: 2rem;">
-                        <label
-                            style="display: flex; align-items: center; cursor: pointer; font-size: 1rem; color: #2c3e50; font-weight: 500;">
-                            <input type="radio" name="difficulty" value="easy" id="difficulty-easy"
-                                style="margin-right: 8px; transform: scale(1.2);" checked>
-                            Easy
-                        </label>
-                        <label
-                            style="display: flex; align-items: center; cursor: pointer; font-size: 1rem; color: #2c3e50; font-weight: 500;">
-                            <input type="radio" name="difficulty" value="hard" id="difficulty-hard"
-                                style="margin-right: 8px; transform: scale(1.2);">
-                            Hard
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <script src="dictionary-loader.js"></script>
