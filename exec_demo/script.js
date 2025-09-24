@@ -147,7 +147,7 @@ function initializeTest() {
     inputArea.value = '';
     inputArea.disabled = false;
     results.style.display = 'none';
-    
+
     // Focus and select the input field for immediate typing
     inputArea.focus();
     inputArea.select();
