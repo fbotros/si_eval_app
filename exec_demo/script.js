@@ -1284,7 +1284,9 @@ function triggerFeedbackAutocorrect(terminatingChar = ' ') {
         feedbackInput.value = newText;
 
         // Position cursor after corrected word and terminating character
-        const newCursorPos = beforeWord.length + finalCorrectedWord.length + 1;
+        // Only add +1 if there's actually a terminating character
+        const terminatingCharLength = terminatingChar.length;
+        const newCursorPos = beforeWord.length + finalCorrectedWord.length + terminatingCharLength;
         try {
             feedbackInput.selectionStart = newCursorPos;
             feedbackInput.selectionEnd = newCursorPos;
