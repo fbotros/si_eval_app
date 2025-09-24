@@ -646,25 +646,26 @@ function calculateAverageResults() {
     if (promptResults.length === 0) return;
 
     let totalEffectiveChars = 0; // For WPM weighting (typedLength - 1)
-    let totalTypedChars = 0;     // For accuracy weighting (typedLength)
+    let totalPromptChars = 0;    // For accuracy weighting (promptLength)
     let weightedWpmSum = 0;
     let weightedAccuracySum = 0;
 
     promptResults.forEach(result => {
         const typedLength = result.typedText.length;
+        const promptLength = result.promptText.length;
         const effectiveChars = Math.max(0, typedLength - 1);
 
         // Weight WPM by effective characters (typedLength - 1)
         totalEffectiveChars += effectiveChars;
         weightedWpmSum += result.wpm * effectiveChars;
 
-        // Weight accuracy by typed characters (typedLength)
-        totalTypedChars += typedLength;
-        weightedAccuracySum += result.accuracy * typedLength;
+        // Weight accuracy by prompt length (not typed length)
+        totalPromptChars += promptLength;
+        weightedAccuracySum += result.accuracy * promptLength;
     });
 
     const avgWpm = totalEffectiveChars > 0 ? weightedWpmSum / totalEffectiveChars : 0;
-    const avgAccuracy = totalTypedChars > 0 ? weightedAccuracySum / totalTypedChars : 0;
+    const avgAccuracy = totalPromptChars > 0 ? weightedAccuracySum / totalPromptChars : 0;
 
     // Update results display
     wpmElement.textContent = Math.round(avgWpm);
@@ -683,24 +684,27 @@ function showResultsPopup() {
     // Calculate and display results in popup
     if (promptResults.length === 0) return;
 
-    let totalEffectiveChars = 0;
-    let totalTypedChars = 0;
+    let totalEffectiveChars = 0; // For WPM weighting (typedLength - 1)
+    let totalPromptChars = 0;    // For accuracy weighting (promptLength)
     let weightedWpmSum = 0;
     let weightedAccuracySum = 0;
 
     promptResults.forEach(result => {
         const typedLength = result.typedText.length;
+        const promptLength = result.promptText.length;
         const effectiveChars = Math.max(0, typedLength - 1);
 
+        // Weight WPM by effective characters (typedLength - 1)
         totalEffectiveChars += effectiveChars;
         weightedWpmSum += result.wpm * effectiveChars;
 
-        totalTypedChars += typedLength;
-        weightedAccuracySum += result.accuracy * typedLength;
+        // Weight accuracy by prompt length (not typed length)
+        totalPromptChars += promptLength;
+        weightedAccuracySum += result.accuracy * promptLength;
     });
 
     const avgWpm = totalEffectiveChars > 0 ? weightedWpmSum / totalEffectiveChars : 0;
-    const avgAccuracy = totalTypedChars > 0 ? weightedAccuracySum / totalTypedChars : 0;
+    const avgAccuracy = totalPromptChars > 0 ? weightedAccuracySum / totalPromptChars : 0;
 
     // Update popup display
     popupWpmElement.textContent = Math.round(avgWpm);
@@ -790,7 +794,19 @@ inputArea.addEventListener('input', function() {
 
         // Handle space/punctuation for autocorrect
         if (isSpaceOrPunct) {
-            triggerAutocorrect(actualTypedChar);
+            const correctionMade = triggerAutocorrect(actualTypedChar);
+            // Always check for auto-advance after punctuation (not just after autocorrect)
+            setTimeout(() => checkAutoAdvance(), 0);
+        }
+
+        // Check for auto-advance after each character (when not editing within a word)
+        if (!isSpaceOrPunct) {
+            // Only check auto-advance if we're at the end of the input (not editing within)
+            const cursorPos = inputArea.selectionStart;
+            const currentText = inputArea.value;
+            if (cursorPos === currentText.length) {
+                checkAutoAdvance();
+            }
         }
     }
     // If length decreased, count as corrected error (backspace)
@@ -852,46 +868,145 @@ inputArea.addEventListener('keydown', function(e) {
     }
 }, true);
 
-// Handle Enter key to move to next prompt
+// Track consecutive Enter presses for advancement override
+let consecutiveEnterPresses = 0;
+let lastEnterPressTime = 0;
+
+// Check if user typed the prompt completely and correctly for auto-advance
+function checkAutoAdvance() {
+    if (!testActive) return false;
+
+    const typedText = inputArea.value.trim();
+    const promptText = prompts[currentPromptIndex];
+
+    // Must match exactly and be complete
+    if (typedText === promptText) {
+        // Auto-advance to next prompt
+        advanceToNextPrompt();
+        return true;
+    }
+
+    return false;
+}
+
+// Function to advance to next prompt (shared logic)
+function advanceToNextPrompt() {
+    // Update end time when advancing
+    endTime = Date.now();
+
+    // Calculate results for the current prompt
+    const promptResult = calculatePromptResult();
+    promptResults.push(promptResult);
+
+    // Clear consecutive Enter counter when advancing
+    consecutiveEnterPresses = 0;
+
+    // Move to the next prompt or end the test
+    if (currentPromptIndex < 5) {  // Stop after 6 prompts (index 0-5)
+        currentPromptIndex++;
+        updateCurrentPrompt();
+        inputArea.value = '';
+        promptTimingStarted = false; // Reset timing flag for new prompt
+        hideAutocorrectTooltip(); // Hide tooltip when moving to next prompt
+        resetBackspaceCounter('new prompt'); // Reset suppression counter for new prompt
+    } else {
+        // End the test after 6 prompts are completed
+        hideAutocorrectTooltip(); // Hide tooltip when test ends
+        resetBackspaceCounter('test end'); // Reset suppression counter
+        endTest();
+    }
+}
+
+// Handle Enter key to move to next prompt with new logic
 inputArea.addEventListener('keydown', function(e) {
     if (!testActive) return;
 
     // Update end time for all keys except Enter (to track until last key entered)
     if (e.key !== 'Enter') {
         endTime = Date.now();
+        // Reset consecutive Enter counter on any other key
+        consecutiveEnterPresses = 0;
     }
 
     if (e.key === 'Enter') {
         e.preventDefault(); // Prevent default Enter behavior
 
-        // Trigger autocorrect before processing the final text
-        triggerAutocorrect('\n');
+        // Check if autocorrect would be applied (without actually applying it)
+        const currentText = inputArea.value;
+        const cursorPos = inputArea.selectionStart;
+        const textBeforeCursor = currentText.substring(0, cursorPos);
+        const wordInfo = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
 
-        const typedText = inputArea.value.trim();
-
-        // Require at least some text to proceed
-        if (typedText.length === 0) {
-            return;
+        let autocorrectWouldApply = false;
+        if (wordInfo.word && wordInfo.word.length > 2) {
+            const wordPattern = /^([^a-zA-Z]*)([a-zA-Z']+)([^a-zA-Z]*)$/;
+            const match = wordInfo.word.match(wordPattern);
+            if (match) {
+                const [, , wordCore] = match;
+                const correctedWord = autocorrectEngine.findClosestWord(wordCore);
+                autocorrectWouldApply = (correctedWord !== wordCore && correctedWord !== wordCore.toLowerCase());
+            }
         }
 
-        // Calculate results for the current prompt
-        const promptResult = calculatePromptResult();
-        promptResults.push(promptResult);
-
-        // Move to the next prompt or end the test
-        if (currentPromptIndex < 5) {  // Stop after 6 prompts (index 0-5)
-            currentPromptIndex++;
-            updateCurrentPrompt();
-            inputArea.value = '';
-            promptTimingStarted = false; // Reset timing flag for new prompt
-            hideAutocorrectTooltip(); // Hide tooltip when moving to next prompt
-            resetBackspaceCounter('new prompt'); // Reset suppression counter for new prompt
+        // Apply autocorrect, but suppress newline if correction is made
+        if (autocorrectWouldApply) {
+            // Apply autocorrect without adding newline (use empty string instead of '\n')
+            triggerAutocorrect('');
         } else {
-            // End the test after 6 prompts are completed
-            hideAutocorrectTooltip(); // Hide tooltip when test ends
-            resetBackspaceCounter('test end'); // Reset suppression counter
-            endTest();
+            // No autocorrect needed, normal flow
+            triggerAutocorrect('\n');
         }
+
+        // Check for auto-advance after autocorrect (in case autocorrect completed the prompt)
+        // Use setTimeout to ensure autocorrect has fully completed
+        let autoAdvanceTriggered = false;
+        setTimeout(() => {
+            if (checkAutoAdvance()) {
+                autoAdvanceTriggered = true;
+            }
+        }, 0);
+
+        // Small delay to let auto-advance check complete, then proceed with Enter logic if needed
+        setTimeout(() => {
+            if (autoAdvanceTriggered) {
+                return; // Auto-advance already handled it
+            }
+
+            const typedText = inputArea.value.trim();
+            const promptText = prompts[currentPromptIndex];
+
+            // Require at least some text to proceed
+            if (typedText.length === 0) {
+                return;
+            }
+
+            // Calculate length percentage
+            const lengthPercentage = (typedText.length / promptText.length) * 100;
+
+            // Track consecutive Enter presses with timing
+            const currentTime = Date.now();
+            if (currentTime - lastEnterPressTime < 1000) { // Within 1 second
+                consecutiveEnterPresses++;
+            } else {
+                consecutiveEnterPresses = 1; // Reset counter if too much time passed
+            }
+            lastEnterPressTime = currentTime;
+
+            // Decision logic for advancement
+            if (lengthPercentage >= 90) {
+                // Length is ≥90%, advance normally
+                advanceToNextPrompt();
+                consecutiveEnterPresses = 0; // Reset counter after successful advance
+            } else if (consecutiveEnterPresses >= 2) {
+                // Length is <90% but Enter was pressed twice, force advance
+                advanceToNextPrompt();
+                consecutiveEnterPresses = 0; // Reset counter after forced advance
+            } else {
+                // Length is <90% and first Enter press, suppress (do nothing)
+                // consecutiveEnterPresses is already incremented above
+                // Visual feedback could be added here (optional)
+            }
+        }, 1); // Very small delay to let auto-advance check complete first
     }
 });
 

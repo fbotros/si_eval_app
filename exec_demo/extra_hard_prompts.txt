@@ -19,7 +19,7 @@ Mortgage rate increased to 7 percent.
 Bandwidth limit is 100 megabits.
 We need 45 tablets total.
 Server utilization peaked at 95 yesterday.
-Your room number is number is 456.
+Your hotel room number is 456.
 Room temperature is 72 degrees.
 We're expecting 500 attendees.
 Revenue reached 8 million total.
