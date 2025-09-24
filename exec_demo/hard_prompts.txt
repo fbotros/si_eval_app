@@ -10,16 +10,16 @@ what's your number? Call Jessica back.
 backups run nightly on Amazon servers.
 we moved to Seattle last month.
 did you update the Tesla files?
-update your LinkedIn profile today!
+update your Linkedin profile today!
 connection times out to Google servers.
 satisfaction improved since Facebook launch!
 server costs went up, ask Microsoft.
-can you encrypt this for IBM?
-license expires soon, notify Oracle support.
+can you encrypt this for Anthropic?
+license expires soon, notify Oracle.
 response time's fast on Netflix now.
 the mobile app for Spotify works!
 update the settings, use London address.
-how many commits? Ask GitHub support.
+how many commits? Ask Github support.
 passport's old, renew before Paris trip.
 balancer works great on Azure systems.
 delivery helped, Amazon loads faster!
@@ -29,7 +29,7 @@ configure the firewall for Twitter access.
 tests fully passed, tell Mozilla team.
 monitor server load during Christmas rush.
 cache ratio's high on Reddit servers.
-update documentation for WordPress users.
+update documentation for Wordpress users.
 serves millions daily across Europe!
 the limit's hourly, check California laws.
 database uses space, contact Oracle team.

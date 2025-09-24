@@ -28,7 +28,7 @@ version 3 has security patches for Adobe.
 loan amount is 750 thousand for the Tesla purchase.
 uptime guarantee is 99 percent from Amazon.
 conference has 25 participants including Maria.
-battery decreased to 6 hours on the MacBook.
+battery decreased to 6 hours on the Macbook.
 we processed 12 thousand transactions through Paypal.
 port 443 is configured for Cisco.
 deadline moved to December 15th for the project.
