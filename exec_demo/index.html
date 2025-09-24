@@ -355,6 +355,14 @@
             margin-top: -1px;
         }
 
+        /* Feedback textarea specific tooltip styling */
+        #feedback-autocorrect-tooltip {
+            /* Match the feedback textarea font size (1rem) instead of main input (1.8rem) */
+            font-size: 1rem !important;
+            padding: 3px 6px;
+            line-height: 1.2;
+        }
+
         @media (max-width: 600px) {
             body {
                 padding: 10px;
@@ -386,6 +394,12 @@
             .autocorrect-tooltip {
                 font-size: 1.6rem;
                 padding: 3px 6px;
+            }
+
+            /* Smaller feedback tooltip on mobile too */
+            #feedback-autocorrect-tooltip {
+                font-size: 0.9rem !important;
+                padding: 2px 5px;
             }
         }
     </style>
