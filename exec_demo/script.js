@@ -130,6 +130,13 @@ const restartButtonFinal = document.getElementById('restart-button-final');
 const autocorrectTooltip = document.getElementById('autocorrect-tooltip');
 const correctionText = document.getElementById('correction-text');
 
+// Popup elements
+const popupOverlay = document.getElementById('results-popup-overlay');
+const popupWpmElement = document.getElementById('popup-wpm');
+const popupAccuracyElement = document.getElementById('popup-accuracy');
+const restartButtonPopup = document.getElementById('restart-button-popup');
+const feedbackInput = document.getElementById('feedback-input');
+
 // Initialize the first prompt
 function initializeTest() {
     currentPromptIndex = 0;
@@ -140,7 +147,10 @@ function initializeTest() {
     inputArea.value = '';
     inputArea.disabled = false;
     results.style.display = 'none';
+    
+    // Focus and select the input field for immediate typing
     inputArea.focus();
+    inputArea.select();
 }
 
 function updateCurrentPrompt() {
@@ -667,7 +677,50 @@ function endTest() {
     testActive = false;
     inputArea.disabled = true;
     calculateAverageResults();
-    results.style.display = 'block';
+    showResultsPopup();
+}
+
+function showResultsPopup() {
+    // Calculate and display results in popup
+    if (promptResults.length === 0) return;
+
+    let totalEffectiveChars = 0;
+    let totalTypedChars = 0;
+    let weightedWpmSum = 0;
+    let weightedAccuracySum = 0;
+
+    promptResults.forEach(result => {
+        const typedLength = result.typedText.length;
+        const effectiveChars = Math.max(0, typedLength - 1);
+
+        totalEffectiveChars += effectiveChars;
+        weightedWpmSum += result.wpm * effectiveChars;
+
+        totalTypedChars += typedLength;
+        weightedAccuracySum += result.accuracy * typedLength;
+    });
+
+    const avgWpm = totalEffectiveChars > 0 ? weightedWpmSum / totalEffectiveChars : 0;
+    const avgAccuracy = totalTypedChars > 0 ? weightedAccuracySum / totalTypedChars : 0;
+
+    // Update popup display
+    popupWpmElement.textContent = Math.round(avgWpm);
+    popupAccuracyElement.textContent = Math.round(avgAccuracy) + '%';
+
+    // Clear feedback input
+    feedbackInput.value = '';
+
+    // Show popup with animation
+    popupOverlay.classList.add('show');
+
+    // Auto-focus the feedback text box after popup animation completes
+    setTimeout(() => {
+        feedbackInput.focus();
+    }, 300); // Wait for popup animation to complete (matches CSS transition duration)
+}
+
+function hideResultsPopup() {
+    popupOverlay.classList.remove('show');
 }
 
 function restartTest() {
@@ -843,8 +896,37 @@ inputArea.addEventListener('keydown', function(e) {
     }
 });
 
-// Restart button event listener
-restartButtonFinal.addEventListener('click', restartTest);
+// Restart button event listener (original one, but now hidden)
+restartButtonFinal.addEventListener('click', async function() {
+    await loadPrompts();
+    await initializeAutocorrect();
+    restartTest();
+});
+
+// Popup event listeners
+restartButtonPopup.addEventListener('click', async function() {
+    hideResultsPopup();
+    await loadPrompts();
+    await initializeAutocorrect();
+    restartTest();
+});
+
+
+// Close popup when clicking outside of it and restart test
+popupOverlay.addEventListener('click', async function(e) {
+    if (e.target === popupOverlay) {
+        hideResultsPopup();
+        await loadPrompts();
+        await initializeAutocorrect();
+        restartTest();
+    }
+});
+
+// Handle feedback input (optional - could be used to send feedback to a server)
+feedbackInput.addEventListener('keydown', function(e) {
+    // Allow normal text input behavior in feedback box
+    e.stopPropagation();
+});
 
 // Configure input area to disable browser autocorrect
 function configureInputArea() {

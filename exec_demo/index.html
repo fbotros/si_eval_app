@@ -17,27 +17,19 @@
         }
 
         .main-layout {
-            display: flex;
-            gap: 20px;
             max-width: 1200px;
             margin: 0 auto;
-            align-items: flex-start;
         }
 
         .container {
-            flex: 2;
+            max-width: 800px;
+            margin: 0 auto;
             padding: 2rem;
             border-radius: 10px;
             background-color: white;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
 
-        .sidebar {
-            flex: 1;
-            min-width: 400px;
-            position: sticky;
-            top: 20px;
-        }
 
         h1 {
             text-align: center;
@@ -162,22 +154,52 @@
             cursor: not-allowed;
         }
 
-        .results {
-            margin-top: 1rem;
-            padding: 1.25rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 12px;
+        /* Popup/Modal Styles */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
             display: none;
-            text-align: center;
-            color: white;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            justify-content: center;
+            align-items: flex-start;
+            backdrop-filter: blur(5px);
+            padding-top: 10vh;
         }
 
-        .results h2 {
-            margin-top: 0;
-            margin-bottom: 1rem;
+        .popup-overlay.show {
+            display: flex;
+        }
+
+        .results-popup {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            text-align: center;
             color: white;
-            font-size: 1.6rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            transform: scale(0.8);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .popup-overlay.show .results-popup {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .results-popup h2 {
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            color: white;
+            font-size: 1.8rem;
             font-weight: 600;
         }
 
@@ -185,7 +207,7 @@
             display: flex;
             justify-content: center;
             gap: 1.5rem;
-            margin-bottom: 1rem;
+            margin-bottom: 2rem;
             flex-wrap: wrap;
         }
 
@@ -214,50 +236,76 @@
             font-weight: 500;
         }
 
-        .results .button {
+        .popup-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .popup-button {
             background: rgba(255, 255, 255, 0.9);
             color: #2c3e50;
             border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
             font-weight: 600;
+            cursor: pointer;
             transition: all 0.3s ease;
-            margin-top: 0.25rem;
+            min-width: 120px;
         }
 
-        .results .button:hover {
+        .popup-button:hover {
             background: white;
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
-
-        .difficulty-card {
-            background-color: #f8f9fa;
-            padding: 1rem 1.25rem;
-            border-radius: 8px;
-            border: 1px solid #dee2e6;
-            display: inline-block;
+        .feedback-section {
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            padding-top: 1.5rem;
+            margin-top: 1.5rem;
         }
 
-        .difficulty-card.results-variant {
-            background: rgba(255, 255, 255, 0.15);
+        .feedback-label {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: white;
+        }
+
+        .feedback-input {
+            width: 100%;
+            padding: 0.8rem;
             border: 1px solid rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 80px;
+            box-sizing: border-box;
+        }
+
+        .feedback-input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .feedback-input:focus {
+            outline: none;
+            border-color: rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .results {
+            display: none;
         }
 
         @media (max-width: 768px) {
-            .main-layout {
-                flex-direction: column;
-                gap: 15px;
-            }
-
-            .sidebar {
-                order: -1;
-                position: static;
-                min-width: unset;
-            }
-
-            .leaderboard {
-                margin-top: 0;
+            .container {
+                padding: 1.5rem;
             }
         }
 
@@ -387,6 +435,31 @@
             </div>
         </div>
 
+    </div>
+
+    <!-- Results Popup -->
+    <div class="popup-overlay" id="results-popup-overlay">
+        <div class="results-popup">
+            <h2>🎉 Test Complete!</h2>
+            <div class="results-metrics">
+                <div class="metric-card">
+                    <span class="metric-value" id="popup-wpm">0</span>
+                    <div class="metric-label">Words per Minute</div>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-value" id="popup-accuracy">0</span>
+                    <div class="metric-label">Accuracy</div>
+                </div>
+            </div>
+            <div class="popup-buttons">
+                <button class="popup-button" id="restart-button-popup">Try Again</button>
+            </div>
+            <div class="feedback-section">
+                <div class="feedback-label">Give us feedback!</div>
+                <textarea class="feedback-input" id="feedback-input"
+                    placeholder="Share your thoughts about surface keyboard..."></textarea>
+            </div>
+        </div>
     </div>
 
     <script src="dictionary-loader.js"></script>
