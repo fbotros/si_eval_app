@@ -1,40 +1,40 @@
-The quarterly report? It shows growth!
-My laptop crashed. I can't finish today.
-Does this work on Windows? I'm not sure.
-Your paperwork? It's due Friday!
-Printer's broken. We're out of toner.
-Can we reschedule? Something came up.
-Maintenance tonight. Don't plan things!
-The budget's allocated. That should work.
-What's your number? I can't find it.
-Backups run nightly. Don't fret.
-We moved. Here's the address.
-Did you update them? They're critical.
-Update your profile. It's been ages!
-Connection times out. What's happening?
-Satisfaction improved! That's good news.
-Server costs went up. We'll need budget.
-Can you encrypt this? They're sensitive.
-License expires soon. Don't forget!
-Response time's fast now. Nice work!
-The mobile app's polished. Great job!
-Update the settings. Use the new address.
-How many commits? Thousands more.
-Passport's old. Don't let it expire!
-Balancer works great. Pretty efficient.
-Delivery helped. Page loads are faster!
-Create a request? There are bugs.
-Migration finished. All good now!
-Configure the firewall. Don't forget.
-Tests fully passed. We're doing great!
-Monitor server load. It gets busy.
-Cache ratio's high. That's what we want.
-Update documentation. It's on the wiki.
-Serves millions daily. That's impressive!
-The limit's hourly. Keep that in mind.
-Database uses space. We need more.
-It indexes constantly. It's working.
-It spans many regions. Wide coverage!
-Retention's thirty days. Should be enough.
-Let's implement secure login. Users care!
-The model's recall is good. Alright!
+quarterly report from Boston shows growth!
+my laptop crashed during Microsoft update.
+does this work on Windows? I'm unsure.
+your paperwork for Toyota is due Friday!
+printer's broken, contact Dell support.
+can we reschedule with Sarah today?
+maintenance tonight in Chicago office.
+the budget for Apple project works.
+what's your number? Call Jessica back.
+backups run nightly on Amazon servers.
+we moved to Seattle last month.
+did you update the Tesla files?
+update your LinkedIn profile today!
+connection times out to Google servers.
+satisfaction improved since Facebook launch!
+server costs went up, ask Microsoft.
+can you encrypt this for IBM?
+license expires soon, notify Oracle support.
+response time's fast on Netflix now.
+the mobile app for Spotify works!
+update the settings, use London address.
+how many commits? Ask GitHub support.
+passport's old, renew before Paris trip.
+balancer works great on Azure systems.
+delivery helped, Amazon loads faster!
+create a request for Slack integration.
+migration finished, notify Instagram team.
+configure the firewall for Twitter access.
+tests fully passed, tell Mozilla team.
+monitor server load during Christmas rush.
+cache ratio's high on Reddit servers.
+update documentation for WordPress users.
+serves millions daily across Europe!
+the limit's hourly, check California laws.
+database uses space, contact Oracle team.
+it indexes constantly on Yahoo systems.
+it spans many regions including Tokyo.
+retention's thirty days per Facebook rules.
+let's implement secure login for Netflix.
+the model's recall improved after Boston.
