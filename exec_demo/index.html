@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Typing Test</title>
+    <title>Typing Playground</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -285,7 +285,7 @@
             color: white;
             font-size: 1rem;
             resize: vertical;
-            min-height: 80px;
+            min-height: 240px;
             box-sizing: border-box;
         }
 
@@ -394,7 +394,7 @@
 <body>
     <div class="main-layout">
         <div class="container">
-            <h1>Typing Test</h1>
+            <h1>Typing Playground</h1>
 
             <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next
                 one.</p>
@@ -440,7 +440,7 @@
     <!-- Results Popup -->
     <div class="popup-overlay" id="results-popup-overlay">
         <div class="results-popup">
-            <h2>🎉 Test Complete!</h2>
+            <h2>🎉 6/6 Prompts Finished!</h2>
             <div class="results-metrics">
                 <div class="metric-card">
                     <span class="metric-value" id="popup-wpm">0</span>
@@ -450,9 +450,6 @@
                     <span class="metric-value" id="popup-accuracy">0</span>
                     <div class="metric-label">Accuracy</div>
                 </div>
-            </div>
-            <div class="popup-buttons">
-                <button class="popup-button" id="restart-button-popup">Try Again</button>
             </div>
             <div class="feedback-section">
                 <div class="feedback-label">Give us feedback!</div>

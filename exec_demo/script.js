@@ -134,7 +134,6 @@ const correctionText = document.getElementById('correction-text');
 const popupOverlay = document.getElementById('results-popup-overlay');
 const popupWpmElement = document.getElementById('popup-wpm');
 const popupAccuracyElement = document.getElementById('popup-accuracy');
-const restartButtonPopup = document.getElementById('restart-button-popup');
 const feedbackInput = document.getElementById('feedback-input');
 
 // Initialize the first prompt
@@ -902,15 +901,6 @@ restartButtonFinal.addEventListener('click', async function() {
     await initializeAutocorrect();
     restartTest();
 });
-
-// Popup event listeners
-restartButtonPopup.addEventListener('click', async function() {
-    hideResultsPopup();
-    await loadPrompts();
-    await initializeAutocorrect();
-    restartTest();
-});
-
 
 // Close popup when clicking outside of it and restart test
 popupOverlay.addEventListener('click', async function(e) {
