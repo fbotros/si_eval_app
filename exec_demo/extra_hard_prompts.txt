@@ -1,0 +1,40 @@
+We owe 12 million in taxes!
+The server's running on port 8080.
+Our budget ask? We need 50 thousand.
+Temperature hit 98 degrees. That's hot!
+Database contains 2 million records.
+Flight 447 departs in 15 minutes.
+System handles 10 thousand requests.
+Error rate jumped to 15 yesterday.
+Can you process 250 invoices today?
+System crashed after 72 hours.
+Stock price dropped to 24 dollars.
+Meeting room 405 is booked.
+We hired 37 new engineers.
+File size is 4 gigabytes.
+Password expires in 90 days.
+Address is 160 Pennsylvania Avenue.
+Call extension 789 please.
+Mortgage rate increased to 7 percent.
+Bandwidth limit is 100 megabits.
+We need 45 tablets total.
+Server utilization peaked at 95 yesterday.
+Your room number is number is 456.
+Room temperature is 72 degrees.
+We're expecting 500 attendees.
+Revenue reached 8 million total.
+Download speed tested 250 megabits.
+Version 3 has security patches.
+Loan amount is 750 thousand.
+Uptime guarantee is 99 percent.
+Conference call has 25 participants.
+Battery decreased to 6 hours.
+We processed 12 thousand transactions.
+Network address 192 is configured.
+Deadline moved to December 15th.
+Memory spiked to 16 gigabytes.
+Discount saves 20 on orders.
+Flight reached 35 thousand feet.
+We need 1 million signatures.
+Meeting starts at 9 tomorrow morning.
+Response averaged 250 milliseconds.

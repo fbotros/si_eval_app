@@ -21,12 +21,32 @@ function shufflePrompts() {
     prompts = shuffleArray(prompts);
 }
 
-async function loadPrompts(difficulty = 'easy') {
-    const filename = difficulty === 'hard' ? './hard_prompts.txt' : './prompts.txt';
-    const response = await fetch(filename);
-    const text = await response.text();
-    prompts = text.split('\n').map(p => p.trim()).filter(p => p.length > 0);
-    shufflePrompts();
+async function loadPrompts() {
+    // Load all three prompt files
+    const easyResponse = await fetch('./prompts.txt');
+    const hardResponse = await fetch('./hard_prompts.txt');
+    const extraHardResponse = await fetch('./extra_hard_prompts.txt');
+    
+    const easyText = await easyResponse.text();
+    const hardText = await hardResponse.text();
+    const extraHardText = await extraHardResponse.text();
+    
+    // Parse prompts from each file
+    const easyPrompts = easyText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+    const hardPrompts = hardText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+    const extraHardPrompts = extraHardText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+    
+    // Shuffle each category using the existing shuffleArray function
+    const shuffledEasy = shuffleArray(easyPrompts);
+    const shuffledHard = shuffleArray(hardPrompts);
+    const shuffledExtraHard = shuffleArray(extraHardPrompts);
+    
+    // Create ordered sequence: 2 easy, 2 hard, 2 extra hard
+    prompts = [
+        ...shuffledEasy.slice(0, 2),
+        ...shuffledHard.slice(0, 2),
+        ...shuffledExtraHard.slice(0, 2)
+    ];
 }
 
 async function initializeAutocorrect() {
@@ -106,10 +126,7 @@ const inputArea = document.getElementById('input-area');
 const results = document.getElementById('results');
 const wpmElement = document.getElementById('wpm');
 const accuracyElement = document.getElementById('accuracy');
-const leaderboardList = document.getElementById('leaderboard-list');
 const restartButtonFinal = document.getElementById('restart-button-final');
-const difficultyEasy = document.getElementById('difficulty-easy');
-const difficultyHard = document.getElementById('difficulty-hard');
 const autocorrectTooltip = document.getElementById('autocorrect-tooltip');
 const correctionText = document.getElementById('correction-text');
 
@@ -129,6 +146,27 @@ function initializeTest() {
 function updateCurrentPrompt() {
     currentPromptElement.textContent = currentPromptIndex + 1;
     sampleTextElement.innerText = prompts[currentPromptIndex];
+    updateDifficultyIndicator();
+}
+
+function updateDifficultyIndicator() {
+    const charsetIcons = document.getElementById('charset-icons');
+    
+    // Determine difficulty based on prompt index
+    // Prompts 0-1: Easy (a-z)
+    // Prompts 2-3: Hard (a-z, .?!)  
+    // Prompts 4-5: Extra Hard (a-z, .?!, 0-9)
+    
+    if (currentPromptIndex <= 1) {
+        // Easy prompts
+        charsetIcons.textContent = 'a-z';
+    } else if (currentPromptIndex <= 3) {
+        // Hard prompts
+        charsetIcons.textContent = 'a-z, .?!';
+    } else {
+        // Extra hard prompts
+        charsetIcons.textContent = 'a-z, .?!, 0-9';
+    }
 }
 
 function startTest() {
@@ -624,79 +662,11 @@ function calculateAverageResults() {
     accuracyElement.textContent = Math.round(avgAccuracy) + '%';
 }
 
-// Generate leaderboard with random results and current user
-function generateLeaderboard() {
-    let currentWpm = 0;
-    let currentAccuracy = 0;
-
-    // If we have completed prompts, calculate current stats using weighted averages
-    if (promptResults.length > 0) {
-        let totalEffectiveChars = 0; // For WPM weighting (typedLength - 1)
-        let totalTypedChars = 0;     // For accuracy weighting (typedLength)
-        let weightedWpmSum = 0;
-        let weightedAccuracySum = 0;
-
-        promptResults.forEach(result => {
-            const typedLength = result.typedText.length;
-            const effectiveChars = Math.max(0, typedLength - 1);
-
-            // Weight WPM by effective characters (typedLength - 1)
-            totalEffectiveChars += effectiveChars;
-            weightedWpmSum += result.wpm * effectiveChars;
-
-            // Weight accuracy by typed characters (typedLength)
-            totalTypedChars += typedLength;
-            weightedAccuracySum += result.accuracy * typedLength;
-        });
-
-        currentWpm = totalEffectiveChars > 0 ? Math.round(weightedWpmSum / totalEffectiveChars) : 0;
-        currentAccuracy = totalTypedChars > 0 ? Math.round(weightedAccuracySum / totalTypedChars) : 0;
-    }
-
-    // Create leaderboard entries with random results
-    const leaderboardData = [
-        { name: "Andrew Bosworth", year: "'24", wpm: 95, accuracy: 99, isCurrentUser: false },
-        { name: "Susan Li", year: "'23", wpm: 101, accuracy: 98, isCurrentUser: false },
-        { name: "Alex Himel", year: "'23", wpm: 93, accuracy: 97, isCurrentUser: false },
-        { name: "You", year: "'25", wpm: currentWpm, accuracy: currentAccuracy, isCurrentUser: true }
-    ];
-
-    // Sort by wpm * accuracy (descending)
-    leaderboardData.sort((a, b) => (b.wpm * b.accuracy / 100) - (a.wpm * a.accuracy / 100));
-
-    // Clear existing leaderboard
-    leaderboardList.innerHTML = '';
-
-    // Create leaderboard rows
-    leaderboardData.forEach((entry, index) => {
-        const tableRow = document.createElement('tr');
-        tableRow.className = entry.isCurrentUser ? 'current-user' : '';
-
-        const score = Math.round(entry.wpm * entry.accuracy / 100);
-
-        tableRow.innerHTML = `
-            <td class="rank-cell">${index + 1}</td>
-            <td class="name-cell">${entry.name}</td>
-            <td class="year-cell">${entry.year}</td>
-            <td class="wpm-cell">${entry.wpm}</td>
-            <td class="accuracy-cell">${entry.accuracy}%</td>
-            <td class="score-cell">${score}</td>
-        `;
-
-        leaderboardList.appendChild(tableRow);
-    });
-}
-
-// Initialize leaderboard with default values
-function initializeLeaderboard() {
-    generateLeaderboard();
-}
 
 function endTest() {
     testActive = false;
     inputArea.disabled = true;
     calculateAverageResults();
-    generateLeaderboard();
     results.style.display = 'block';
 }
 
@@ -707,29 +677,6 @@ function restartTest() {
     initializeTest();
 }
 
-// Sync difficulty radio buttons
-function syncDifficultyRadios(selectedValue) {
-    // Update main difficulty radios
-    if (selectedValue === 'easy') {
-        difficultyEasy.checked = true;
-        difficultyHard.checked = false;
-    } else {
-        difficultyEasy.checked = false;
-        difficultyHard.checked = true;
-    }
-}
-
-// Handle difficulty change based on test state
-async function handleDifficultyChange(selectedDifficulty) {
-    // If test is active or not started (restart button not visible), restart immediately
-    if (testActive || results.style.display === 'none') {
-        await loadPrompts(selectedDifficulty);
-        await initializeAutocorrect();
-        restartTest();
-    }
-    // If test is complete (restart button visible), just sync the selectors but don't restart
-    // The restart will happen when the user clicks the restart button
-}
 
 // Track input value changes for autocorrect
 let previousInputLength = 0;
@@ -880,7 +827,7 @@ inputArea.addEventListener('keydown', function(e) {
         promptResults.push(promptResult);
 
         // Move to the next prompt or end the test
-        if (currentPromptIndex < 3) {  // Stop after 4 prompts (index 0-3)
+        if (currentPromptIndex < 5) {  // Stop after 6 prompts (index 0-5)
             currentPromptIndex++;
             updateCurrentPrompt();
             inputArea.value = '';
@@ -888,7 +835,7 @@ inputArea.addEventListener('keydown', function(e) {
             hideAutocorrectTooltip(); // Hide tooltip when moving to next prompt
             resetBackspaceCounter('new prompt'); // Reset suppression counter for new prompt
         } else {
-            // End the test after 4 prompts are completed
+            // End the test after 6 prompts are completed
             hideAutocorrectTooltip(); // Hide tooltip when test ends
             resetBackspaceCounter('test end'); // Reset suppression counter
             endTest();
@@ -909,41 +856,11 @@ function configureInputArea() {
 
 // Initialize the test on page load
 document.addEventListener('DOMContentLoaded', async function() {
-    // Load prompts from prompts.txt first (default to easy)
-    await loadPrompts('easy');
+    // Load prompts from prompts.txt
+    await loadPrompts();
     // Initialize dictionary with prompt words and common words from file
     await initializeAutocorrect();
     // Configure input area
     configureInputArea();
     initializeTest();
-    // Initialize leaderboard
-    initializeLeaderboard();
-
-    // Add difficulty radio button event listeners
-    difficultyEasy.addEventListener('change', async function() {
-        if (this.checked) {
-            // Sync radios
-            syncDifficultyRadios('easy');
-            // Handle the difficulty change with smart behavior
-            await handleDifficultyChange('easy');
-        }
-    });
-
-    difficultyHard.addEventListener('change', async function() {
-        if (this.checked) {
-            // Sync radios
-            syncDifficultyRadios('hard');
-            // Handle the difficulty change with smart behavior
-            await handleDifficultyChange('hard');
-        }
-    });
-
-    // Restart button listener - when clicked, load the currently selected difficulty
-    restartButtonFinal.addEventListener('click', async function() {
-        // When restart is clicked, load the difficulty selected in the sidebar
-        const selectedDifficulty = difficultyEasy.checked ? 'easy' : 'hard';
-        await loadPrompts(selectedDifficulty);
-        await initializeAutocorrect();
-        restartTest();
-    });
 });
