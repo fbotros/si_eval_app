@@ -26,21 +26,21 @@ async function loadPrompts() {
     const easyResponse = await fetch('./prompts.txt');
     const hardResponse = await fetch('./hard_prompts.txt');
     const extraHardResponse = await fetch('./extra_hard_prompts.txt');
-    
+
     const easyText = await easyResponse.text();
     const hardText = await hardResponse.text();
     const extraHardText = await extraHardResponse.text();
-    
+
     // Parse prompts from each file
     const easyPrompts = easyText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
     const hardPrompts = hardText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
     const extraHardPrompts = extraHardText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
-    
+
     // Shuffle each category using the existing shuffleArray function
     const shuffledEasy = shuffleArray(easyPrompts);
     const shuffledHard = shuffleArray(hardPrompts);
     const shuffledExtraHard = shuffleArray(extraHardPrompts);
-    
+
     // Create ordered sequence: 2 easy, 2 hard, 2 extra hard
     prompts = [
         ...shuffledEasy.slice(0, 2),
@@ -151,12 +151,12 @@ function updateCurrentPrompt() {
 
 function updateDifficultyIndicator() {
     const charsetIcons = document.getElementById('charset-icons');
-    
+
     // Determine difficulty based on prompt index
     // Prompts 0-1: Easy (a-z)
-    // Prompts 2-3: Hard (a-z, .?!)  
+    // Prompts 2-3: Hard (a-z, .?!)
     // Prompts 4-5: Extra Hard (a-z, .?!, 0-9)
-    
+
     if (currentPromptIndex <= 1) {
         // Easy prompts
         charsetIcons.textContent = 'a-z';
