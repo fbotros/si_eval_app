@@ -272,26 +272,49 @@
 
             <!-- Toolbar -->
             <div class="toolbar">
-                <button id="bold-btn" title="Bold (Ctrl+B)"><strong>B</strong></button>
+                <button id="bold-btn" title="Bold (Ctrl+B)">B</button>
                 <button id="italic-btn" title="Italic (Ctrl+I)"><em>I</em></button>
-                <button id="underline-btn" title="Underline (Ctrl+U)"><u>U</u></button>
+                <button id="underline-btn" title="Underline (Ctrl+U)">U</button>
             </div>
 
             <!-- Document Editor -->
-            <div id="document-editor" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false">
-                This is a sample text document.
+            <div id="document-editor" 
+                 contenteditable="true" 
+                 spellcheck="false" 
+                 autocorrect="off" 
+                 autocapitalize="off" 
+                 autocomplete="off" 
+                 data-gramm="false" 
+                 data-gramm_editor="false" 
+                 data-enable-grammarly="false" 
+                 translate="no" 
+                 data-ms-editor="false" 
+                 data-lt-tmp-id="lt-0"
+                 data-lt-installed="false"
+                 data-grammarly-disable="true"
+                 style="-webkit-text-size-adjust: none; -moz-text-size-adjust: none; -ms-text-size-adjust: none;">
             </div>
-
         </div>
     </div>
 
-    <script src="../TrieDictionary.js"></script>
+    <!-- Load external scripts -->
     <script src="../dictionary-loader.js"></script>
     <script src="../AutocorrectEngine.js"></script>
     <script>
-        // Get DOM elements
-        const editor = document.getElementById('document-editor');
-        const titleInput = document.getElementById('document-title');
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeEditor();
+        });
+
+        function initializeEditor() {
+            // Get DOM elements
+            const editor = document.getElementById('document-editor');
+            const titleInput = document.getElementById('document-title');
+
+            if (!editor || !titleInput) {
+                console.error('Required DOM elements not found');
+                return;
+            }
 
         // Formatting buttons
         const boldBtn = document.getElementById('bold-btn');
@@ -506,7 +529,7 @@
                 const range = selection.getRangeAt(0);
                 const fullText = editor.innerText || '';
 
-                // Calculate cursor position using TreeWalker (reliable method)
+                // Calculate cursor position using TreeWalker (reliable)
                 let cursorPos = 0;
                 const walker = document.createTreeWalker(
                     editor,
@@ -525,7 +548,7 @@
                     currentOffset += node.textContent.length;
                 }
 
-                // Get clean text before cursor using fullText.substring (avoids corruption)
+                // Get clean text before cursor using fullText.substring (no corruption)
                 const textBeforeCursor = fullText.substring(0, cursorPos);
 
                 // Split by whitespace/newlines and take last segment
@@ -829,10 +852,11 @@
             }
         });
 
-        // Initialize
-        updateToolbarState();
-        updateEditIconPosition();
-    </script>
+          // Initialize
+          updateToolbarState();
+          updateEditIconPosition();
+      } // Close initializeEditor function
+      </script>
 </body>
 
 </html>

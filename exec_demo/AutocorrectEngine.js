@@ -208,14 +208,15 @@ class AutocorrectEngine {
         let bestMatch = null;
         let bestDistance = Infinity;
 
-        // REQUIRE TrieDictionary for performance - fail hard if not available
-        if (!this.trieDictionary) {
-            throw new Error('TrieDictionary is required for performance. Cannot proceed with brute force approach.');
+        // Fall back to brute force if TrieDictionary is not available
+        let candidates;
+        if (this.trieDictionary) {
+            // Get candidates from trie - this should return a small set (50-200 words)
+            candidates = this.trieDictionary.search(part, this.maxEditDistance);
+        } else {
+            // Brute force fallback - check all dictionary words
+            candidates = this.dictionary.map(word => ({ word: word }));
         }
-
-        // Get candidates from trie - this should return a small set (50-200 words)
-        // instead of checking all 9,919 words
-        const candidates = this.trieDictionary.search(part, this.maxEditDistance);
 
 
         let bestFrequencyScore = Infinity;
