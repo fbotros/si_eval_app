@@ -516,9 +516,9 @@
                 const textBeforeCursor = tempDiv.innerText || '';
                 const cursorPos = textBeforeCursor.length;
 
-                // Find word at cursor position - consider punctuation as word boundaries too
-                // Match word characters at the end, after any non-word character boundary
-                const wordMatch = textBeforeCursor.match(/(?:^|[^\w])(\w+)$/);
+                // Find word at cursor position - allow apostrophes within words for contractions
+                // Match word characters and apostrophes, but not start with apostrophe
+                const wordMatch = textBeforeCursor.match(/(?:^|[^\w'])(\w+(?:'\w*)*)$/);
                 const currentWord = wordMatch ? wordMatch[1] : '';
 
 
