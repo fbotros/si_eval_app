@@ -681,6 +681,30 @@
             const currentWord = getCurrentWord();
 
             if (currentWord.length < 3) {
+                currentAutocorrectSuggestion = null;
+                hideAutocorrectTooltip();
+                return;
+            }
+
+            // Check if possessive form is valid (base word exists in dictionary)
+            if (currentWord.endsWith("'s")) {
+                const baseWord = currentWord.slice(0, -2); // Remove 's
+                const baseWordExists = editorAutocorrectEngine.dictionarySet && editorAutocorrectEngine.dictionarySet.has(baseWord.toLowerCase());
+                  
+                if (baseWordExists) {
+                    console.log('✅ Valid possessive word:', currentWord, '(base:', baseWord, 'exists)');
+                    currentAutocorrectSuggestion = null;
+                    hideAutocorrectTooltip();
+                    return;
+                }
+                // If base word doesn't exist, continue with autocorrect
+                console.log('🔍 Possessive with unknown base:', currentWord, '(base:', baseWord, 'not found) - checking for corrections');
+            }
+
+            // Skip autocorrect for proper nouns (capitalized words)
+            if (currentWord[0] === currentWord[0].toUpperCase() && currentWord.length > 1) {
+                console.log('🚫 Skipping proper noun:', currentWord, '- clearing suggestion');
+                currentAutocorrectSuggestion = null;
                 hideAutocorrectTooltip();
                 return;
             }
@@ -751,6 +775,15 @@
 
                 if (isEnter || isSpace || isPunctuation) {
                     const wordToDelete = getCurrentWord();
+
+                    console.log('🎯 AUTOCORRECT TRIGGER DETECTED:', {
+                        triggerKey: e.key,
+                        currentSuggestion: currentAutocorrectSuggestion,
+                        wordToDelete: JSON.stringify(wordToDelete),
+                        wordEndsWith_s: wordToDelete ? wordToDelete.endsWith("'s") : false,
+                        action: 'will replace if valid'
+                    });
+
 
                     // Prevent the trigger key from being processed normally
                     e.preventDefault();
