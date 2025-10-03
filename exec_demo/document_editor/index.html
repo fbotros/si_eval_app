@@ -178,18 +178,6 @@
             outline: none;
         }
 
-        .stats {
-            background: rgba(255, 255, 255, 0.6);
-            backdrop-filter: blur(10px);
-            padding: 16px 32px;
-            border-top: 1px solid rgba(0, 0, 0, 0.05);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 14px;
-            color: #718096;
-            font-weight: 500;
-        }
 
         /* Format styles for content */
         .bold {
@@ -290,18 +278,10 @@
             </div>
 
             <!-- Document Editor -->
-            <div id="document-editor" contenteditable="true" spellcheck="false">
+            <div id="document-editor" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false">
                 This is a sample text document.
             </div>
 
-            <!-- Stats -->
-            <div class="stats">
-                <div>
-                    <span id="word-count">Words: 0</span> •
-                    <span id="char-count">Characters: 0</span>
-                </div>
-                <div>Ready to write</div>
-            </div>
         </div>
     </div>
 
@@ -312,8 +292,6 @@
         // Get DOM elements
         const editor = document.getElementById('document-editor');
         const titleInput = document.getElementById('document-title');
-        const wordCountSpan = document.getElementById('word-count');
-        const charCountSpan = document.getElementById('char-count');
 
         // Formatting buttons
         const boldBtn = document.getElementById('bold-btn');
@@ -322,6 +300,9 @@
 
         // Initialize autocorrect engine
         let editorAutocorrectEngine = null;
+
+        // Global variable to store current autocorrect suggestion
+        let currentAutocorrectSuggestion = null;
 
         // Initialize dictionary and autocorrect engine
         async function initializeAutocorrect() {
@@ -341,6 +322,7 @@
 
         // Format functions
         function toggleFormat(command) {
+            console.log('🔧 execCommand called:', command);
             document.execCommand(command, false, null);
             updateToolbarState();
             editor.focus();
@@ -352,14 +334,6 @@
             underlineBtn.classList.toggle('active', document.queryCommandState('underline'));
         }
 
-        function updateWordCount() {
-            const text = editor.innerText || editor.textContent || '';
-            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-            const chars = text.length;
-
-            wordCountSpan.textContent = `Words: ${words}`;
-            charCountSpan.textContent = `Characters: ${chars}`;
-        }
 
         // Event listeners
         boldBtn.addEventListener('click', () => toggleFormat('bold'));
@@ -401,9 +375,8 @@
             }
         });
 
-        // Update toolbar state and word count on input
+        // Update toolbar state on input
         editor.addEventListener('input', function () {
-            updateWordCount();
             updateToolbarState();
         });
 
@@ -465,12 +438,12 @@
                 editor.style.position = 'relative';
                 editor.appendChild(tooltip);
             }
-            
+
             tooltip.textContent = text;
-            
+
             // Remove show class first to ensure clean state
             tooltip.classList.remove('show');
-            
+
             // Position tooltip - let CSS handle opacity
             tooltip.style.position = 'absolute'; // Use absolute positioning relative to container
             tooltip.style.visibility = 'visible';
@@ -481,35 +454,35 @@
             tooltip.style.backgroundColor = '';
             tooltip.style.border = '';
             tooltip.style.opacity = ''; // Remove inline opacity to let CSS class control it
-            
+
             // Force a layout to get measurements
             const tooltipWidth = tooltip.offsetWidth;
             const tooltipHeight = tooltip.offsetHeight;
-            
+
             // Position tooltip near cursor, shifted 10px right, adjusted 3px left for perfect alignment
             // Position so the arrow (8px from right edge) aligns with cursor, shifted 10px right
             let finalX = x - tooltipWidth + 8 + 10 - 3;
             let finalY = y;
-            
+
             // Ensure tooltip doesn't go off the right edge of editor
             const editorWidth = editor.offsetWidth;
             if (finalX + tooltipWidth > editorWidth - 10) {
                 finalX = editorWidth - tooltipWidth - 10;
             }
-            
-            // Ensure tooltip doesn't go off the left edge of editor  
+
+            // Ensure tooltip doesn't go off the left edge of editor
             if (finalX < 10) {
                 finalX = 10;
             }
-            
+
             // Ensure tooltip doesn't go off the top - position below cursor instead
             if (finalY < 0) {
                 finalY = y + 30; // Position below cursor instead
             }
-            
+
             tooltip.style.left = finalX + 'px';
             tooltip.style.top = finalY + 'px';
-            
+
             // Show the tooltip immediately
             tooltip.classList.add('show');
         }
@@ -545,8 +518,17 @@
                 const cursorPos = textBeforeCursor.length;
 
                 // Find word at cursor position
-                const wordMatch = textContent.substring(0, cursorPos).match(/\b\w+$/);
+                const wordMatch = textBeforeCursor.match(/\b\w+$/);
                 const currentWord = wordMatch ? wordMatch[0] : '';
+
+                // Debug logging
+                console.log('🔧 getCurrentWord debug:', {
+                    textContent: JSON.stringify(textContent),
+                    textBeforeCursor: JSON.stringify(textBeforeCursor),
+                    cursorPos: cursorPos,
+                    wordMatch: wordMatch,
+                    currentWord: JSON.stringify(currentWord)
+                });
 
                 return currentWord;
 
@@ -559,14 +541,14 @@
         function getCursorPosition() {
             const selection = window.getSelection();
             if (selection.rangeCount === 0) return null;
-              
+
             try {
                 const range = selection.getRangeAt(0);
                 const rect = range.getBoundingClientRect();
-                  
+
                 // Get editor bounds to calculate relative position
                 const editorRect = editor.getBoundingClientRect();
-                  
+
                 // Calculate position relative to the editor container
                 return {
                     x: rect.left - editorRect.left, // Relative to editor
@@ -580,11 +562,15 @@
         // Check for autocorrect suggestions using EXACT logic from typing test
         function checkForAutocorrect() {
             if (!editorAutocorrectEngine) {
+                console.log('❌ No autocorrect engine available');
                 return;
             }
 
             const currentWord = getCurrentWord();
+            console.log('🔤 Checking word:', JSON.stringify(currentWord));
+
             if (currentWord.length < 3) {
+                console.log('📏 Word too short for autocorrect');
                 hideAutocorrectTooltip();
                 return;
             }
@@ -593,6 +579,7 @@
             const lowerWord = currentWord.toLowerCase();
             if (editorAutocorrectEngine.correctionOverrides && editorAutocorrectEngine.correctionOverrides[lowerWord]) {
                 const suggestion = editorAutocorrectEngine.correctionOverrides[lowerWord];
+                currentAutocorrectSuggestion = suggestion;
 
                 const cursorPos = getCursorPosition();
                 if (cursorPos) {
@@ -604,13 +591,18 @@
             // Test word splitting approach first
             if (editorAutocorrectEngine.findTwoWordSplit) {
                 const twoWordSplit = editorAutocorrectEngine.findTwoWordSplit(currentWord);
+                console.log('🔍 Two-word split result for', currentWord, ':', twoWordSplit);
 
                 if (twoWordSplit && twoWordSplit !== currentWord.toLowerCase()) {
+                    console.log('✅ Using two-word split suggestion:', twoWordSplit);
+                    currentAutocorrectSuggestion = twoWordSplit;
                     const cursorPos = getCursorPosition();
                     if (cursorPos) {
                         showAutocorrectTooltip(twoWordSplit, cursorPos.x, cursorPos.y);
                         return;
                     }
+                } else {
+                    console.log('❌ Two-word split not applicable');
                 }
             }
 
@@ -619,11 +611,13 @@
 
             // Show tooltip if suggestion is different from original input
             if (suggestion && suggestion !== currentWord && suggestion !== currentWord.toLowerCase()) {
+                currentAutocorrectSuggestion = suggestion;
                 const cursorPos = getCursorPosition();
                 if (cursorPos) {
                     showAutocorrectTooltip(suggestion, cursorPos.x, cursorPos.y);
                 }
             } else {
+                currentAutocorrectSuggestion = null;
                 hideAutocorrectTooltip();
             }
         }
@@ -635,18 +629,18 @@
             autocorrectTimeout = setTimeout(checkForAutocorrect, 50);
         }
 
-        // Add input listener for autocorrect
-        editor.addEventListener('input', function () {
-            updateWordCount();
+        // Add input listener for autocorrect tooltips (suggestion-only)
+        editor.addEventListener('input', function (e) {
             updateToolbarState();
             debouncedAutocorrectCheck();
         });
 
-        // Hide tooltip when cursor moves
+        // Hide tooltip on navigation keys
         editor.addEventListener('keydown', function (e) {
             // Hide tooltip on navigation keys
             if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
                 hideAutocorrectTooltip();
+                currentAutocorrectSuggestion = null;
             }
         });
 
@@ -658,7 +652,6 @@
         });
 
         // Initialize
-        updateWordCount();
         updateToolbarState();
         updateEditIconPosition();
     </script>
