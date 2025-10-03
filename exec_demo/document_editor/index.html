@@ -825,7 +825,7 @@
 
             // Check if word is capitalized (for preserving capitalization in suggestions)
             const isCapitalized = currentWord[0] === currentWord[0].toUpperCase() && currentWord.length > 1;
-            
+
             // Create lowercase version for dictionary lookup
             const wordForLookup = isCapitalized ? currentWord.toLowerCase() : currentWord;
 
@@ -853,7 +853,7 @@
                     if (isCapitalized && twoWordSplit.length > 0) {
                         finalSuggestion = twoWordSplit.charAt(0).toUpperCase() + twoWordSplit.slice(1);
                     }
-                    
+
                     currentAutocorrectSuggestion = finalSuggestion;
                     const cursorPos = getCursorPosition();
                     if (cursorPos) {
@@ -873,7 +873,7 @@
                 if (isCapitalized && suggestion.length > 0) {
                     finalSuggestion = suggestion.charAt(0).toUpperCase() + suggestion.slice(1);
                 }
-                
+
                 currentAutocorrectSuggestion = finalSuggestion;
                 const cursorPos = getCursorPosition();
                 if (cursorPos) {
