@@ -530,7 +530,7 @@
         }
 
         // Replace current word with autocorrect suggestion
-        function replaceCurrentWord(wordToDelete, suggestion) {
+        function replaceCurrentWord(wordToDelete, suggestion, triggerKey) {
             try {
                 const selection = window.getSelection();
                 if (selection.rangeCount === 0) return;
@@ -589,8 +589,8 @@
                     selection.addRange(wordRange);
                     document.execCommand('insertText', false, suggestion);
 
-                    // Add space after multi-word suggestions to prevent word joining
-                    if (suggestion.includes(' ')) {
+                    // Only add space after multi-word suggestions if trigger wasn't space or punctuation
+                    if (suggestion.includes(' ') && triggerKey !== ' ' && ![',', '.', ';', '/'].includes(triggerKey)) {
                         document.execCommand('insertText', false, ' ');
                     }
                 } else {
@@ -600,18 +600,13 @@
                         document.execCommand('delete', false, null);
                     }
                     document.execCommand('insertText', false, suggestion);
-
-                    // Add space after multi-word suggestions to prevent word joining
-                    if (suggestion.includes(' ')) {
-                        document.execCommand('insertText', false, ' ');
-                    }
-
-                    // Add space after multi-word suggestions to prevent word joining
-                    if (suggestion.includes(' ')) {
+                    
+                    // Only add space after multi-word suggestions if trigger wasn't space or punctuation
+                    if (suggestion.includes(' ') && triggerKey !== ' ' && ![',', '.', ';', '/'].includes(triggerKey)) {
                         document.execCommand('insertText', false, ' ');
                     }
                 }
-
+                
             } catch (error) {
                 console.error('❌ Error replacing word:', error);
                 // Fallback to simple deletion method
@@ -620,6 +615,11 @@
                         document.execCommand('delete', false, null);
                     }
                     document.execCommand('insertText', false, suggestion);
+                    
+                    // Only add space after multi-word suggestions if trigger wasn't space or punctuation
+                    if (suggestion.includes(' ') && triggerKey !== ' ' && ![',', '.', ';', '/'].includes(triggerKey)) {
+                        document.execCommand('insertText', false, ' ');
+                    }
                 } catch (fallbackError) {
                     console.error('❌ Fallback replacement also failed:', fallbackError);
                 }
@@ -724,22 +724,22 @@
                 const isEnter = e.key === 'Enter';
                 const isSpace = e.key === ' ';
                 const isPunctuation = [',', '.', ';', '/'].includes(e.key);
-
+                
                 if (isEnter || isSpace || isPunctuation) {
                     const wordToDelete = getCurrentWord();
-
+                    
                     // Prevent the trigger key from being processed normally
                     e.preventDefault();
-
+                    
                     // Replace the current word with autocorrect suggestion
                     if (wordToDelete) {
-                        replaceCurrentWord(wordToDelete, currentAutocorrectSuggestion);
+                        replaceCurrentWord(wordToDelete, currentAutocorrectSuggestion, e.key);
                     }
-
+                    
                     // Hide tooltip and clear suggestion
                     hideAutocorrectTooltip();
                     currentAutocorrectSuggestion = null;
-
+                    
                     // Insert the trigger key that was prevented
                     if (e.key === 'Enter') {
                         // Insert line break using insertLineBreak for better contentEditable support
