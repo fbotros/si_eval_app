@@ -506,15 +506,27 @@
                 const range = selection.getRangeAt(0);
                 const fullText = editor.innerText || '';
 
-                // Use a much simpler and more reliable approach
-                // Create a range from start of editor to cursor position
-                const preCaretRange = document.createRange();
-                preCaretRange.setStart(editor, 0);
-                preCaretRange.setEnd(range.startContainer, range.startOffset);
-                
-                // Get the text content of this range
-                const textBeforeCursor = preCaretRange.toString();
-                const cursorPos = textBeforeCursor.length;
+                // Calculate cursor position using TreeWalker (reliable method)
+                let cursorPos = 0;
+                const walker = document.createTreeWalker(
+                    editor,
+                    NodeFilter.SHOW_TEXT,
+                    null,
+                    false
+                );
+
+                let currentOffset = 0;
+                while (walker.nextNode()) {
+                    const node = walker.currentNode;
+                    if (node === range.startContainer) {
+                        cursorPos = currentOffset + range.startOffset;
+                        break;
+                    }
+                    currentOffset += node.textContent.length;
+                }
+
+                // Get clean text before cursor using fullText.substring (avoids corruption)
+                const textBeforeCursor = fullText.substring(0, cursorPos);
 
                 // Split by whitespace/newlines and take last segment
                 const segments = textBeforeCursor.split(/[\s\n\r]+/);
