@@ -51,8 +51,8 @@
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             border-radius: 24px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 
-                        0 0 0 1px rgba(255, 255, 255, 0.2);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25),
+                0 0 0 1px rgba(255, 255, 255, 0.2);
             overflow: hidden;
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
@@ -91,7 +91,7 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
-        .document-title-input:focus + .edit-icon {
+        .document-title-input:focus+.edit-icon {
             opacity: 0;
         }
 
@@ -103,7 +103,8 @@
             pointer-events: none;
             top: 50%;
             transform: translateY(-50%);
-            left: 20px; /* Will be dynamically updated */
+            left: 20px;
+            /* Will be dynamically updated */
             transition: left 0.1s ease;
         }
 
@@ -211,6 +212,52 @@
         .container:focus-within {
             box-shadow: 0 2px 10px rgba(0, 123, 255, 0.2);
         }
+
+        /* Autocorrect Tooltip - EXACT COPY from typing test modal */
+        .autocorrect-tooltip {
+            position: absolute;
+            background: white;
+            color: #333;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #3498db;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(-2px);
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            white-space: nowrap;
+            /* Match document editor font */
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 18px;
+            font-weight: normal;
+            line-height: 1.2;
+        }
+
+        .autocorrect-tooltip.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .autocorrect-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 8px;
+            border: 5px solid transparent;
+            border-top-color: #3498db;
+        }
+
+        .autocorrect-tooltip::before {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 8px;
+            border: 6px solid transparent;
+            border-top-color: white;
+            margin-top: -1px;
+        }
     </style>
 </head>
 
@@ -226,12 +273,15 @@
                 <div class="document-title-container">
                     <input type="text" class="document-title-input" value="Untitled Document" id="document-title">
                     <svg class="edit-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M17.2929 2.29291C17.6834 1.90238 18.3166 1.90238 18.7071 2.29291L21.7071 5.29291C22.0976 5.68343 22.0976 6.31659 21.7071 6.70712L8.70711 19.7071C8.51957 19.8947 8.26522 20 8 20H5C4.44772 20 4 19.5523 4 19V16C4 15.7348 4.10536 15.4804 4.29289 15.2929L17.2929 2.29291Z" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        <path d="M15 5L19 9" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path
+                            d="M17.2929 2.29291C17.6834 1.90238 18.3166 1.90238 18.7071 2.29291L21.7071 5.29291C22.0976 5.68343 22.0976 6.31659 21.7071 6.70712L8.70711 19.7071C8.51957 19.8947 8.26522 20 8 20H5C4.44772 20 4 19.5523 4 19V16C4 15.7348 4.10536 15.4804 4.29289 15.2929L17.2929 2.29291Z"
+                            stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M15 5L19 9" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
                     </svg>
                 </div>
             </div>
-            
+
             <!-- Toolbar -->
             <div class="toolbar">
                 <button id="bold-btn" title="Bold (Ctrl+B)"><strong>B</strong></button>
@@ -247,7 +297,7 @@
             <!-- Stats -->
             <div class="stats">
                 <div>
-                    <span id="word-count">Words: 0</span> • 
+                    <span id="word-count">Words: 0</span> •
                     <span id="char-count">Characters: 0</span>
                 </div>
                 <div>Ready to write</div>
@@ -255,6 +305,9 @@
         </div>
     </div>
 
+    <script src="../TrieDictionary.js"></script>
+    <script src="../dictionary-loader.js"></script>
+    <script src="../AutocorrectEngine.js"></script>
     <script>
         // Get DOM elements
         const editor = document.getElementById('document-editor');
@@ -266,6 +319,34 @@
         const boldBtn = document.getElementById('bold-btn');
         const italicBtn = document.getElementById('italic-btn');
         const underlineBtn = document.getElementById('underline-btn');
+
+        // Initialize autocorrect engine
+        let editorAutocorrectEngine = null;
+
+        // Initialize dictionary and autocorrect engine
+        async function initializeAutocorrect() {
+            try {
+                console.log('Loading dictionary...');
+                const dictionary = await loadDictionary('../comprehensive_dictionary.txt');
+
+                // Create autocorrect engine with dictionary words
+                editorAutocorrectEngine = new AutocorrectEngine();
+                editorAutocorrectEngine.addWords(dictionary);
+
+                console.log('✅ Autocorrect engine initialized with', dictionary.length, 'words');
+                console.log('🔧 Dictionary sample check:', {
+                    hasAs: editorAutocorrectEngine.dictionarySet.has('as'),
+                    hasOf: editorAutocorrectEngine.dictionarySet.has('of'),
+                    hasThe: editorAutocorrectEngine.dictionarySet.has('the'),
+                    totalWords: editorAutocorrectEngine.dictionarySet.size
+                });
+            } catch (error) {
+                console.error('❌ Failed to initialize autocorrect:', error);
+            }
+        }
+
+        // Start initialization
+        initializeAutocorrect();
 
         // Format functions
         function toggleFormat(command) {
@@ -354,9 +435,9 @@
         function updateEditIconPosition() {
             const input = document.getElementById('document-title');
             const icon = document.querySelector('.edit-icon');
-            
+
             if (!input || !icon) return;
-            
+
             // Create a temporary span to measure text width
             const tempSpan = document.createElement('span');
             tempSpan.style.position = 'absolute';
@@ -368,11 +449,11 @@
             tempSpan.style.fontWeight = '600';
             tempSpan.style.fontFamily = getComputedStyle(input).fontFamily;
             tempSpan.textContent = input.value || input.placeholder;
-            
+
             document.body.appendChild(tempSpan);
             const textWidth = tempSpan.offsetWidth;
             document.body.removeChild(tempSpan);
-            
+
             // Position icon right after the text (16px padding + text width + 8px gap)
             icon.style.left = (16 + textWidth + 8) + 'px';
         }
@@ -381,6 +462,276 @@
         titleInput.addEventListener('input', updateEditIconPosition);
         titleInput.addEventListener('focus', updateEditIconPosition);
         titleInput.addEventListener('blur', updateEditIconPosition);
+
+        // Tooltip management functions
+        function showAutocorrectTooltip(text, x, y) {
+            let tooltip = document.getElementById('autocorrect-tooltip');
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.id = 'autocorrect-tooltip';
+                tooltip.className = 'autocorrect-tooltip';
+                // Append to editor container and position relative to it
+                editor.style.position = 'relative';
+                editor.appendChild(tooltip);
+                console.log('🔧 Created new tooltip element - appended to editor');
+            }
+            
+            tooltip.textContent = text;
+            
+            // Remove show class first to ensure clean state
+            tooltip.classList.remove('show');
+            
+            // Position tooltip - let CSS handle opacity
+            tooltip.style.position = 'absolute'; // Use absolute positioning relative to container
+            tooltip.style.visibility = 'visible';
+            tooltip.style.zIndex = '9999'; // Ensure it's on top
+            tooltip.style.top = y + 'px';
+            tooltip.style.left = '0px'; // Temporary position
+            // Remove debug styling and inline opacity - let CSS handle appearance
+            tooltip.style.backgroundColor = '';
+            tooltip.style.border = '';
+            tooltip.style.opacity = ''; // Remove inline opacity to let CSS class control it
+            
+            // Force a layout to get measurements
+            const tooltipWidth = tooltip.offsetWidth;
+            const tooltipHeight = tooltip.offsetHeight;
+            
+            console.log('🔧 Tooltip measurements:', {
+                width: tooltipWidth, 
+                height: tooltipHeight,
+                text: text,
+                inputCoords: {x, y}
+            });
+            
+            // Position tooltip near cursor, shifted 10px right, adjusted 3px left for perfect alignment
+            // Position so the arrow (8px from right edge) aligns with cursor, shifted 10px right
+            let finalX = x - tooltipWidth + 8 + 10 - 3;
+            let finalY = y;
+            
+            // Ensure tooltip doesn't go off the right edge of editor
+            const editorWidth = editor.offsetWidth;
+            if (finalX + tooltipWidth > editorWidth - 10) {
+                finalX = editorWidth - tooltipWidth - 10;
+            }
+            
+            // Ensure tooltip doesn't go off the left edge of editor  
+            if (finalX < 10) {
+                finalX = 10;
+            }
+            
+            // Ensure tooltip doesn't go off the top - position below cursor instead
+            if (finalY < 0) {
+                finalY = y + 30; // Position below cursor instead
+            }
+            
+            tooltip.style.left = finalX + 'px';
+            tooltip.style.top = finalY + 'px';
+            
+            // Now show the tooltip with animation
+            setTimeout(() => {
+                tooltip.classList.add('show');
+            }, 10);
+            
+            console.log('📍 Tooltip positioned:', {
+                text: text,
+                finalPosition: {x: finalX, y: finalY}, 
+                originalCursor: {x, y},
+                viewport: {width: window.innerWidth, height: window.innerHeight},
+                tooltipRect: tooltip.getBoundingClientRect(),
+                tooltipStyle: {
+                    position: tooltip.style.position,
+                    left: tooltip.style.left, 
+                    top: tooltip.style.top,
+                    opacity: tooltip.style.opacity,
+                    visibility: tooltip.style.visibility
+                },
+                isVisible: tooltip.offsetParent !== null
+            });
+        }
+
+        function hideAutocorrectTooltip() {
+            const tooltip = document.getElementById('autocorrect-tooltip');
+            if (tooltip) {
+                tooltip.classList.remove('show');
+                tooltip.style.opacity = '0';
+                tooltip.style.visibility = 'hidden';
+                console.log('📍 Hiding tooltip');
+            }
+        }
+
+        // Get current word being typed
+        function getCurrentWord() {
+            if (!editorAutocorrectEngine) return '';
+
+            const selection = window.getSelection();
+            if (selection.rangeCount === 0) return '';
+
+            try {
+                const range = selection.getRangeAt(0);
+                const textContent = editor.innerText || '';
+
+                // Get cursor position in text
+                const preCaretRange = document.createRange();
+                preCaretRange.setStart(editor, 0);
+                preCaretRange.setEnd(range.startContainer, range.startOffset);
+
+                const tempDiv = document.createElement('div');
+                tempDiv.appendChild(preCaretRange.cloneContents());
+                const textBeforeCursor = tempDiv.innerText || '';
+                const cursorPos = textBeforeCursor.length;
+
+                // Find word at cursor position
+                const wordMatch = textContent.substring(0, cursorPos).match(/\b\w+$/);
+                const currentWord = wordMatch ? wordMatch[0] : '';
+
+                console.log('🔤 Current word:', JSON.stringify(currentWord));
+                return currentWord;
+
+            } catch (error) {
+                console.log('❌ Error getting current word:', error);
+                return '';
+            }
+        }
+
+        // Get cursor position for tooltip placement
+        function getCursorPosition() {
+            const selection = window.getSelection();
+            if (selection.rangeCount === 0) return null;
+              
+            try {
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                  
+                // Get editor bounds to calculate relative position
+                const editorRect = editor.getBoundingClientRect();
+                  
+                // Calculate position relative to the editor container
+                return {
+                    x: rect.left - editorRect.left, // Relative to editor
+                    y: rect.top - editorRect.top - 35 // Relative to editor, positioned above text
+                };
+            } catch (error) {
+                console.log('❌ Error getting cursor position:', error);
+                return null;
+            }
+        }
+
+        // Check for autocorrect suggestions using EXACT logic from typing test
+        function checkForAutocorrect() {
+            if (!editorAutocorrectEngine) {
+                console.log('❌ No autocorrect engine available');
+                return;
+            }
+
+            const currentWord = getCurrentWord();
+            if (currentWord.length < 3) {
+                console.log('📍 Word too short for autocorrect:', JSON.stringify(currentWord));
+                hideAutocorrectTooltip();
+                return;
+            }
+
+            // Check for override corrections first
+            const lowerWord = currentWord.toLowerCase();
+            if (editorAutocorrectEngine.correctionOverrides && editorAutocorrectEngine.correctionOverrides[lowerWord]) {
+                const suggestion = editorAutocorrectEngine.correctionOverrides[lowerWord];
+                console.log('🔍 Override correction found:', lowerWord, '->', suggestion);
+
+                const cursorPos = getCursorPosition();
+                if (cursorPos) {
+                    showAutocorrectTooltip(suggestion, cursorPos.x, cursorPos.y);
+                }
+                return;
+            }
+
+            // DEBUG: Test the autocorrect engine methods directly
+            console.log('🔧 DEBUG: Engine methods available:', {
+                findTwoWordSplit: typeof editorAutocorrectEngine.findTwoWordSplit,
+                findClosestWord: typeof editorAutocorrectEngine.findClosestWord,
+                dictionary: !!editorAutocorrectEngine.dictionary,
+                dictionarySize: editorAutocorrectEngine.dictionary ? editorAutocorrectEngine.dictionary.size : 0
+            });
+
+            // Test if "as" and "of" are in dictionary using correct property
+            console.log('🔧 DEBUG: Dictionary check for "as" and "of":', {
+                hasAs: editorAutocorrectEngine.dictionarySet ? editorAutocorrectEngine.dictionarySet.has('as') : false,
+                hasOf: editorAutocorrectEngine.dictionarySet ? editorAutocorrectEngine.dictionarySet.has('of') : false,
+                dictionarySetExists: !!editorAutocorrectEngine.dictionarySet,
+                dictionarySetSize: editorAutocorrectEngine.dictionarySet ? editorAutocorrectEngine.dictionarySet.size : 0
+            });
+
+            // Test word splitting approach for "asdf" -> "as of"
+            if (editorAutocorrectEngine.findTwoWordSplit) {
+                const twoWordSplit = editorAutocorrectEngine.findTwoWordSplit(currentWord);
+                console.log('🔍 Two-word split result for', currentWord, ':', twoWordSplit);
+
+                if (twoWordSplit && twoWordSplit !== currentWord.toLowerCase()) {
+                    const cursorPos = getCursorPosition();
+                    if (cursorPos) {
+                        showAutocorrectTooltip(twoWordSplit, cursorPos.x, cursorPos.y);
+                        return;
+                    }
+                }
+            }
+
+            // Test direct dictionary lookup using correct property
+            const isInDictionary = editorAutocorrectEngine.dictionarySet ? editorAutocorrectEngine.dictionarySet.has(currentWord.toLowerCase()) : false;
+            console.log('🔧 DEBUG: Word in dictionary check:', {
+                word: currentWord,
+                isInDictionary: isInDictionary
+            });
+
+            // For regular words, use findClosestWord
+            const suggestion = editorAutocorrectEngine.findClosestWord(currentWord);
+            console.log('🔍 Autocorrect check (using findClosestWord):', {
+                currentWord: currentWord,
+                suggestion: suggestion,
+                isDifferent: suggestion !== currentWord,
+                isInDictionary: isInDictionary
+            });
+
+            // Show tooltip if suggestion is different from original input
+            if (suggestion && suggestion !== currentWord && suggestion !== currentWord.toLowerCase()) {
+                const cursorPos = getCursorPosition();
+                console.log('📍 Cursor position:', cursorPos);
+                if (cursorPos) {
+                    showAutocorrectTooltip(suggestion, cursorPos.x, cursorPos.y);
+                } else {
+                    console.log('❌ Could not get cursor position');
+                }
+            } else {
+                console.log('📍 No suggestion needed - same word or not different enough');
+                hideAutocorrectTooltip();
+            }
+        }
+
+        // Debounced autocorrect check
+        let autocorrectTimeout;
+        function debouncedAutocorrectCheck() {
+            clearTimeout(autocorrectTimeout);
+            autocorrectTimeout = setTimeout(checkForAutocorrect, 300);
+        }
+
+        // Add input listener for autocorrect
+        editor.addEventListener('input', function () {
+            updateWordCount();
+            updateToolbarState();
+            debouncedAutocorrectCheck();
+        });
+
+        // Hide tooltip when cursor moves
+        editor.addEventListener('keydown', function (e) {
+            // Hide tooltip on navigation keys
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+                hideAutocorrectTooltip();
+            }
+        });
+
+        // Hide tooltip when clicking elsewhere
+        document.addEventListener('click', function (e) {
+            if (e.target !== editor) {
+                hideAutocorrectTooltip();
+            }
+        });
 
         // Initialize
         updateWordCount();
