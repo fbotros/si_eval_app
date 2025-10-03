@@ -52,7 +52,7 @@ class AutocorrectEngine {
             'werent': 'weren\'t',
             'wouldnt': 'wouldn\'t',
             'shouldnt': 'shouldn\'t',
-            'dontt': 'don\'t'
+            'dont': 'don\'t'
         };
 
         // Word frequency list (most common words first) - shared across all methods
