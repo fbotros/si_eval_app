@@ -823,12 +823,11 @@
                 }
             }
 
-            // Skip autocorrect for proper nouns (capitalized words)
-            if (currentWord[0] === currentWord[0].toUpperCase() && currentWord.length > 1) {
-                currentAutocorrectSuggestion = null;
-                hideAutocorrectTooltip();
-                return;
-            }
+            // Check if word is capitalized (for preserving capitalization in suggestions)
+            const isCapitalized = currentWord[0] === currentWord[0].toUpperCase() && currentWord.length > 1;
+            
+            // Create lowercase version for dictionary lookup
+            const wordForLookup = isCapitalized ? currentWord.toLowerCase() : currentWord;
 
             // Check for override corrections first
             const lowerWord = currentWord.toLowerCase();
@@ -844,29 +843,41 @@
             }
 
 
-            // Test word splitting approach first
+            // Test word splitting approach first (using lowercase for lookup)
             if (editorAutocorrectEngine.findTwoWordSplit) {
-                const twoWordSplit = editorAutocorrectEngine.findTwoWordSplit(currentWord);
+                const twoWordSplit = editorAutocorrectEngine.findTwoWordSplit(wordForLookup);
 
-                if (twoWordSplit && twoWordSplit !== currentWord.toLowerCase()) {
-                    currentAutocorrectSuggestion = twoWordSplit;
+                if (twoWordSplit && twoWordSplit !== wordForLookup) {
+                    // Capitalize suggestion if original word was capitalized
+                    let finalSuggestion = twoWordSplit;
+                    if (isCapitalized && twoWordSplit.length > 0) {
+                        finalSuggestion = twoWordSplit.charAt(0).toUpperCase() + twoWordSplit.slice(1);
+                    }
+                    
+                    currentAutocorrectSuggestion = finalSuggestion;
                     const cursorPos = getCursorPosition();
                     if (cursorPos) {
-                        showAutocorrectTooltip(twoWordSplit, cursorPos.x, cursorPos.y);
+                        showAutocorrectTooltip(finalSuggestion, cursorPos.x, cursorPos.y);
                         return;
                     }
                 }
             }
 
-            // For regular words, use findClosestWord
-            const suggestion = editorAutocorrectEngine.findClosestWord(currentWord);
+            // For regular words, use findClosestWord (using lowercase for lookup)
+            const suggestion = editorAutocorrectEngine.findClosestWord(wordForLookup);
 
             // Show tooltip if suggestion is different from original input
-            if (suggestion && suggestion !== currentWord && suggestion !== currentWord.toLowerCase()) {
-                currentAutocorrectSuggestion = suggestion;
+            if (suggestion && suggestion !== wordForLookup && suggestion !== currentWord.toLowerCase()) {
+                // Capitalize suggestion if original word was capitalized
+                let finalSuggestion = suggestion;
+                if (isCapitalized && suggestion.length > 0) {
+                    finalSuggestion = suggestion.charAt(0).toUpperCase() + suggestion.slice(1);
+                }
+                
+                currentAutocorrectSuggestion = finalSuggestion;
                 const cursorPos = getCursorPosition();
                 if (cursorPos) {
-                    showAutocorrectTooltip(suggestion, cursorPos.x, cursorPos.y);
+                    showAutocorrectTooltip(finalSuggestion, cursorPos.x, cursorPos.y);
                 }
             } else {
                 currentAutocorrectSuggestion = null;
