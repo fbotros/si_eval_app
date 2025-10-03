@@ -50,7 +50,7 @@
             max-width: 800px;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
-            border-radius: 24px;
+            border-radius: 4px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25),
                 0 0 0 1px rgba(255, 255, 255, 0.2);
             overflow: hidden;
@@ -326,20 +326,11 @@
         // Initialize dictionary and autocorrect engine
         async function initializeAutocorrect() {
             try {
-                console.log('Loading dictionary...');
                 const dictionary = await loadDictionary('../comprehensive_dictionary.txt');
 
                 // Create autocorrect engine with dictionary words
                 editorAutocorrectEngine = new AutocorrectEngine();
                 editorAutocorrectEngine.addWords(dictionary);
-
-                console.log('✅ Autocorrect engine initialized with', dictionary.length, 'words');
-                console.log('🔧 Dictionary sample check:', {
-                    hasAs: editorAutocorrectEngine.dictionarySet.has('as'),
-                    hasOf: editorAutocorrectEngine.dictionarySet.has('of'),
-                    hasThe: editorAutocorrectEngine.dictionarySet.has('the'),
-                    totalWords: editorAutocorrectEngine.dictionarySet.size
-                });
             } catch (error) {
                 console.error('❌ Failed to initialize autocorrect:', error);
             }
@@ -473,7 +464,6 @@
                 // Append to editor container and position relative to it
                 editor.style.position = 'relative';
                 editor.appendChild(tooltip);
-                console.log('🔧 Created new tooltip element - appended to editor');
             }
             
             tooltip.textContent = text;
@@ -495,13 +485,6 @@
             // Force a layout to get measurements
             const tooltipWidth = tooltip.offsetWidth;
             const tooltipHeight = tooltip.offsetHeight;
-            
-            console.log('🔧 Tooltip measurements:', {
-                width: tooltipWidth, 
-                height: tooltipHeight,
-                text: text,
-                inputCoords: {x, y}
-            });
             
             // Position tooltip near cursor, shifted 10px right, adjusted 3px left for perfect alignment
             // Position so the arrow (8px from right edge) aligns with cursor, shifted 10px right
@@ -527,26 +510,8 @@
             tooltip.style.left = finalX + 'px';
             tooltip.style.top = finalY + 'px';
             
-            // Now show the tooltip with animation
-            setTimeout(() => {
-                tooltip.classList.add('show');
-            }, 10);
-            
-            console.log('📍 Tooltip positioned:', {
-                text: text,
-                finalPosition: {x: finalX, y: finalY}, 
-                originalCursor: {x, y},
-                viewport: {width: window.innerWidth, height: window.innerHeight},
-                tooltipRect: tooltip.getBoundingClientRect(),
-                tooltipStyle: {
-                    position: tooltip.style.position,
-                    left: tooltip.style.left, 
-                    top: tooltip.style.top,
-                    opacity: tooltip.style.opacity,
-                    visibility: tooltip.style.visibility
-                },
-                isVisible: tooltip.offsetParent !== null
-            });
+            // Show the tooltip immediately
+            tooltip.classList.add('show');
         }
 
         function hideAutocorrectTooltip() {
@@ -555,7 +520,6 @@
                 tooltip.classList.remove('show');
                 tooltip.style.opacity = '0';
                 tooltip.style.visibility = 'hidden';
-                console.log('📍 Hiding tooltip');
             }
         }
 
@@ -584,11 +548,9 @@
                 const wordMatch = textContent.substring(0, cursorPos).match(/\b\w+$/);
                 const currentWord = wordMatch ? wordMatch[0] : '';
 
-                console.log('🔤 Current word:', JSON.stringify(currentWord));
                 return currentWord;
 
             } catch (error) {
-                console.log('❌ Error getting current word:', error);
                 return '';
             }
         }
@@ -611,7 +573,6 @@
                     y: rect.top - editorRect.top - 35 // Relative to editor, positioned above text
                 };
             } catch (error) {
-                console.log('❌ Error getting cursor position:', error);
                 return null;
             }
         }
@@ -619,13 +580,11 @@
         // Check for autocorrect suggestions using EXACT logic from typing test
         function checkForAutocorrect() {
             if (!editorAutocorrectEngine) {
-                console.log('❌ No autocorrect engine available');
                 return;
             }
 
             const currentWord = getCurrentWord();
             if (currentWord.length < 3) {
-                console.log('📍 Word too short for autocorrect:', JSON.stringify(currentWord));
                 hideAutocorrectTooltip();
                 return;
             }
@@ -634,7 +593,6 @@
             const lowerWord = currentWord.toLowerCase();
             if (editorAutocorrectEngine.correctionOverrides && editorAutocorrectEngine.correctionOverrides[lowerWord]) {
                 const suggestion = editorAutocorrectEngine.correctionOverrides[lowerWord];
-                console.log('🔍 Override correction found:', lowerWord, '->', suggestion);
 
                 const cursorPos = getCursorPosition();
                 if (cursorPos) {
@@ -643,26 +601,9 @@
                 return;
             }
 
-            // DEBUG: Test the autocorrect engine methods directly
-            console.log('🔧 DEBUG: Engine methods available:', {
-                findTwoWordSplit: typeof editorAutocorrectEngine.findTwoWordSplit,
-                findClosestWord: typeof editorAutocorrectEngine.findClosestWord,
-                dictionary: !!editorAutocorrectEngine.dictionary,
-                dictionarySize: editorAutocorrectEngine.dictionary ? editorAutocorrectEngine.dictionary.size : 0
-            });
-
-            // Test if "as" and "of" are in dictionary using correct property
-            console.log('🔧 DEBUG: Dictionary check for "as" and "of":', {
-                hasAs: editorAutocorrectEngine.dictionarySet ? editorAutocorrectEngine.dictionarySet.has('as') : false,
-                hasOf: editorAutocorrectEngine.dictionarySet ? editorAutocorrectEngine.dictionarySet.has('of') : false,
-                dictionarySetExists: !!editorAutocorrectEngine.dictionarySet,
-                dictionarySetSize: editorAutocorrectEngine.dictionarySet ? editorAutocorrectEngine.dictionarySet.size : 0
-            });
-
-            // Test word splitting approach for "asdf" -> "as of"
+            // Test word splitting approach first
             if (editorAutocorrectEngine.findTwoWordSplit) {
                 const twoWordSplit = editorAutocorrectEngine.findTwoWordSplit(currentWord);
-                console.log('🔍 Two-word split result for', currentWord, ':', twoWordSplit);
 
                 if (twoWordSplit && twoWordSplit !== currentWord.toLowerCase()) {
                     const cursorPos = getCursorPosition();
@@ -673,33 +614,16 @@
                 }
             }
 
-            // Test direct dictionary lookup using correct property
-            const isInDictionary = editorAutocorrectEngine.dictionarySet ? editorAutocorrectEngine.dictionarySet.has(currentWord.toLowerCase()) : false;
-            console.log('🔧 DEBUG: Word in dictionary check:', {
-                word: currentWord,
-                isInDictionary: isInDictionary
-            });
-
             // For regular words, use findClosestWord
             const suggestion = editorAutocorrectEngine.findClosestWord(currentWord);
-            console.log('🔍 Autocorrect check (using findClosestWord):', {
-                currentWord: currentWord,
-                suggestion: suggestion,
-                isDifferent: suggestion !== currentWord,
-                isInDictionary: isInDictionary
-            });
 
             // Show tooltip if suggestion is different from original input
             if (suggestion && suggestion !== currentWord && suggestion !== currentWord.toLowerCase()) {
                 const cursorPos = getCursorPosition();
-                console.log('📍 Cursor position:', cursorPos);
                 if (cursorPos) {
                     showAutocorrectTooltip(suggestion, cursorPos.x, cursorPos.y);
-                } else {
-                    console.log('❌ Could not get cursor position');
                 }
             } else {
-                console.log('📍 No suggestion needed - same word or not different enough');
                 hideAutocorrectTooltip();
             }
         }
@@ -708,7 +632,7 @@
         let autocorrectTimeout;
         function debouncedAutocorrectCheck() {
             clearTimeout(autocorrectTimeout);
-            autocorrectTimeout = setTimeout(checkForAutocorrect, 300);
+            autocorrectTimeout = setTimeout(checkForAutocorrect, 50);
         }
 
         // Add input listener for autocorrect
