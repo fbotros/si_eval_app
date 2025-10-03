@@ -322,7 +322,6 @@
 
         // Format functions
         function toggleFormat(command) {
-            console.log('🔧 execCommand called:', command);
             document.execCommand(command, false, null);
             updateToolbarState();
             editor.focus();
@@ -517,23 +516,113 @@
                 const textBeforeCursor = tempDiv.innerText || '';
                 const cursorPos = textBeforeCursor.length;
 
-                // Find word at cursor position
-                const wordMatch = textBeforeCursor.match(/\b\w+$/);
-                const currentWord = wordMatch ? wordMatch[0] : '';
+                // Find word at cursor position - ensure newlines act as word boundaries
+                // Match word characters at the end, but only after a word boundary (space, newline, start of string, etc.)
+                const wordMatch = textBeforeCursor.match(/(?:^|\s|\n)(\w+)$/);
+                const currentWord = wordMatch ? wordMatch[1] : '';
 
-                // Debug logging
-                console.log('🔧 getCurrentWord debug:', {
-                    textContent: JSON.stringify(textContent),
-                    textBeforeCursor: JSON.stringify(textBeforeCursor),
-                    cursorPos: cursorPos,
-                    wordMatch: wordMatch,
-                    currentWord: JSON.stringify(currentWord)
-                });
 
                 return currentWord;
 
             } catch (error) {
                 return '';
+            }
+        }
+
+        // Replace current word with autocorrect suggestion
+        function replaceCurrentWord(wordToDelete, suggestion) {
+            try {
+                const selection = window.getSelection();
+                if (selection.rangeCount === 0) return;
+
+                const range = selection.getRangeAt(0);
+
+                // Create a new range to select exactly the word we want to replace
+                const wordRange = document.createRange();
+
+                // Move the range start backwards by the word length
+                let startContainer = range.startContainer;
+                let startOffset = range.startOffset;
+
+                // Move backwards character by character to find the word start
+                let remainingChars = wordToDelete.length;
+
+                while (remainingChars > 0 && startContainer) {
+                    if (startContainer.nodeType === Node.TEXT_NODE) {
+                        const availableChars = startOffset;
+                        const charsToTake = Math.min(remainingChars, availableChars);
+
+                        startOffset -= charsToTake;
+                        remainingChars -= charsToTake;
+
+                        if (remainingChars > 0) {
+                            // Need to go to previous text node
+                            const walker = document.createTreeWalker(
+                                editor,
+                                NodeFilter.SHOW_TEXT,
+                                null,
+                                false
+                            );
+                            walker.currentNode = startContainer;
+                            const prevNode = walker.previousNode();
+                            if (prevNode) {
+                                startContainer = prevNode;
+                                startOffset = prevNode.textContent.length;
+                            } else {
+                                break;
+                            }
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                // Set the range to select exactly the word
+                wordRange.setStart(startContainer, startOffset);
+                wordRange.setEnd(range.startContainer, range.startOffset);
+
+                // Verify we're selecting the right text
+                const selectedText = wordRange.toString();
+                if (selectedText === wordToDelete) {
+                    // Select and replace the word
+                    selection.removeAllRanges();
+                    selection.addRange(wordRange);
+                    document.execCommand('insertText', false, suggestion);
+
+                    // Add space after multi-word suggestions to prevent word joining
+                    if (suggestion.includes(' ')) {
+                        document.execCommand('insertText', false, ' ');
+                    }
+                } else {
+                    console.log('❌ Word mismatch - expected:', wordToDelete, 'got:', selectedText);
+                    // Fallback to original method
+                    for (let i = 0; i < wordToDelete.length; i++) {
+                        document.execCommand('delete', false, null);
+                    }
+                    document.execCommand('insertText', false, suggestion);
+
+                    // Add space after multi-word suggestions to prevent word joining
+                    if (suggestion.includes(' ')) {
+                        document.execCommand('insertText', false, ' ');
+                    }
+
+                    // Add space after multi-word suggestions to prevent word joining
+                    if (suggestion.includes(' ')) {
+                        document.execCommand('insertText', false, ' ');
+                    }
+                }
+
+            } catch (error) {
+                console.error('❌ Error replacing word:', error);
+                // Fallback to simple deletion method
+                try {
+                    for (let i = 0; i < wordToDelete.length; i++) {
+                        document.execCommand('delete', false, null);
+                    }
+                    document.execCommand('insertText', false, suggestion);
+                } catch (fallbackError) {
+                    console.error('❌ Fallback replacement also failed:', fallbackError);
+                }
             }
         }
 
@@ -562,15 +651,12 @@
         // Check for autocorrect suggestions using EXACT logic from typing test
         function checkForAutocorrect() {
             if (!editorAutocorrectEngine) {
-                console.log('❌ No autocorrect engine available');
                 return;
             }
 
             const currentWord = getCurrentWord();
-            console.log('🔤 Checking word:', JSON.stringify(currentWord));
 
             if (currentWord.length < 3) {
-                console.log('📏 Word too short for autocorrect');
                 hideAutocorrectTooltip();
                 return;
             }
@@ -591,18 +677,14 @@
             // Test word splitting approach first
             if (editorAutocorrectEngine.findTwoWordSplit) {
                 const twoWordSplit = editorAutocorrectEngine.findTwoWordSplit(currentWord);
-                console.log('🔍 Two-word split result for', currentWord, ':', twoWordSplit);
 
                 if (twoWordSplit && twoWordSplit !== currentWord.toLowerCase()) {
-                    console.log('✅ Using two-word split suggestion:', twoWordSplit);
                     currentAutocorrectSuggestion = twoWordSplit;
                     const cursorPos = getCursorPosition();
                     if (cursorPos) {
                         showAutocorrectTooltip(twoWordSplit, cursorPos.x, cursorPos.y);
                         return;
                     }
-                } else {
-                    console.log('❌ Two-word split not applicable');
                 }
             }
 
@@ -635,8 +717,40 @@
             debouncedAutocorrectCheck();
         });
 
-        // Hide tooltip on navigation keys
+        // Handle autocorrect application triggers and navigation keys
         editor.addEventListener('keydown', function (e) {
+            // Check for autocorrect application triggers
+            if (currentAutocorrectSuggestion) {
+                const isEnter = e.key === 'Enter';
+                const isSpace = e.key === ' ';
+                const isPunctuation = [',', '.', ';', '/'].includes(e.key);
+
+                if (isEnter || isSpace || isPunctuation) {
+                    const wordToDelete = getCurrentWord();
+
+                    // Prevent the trigger key from being processed normally
+                    e.preventDefault();
+
+                    // Replace the current word with autocorrect suggestion
+                    if (wordToDelete) {
+                        replaceCurrentWord(wordToDelete, currentAutocorrectSuggestion);
+                    }
+
+                    // Hide tooltip and clear suggestion
+                    hideAutocorrectTooltip();
+                    currentAutocorrectSuggestion = null;
+
+                    // Insert the trigger key that was prevented
+                    if (e.key === 'Enter') {
+                        // Insert line break using insertLineBreak for better contentEditable support
+                        document.execCommand('insertLineBreak', false, null);
+                    } else {
+                        // For space and punctuation, insert the actual character
+                        document.execCommand('insertText', false, e.key);
+                    }
+                }
+            }
+
             // Hide tooltip on navigation keys
             if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
                 hideAutocorrectTooltip();
