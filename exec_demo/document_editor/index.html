@@ -532,12 +532,6 @@
                 // Strip trailing newlines to avoid cursor position confusion
                 fullText = fullText.replace(/\n+$/, '');
 
-                console.log('🔍 Text normalization:', {
-                    originalLength: (editor.innerText || '').length,
-                    normalizedLength: fullText.length,
-                    originalLastChars: JSON.stringify((editor.innerText || '').slice(-5)),
-                    normalizedLastChars: JSON.stringify(fullText.slice(-5))
-                });
 
                 // Calculate cursor position more reliably
                 let cursorPos = 0;
@@ -604,19 +598,6 @@
                     selectionCursorPos = cursorPos;
                 }
 
-                console.log('🔍 Cursor calculation debug:', {
-                    method: calculationMethod,
-                    originalCursorPos: cursorPos,
-                    fallbackCursorPos: fallbackCursorPos,
-                    selectionCursorPos: selectionCursorPos,
-                    rangeStartContainer: range.startContainer.nodeName || 'TEXT',
-                    rangeStartOffset: range.startOffset,
-                    textNodeLength: range.startContainer.nodeType === Node.TEXT_NODE ? range.startContainer.textContent.length : 'N/A',
-                    actualTextNodeContent: range.startContainer.nodeType === Node.TEXT_NODE ? JSON.stringify(range.startContainer.textContent) : 'N/A',
-                    isAtEndOfTextNode: range.startContainer.nodeType === Node.TEXT_NODE && range.startOffset === range.startContainer.textContent.length,
-                    allMethodsAgree: cursorPos === fallbackCursorPos && fallbackCursorPos === selectionCursorPos,
-                    maxDifference: Math.max(Math.abs(cursorPos - fallbackCursorPos), Math.abs(cursorPos - selectionCursorPos), Math.abs(fallbackCursorPos - selectionCursorPos))
-                });
 
                 // Special fix: if cursor is at the end of a text node but position seems off
                 let adjustedForEndOfNode = false;
@@ -639,19 +620,9 @@
                         }
                     }
 
-                    console.log('🔧 Cursor at end of text node fix:', {
-                        cursorPos: cursorPos,
-                        fullTextLength: fullText.length,
-                        nodeText: JSON.stringify(nodeText),
-                        nodeTextLength: nodeText.length,
-                        correctCursorPos: correctCursorPos,
-                        searchRange: `${Math.max(0, cursorPos - nodeText.length)}-${cursorPos}`,
-                        willAdjust: correctCursorPos > cursorPos && correctCursorPos <= fullText.length
-                    });
 
                     // If we found a better cursor position, use it
                     if (correctCursorPos > cursorPos && correctCursorPos <= fullText.length) {
-                        console.log('🎯 Adjusted cursor position from', cursorPos, 'to', correctCursorPos);
                         cursorPos = correctCursorPos;
                         adjustedForEndOfNode = true;
                     }
@@ -659,51 +630,17 @@
 
                 // Only use selection method if we haven't already adjusted for end-of-node issue
                 if (!adjustedForEndOfNode && selectionCursorPos !== cursorPos && Math.abs(cursorPos - selectionCursorPos) <= 1) {
-                    console.log('🔧 Using selection cursor position:', selectionCursorPos, 'instead of original:', cursorPos);
                     cursorPos = selectionCursorPos;
-                } else if (adjustedForEndOfNode) {
-                    console.log('✅ Keeping adjusted cursor position:', cursorPos, '(not overriding with selection method)');
-                }
-
-                // Get clean text before cursor using the same method as cursor position calculation
-                let textBeforeCursor = '';
-                try {
-                    // Create a range from start of editor to current cursor position
-                    const textRange = document.createRange();
-                    textRange.setStart(editor, 0);
-                    textRange.setEnd(range.startContainer, range.startOffset);
-                    textBeforeCursor = textRange.toString();
-
-                    // Strip trailing newlines to match our fullText normalization
-                    textBeforeCursor = textBeforeCursor.replace(/\n+$/, '');
-                } catch (error) {
-                    // Fallback to substring method
-                    textBeforeCursor = fullText.substring(0, cursorPos);
-                }
-
-                // Debug: Check for mismatch between methods
-                const fallbackTextBefore = fullText.substring(0, cursorPos);
-                if (textBeforeCursor !== fallbackTextBefore) {
-                    console.log('🔧 Text before cursor mismatch detected:', {
-                        rangeMethod: JSON.stringify(textBeforeCursor.slice(-15)),
-                        substringMethod: JSON.stringify(fallbackTextBefore.slice(-15)),
-                        rangeLenght: textBeforeCursor.length,
-                        substringLength: fallbackTextBefore.length,
-                        usingRangeMethod: true
-                    });
+}
                 }
 
                 // Validate cursor position makes sense
                 if (cursorPos > fullText.length) {
-                    console.warn('⚠️ Cursor position beyond text length, fixing:', {
-                        cursorPos: cursorPos,
-                        fullTextLength: fullText.length,
-                        willFixTo: fullText.length
-                    });
                     cursorPos = fullText.length;
                 }
 
                 // Additional validation: if we're at the end of a text node but cursor position seems way off
+                let cursorPositionFixed = false;
                 if (range.startContainer.nodeType === Node.TEXT_NODE &&
                     range.startOffset === range.startContainer.textContent.length) {
 
@@ -713,26 +650,31 @@
                     if (expectedPos !== -1 && expectedPos + nodeText.length !== cursorPos) {
                         const betterCursorPos = expectedPos + nodeText.length;
 
-                        console.log('🔧 Cursor position validation fix:', {
-                            originalCursorPos: cursorPos,
-                            nodeText: JSON.stringify(nodeText),
-                            expectedPos: expectedPos,
-                            betterCursorPos: betterCursorPos,
-                            fullTextAroundExpected: JSON.stringify(fullText.substring(expectedPos - 5, expectedPos + nodeText.length + 5)),
-                            willFixTo: betterCursorPos
-                        });
 
                         cursorPos = betterCursorPos;
+                        cursorPositionFixed = true;
                     }
                 }
 
-                // Debug: Log the actual cursor position and text
-                console.log('🔍 Cursor position debug:', {
-                    fullTextLength: fullText.length,
-                    cursorPos: cursorPos,
-                    fullTextLastChars: JSON.stringify(fullText.slice(-10)),
-                    textBeforeCursorLastChars: JSON.stringify(textBeforeCursor.slice(-10))
-                });
+                // Get clean text before cursor - AFTER cursor position is fixed
+                let textBeforeCursor = fullText.substring(0, cursorPos);
+                
+                // Try range method as backup/comparison
+                let rangeTextBefore = '';
+                try {
+                    // Create a range from start of editor to current cursor position
+                    const textRange = document.createRange();
+                    textRange.setStart(editor, 0);
+                    textRange.setEnd(range.startContainer, range.startOffset);
+                    rangeTextBefore = textRange.toString();
+                    // Strip trailing newlines to match our fullText normalization
+                    rangeTextBefore = rangeTextBefore.replace(/\n+$/, '');
+                } catch (error) {
+                    rangeTextBefore = textBeforeCursor; // Use substring as fallback
+                }
+
+                // Debug: Check for mismatch but always use substring method
+
 
                 // Split by whitespace/newlines and take last segment
                 const segments = textBeforeCursor.split(/[\s\n\r]+/);
@@ -742,14 +684,6 @@
                 const wordMatch = lastSegment.match(/(\w+(?:'\w*)*)$/);
                 const currentWord = wordMatch ? wordMatch[1] : '';
 
-                console.log('🔍 getCurrentWord DEBUG (FIXED):', {
-                    fullText: JSON.stringify(fullText.slice(0, 50)),
-                    cursorPos: cursorPos,
-                    textBeforeCursor: JSON.stringify(textBeforeCursor.slice(-30)),
-                    segments: segments.slice(-3),
-                    lastSegment: JSON.stringify(lastSegment),
-                    currentWord: JSON.stringify(currentWord)
-                });
 
                 return currentWord;
 
@@ -819,27 +753,15 @@
                     selection.addRange(wordRange);
                     document.execCommand('insertText', false, suggestion);
 
-                    // Add space after multi-word suggestions to prevent word joining
-                    if (suggestion.includes(' ')) {
-                        document.execCommand('insertText', false, ' ');
-                    }
+                    // Don't add extra space - trigger key will handle spacing
                 } else {
-                    console.log('❌ Word mismatch - expected:', wordToDelete, 'got:', selectedText);
                     // Fallback to original method
                     for (let i = 0; i < wordToDelete.length; i++) {
                         document.execCommand('delete', false, null);
                     }
                     document.execCommand('insertText', false, suggestion);
 
-                    // Add space after multi-word suggestions to prevent word joining
-                    if (suggestion.includes(' ')) {
-                        document.execCommand('insertText', false, ' ');
-                    }
-
-                    // Add space after multi-word suggestions to prevent word joining
-                    if (suggestion.includes(' ')) {
-                        document.execCommand('insertText', false, ' ');
-                    }
+                    // No extra space needed - trigger key will handle proper spacing
                 }
 
             } catch (error) {
@@ -895,21 +817,14 @@
             // Check if possessive form is valid (base word exists in dictionary)
             if (currentWord.endsWith("'s")) {
                 const baseWord = currentWord.slice(0, -2); // Remove 's
-                const baseWordExists = editorAutocorrectEngine.dictionarySet && editorAutocorrectEngine.dictionarySet.has(baseWord.toLowerCase());
-
-                if (baseWordExists) {
-                    console.log('✅ Valid possessive word:', currentWord, '(base:', baseWord, 'exists)');
-                    currentAutocorrectSuggestion = null;
-                    hideAutocorrectTooltip();
-                    return;
-                }
-                // If base word doesn't exist, continue with autocorrect
-                console.log('🔍 Possessive with unknown base:', currentWord, '(base:', baseWord, 'not found) - checking for corrections');
+            if (editorAutocorrectEngine.dictionarySet && editorAutocorrectEngine.dictionarySet.has(baseWord.toLowerCase())) {
+                currentAutocorrectSuggestion = null;
+                hideAutocorrectTooltip();
+                return;
             }
 
             // Skip autocorrect for proper nouns (capitalized words)
             if (currentWord[0] === currentWord[0].toUpperCase() && currentWord.length > 1) {
-                console.log('🚫 Skipping proper noun:', currentWord, '- clearing suggestion');
                 currentAutocorrectSuggestion = null;
                 hideAutocorrectTooltip();
                 return;
@@ -928,15 +843,12 @@
                 return;
             }
 
-            console.log('🔍 Checking autocorrect for word:', currentWord);
 
             // Test word splitting approach first
             if (editorAutocorrectEngine.findTwoWordSplit) {
                 const twoWordSplit = editorAutocorrectEngine.findTwoWordSplit(currentWord);
-                console.log('🔄 Two-word split result:', twoWordSplit, 'for word:', currentWord);
 
                 if (twoWordSplit && twoWordSplit !== currentWord.toLowerCase()) {
-                    console.log('✅ Using two-word split suggestion:', twoWordSplit);
                     currentAutocorrectSuggestion = twoWordSplit;
                     const cursorPos = getCursorPosition();
                     if (cursorPos) {
@@ -948,18 +860,15 @@
 
             // For regular words, use findClosestWord
             const suggestion = editorAutocorrectEngine.findClosestWord(currentWord);
-            console.log('🔍 findClosestWord result:', suggestion, 'for word:', currentWord);
 
             // Show tooltip if suggestion is different from original input
             if (suggestion && suggestion !== currentWord && suggestion !== currentWord.toLowerCase()) {
-                console.log('✅ Showing autocorrect tooltip:', suggestion);
                 currentAutocorrectSuggestion = suggestion;
                 const cursorPos = getCursorPosition();
                 if (cursorPos) {
                     showAutocorrectTooltip(suggestion, cursorPos.x, cursorPos.y);
                 }
             } else {
-                console.log('❌ No autocorrect suggestion needed');
                 currentAutocorrectSuggestion = null;
                 hideAutocorrectTooltip();
             }
@@ -989,13 +898,6 @@
                 if (isEnter || isSpace || isPunctuation) {
                     const wordToDelete = getCurrentWord();
 
-                    console.log('🎯 AUTOCORRECT TRIGGER DETECTED:', {
-                        triggerKey: e.key,
-                        currentSuggestion: currentAutocorrectSuggestion,
-                        wordToDelete: JSON.stringify(wordToDelete),
-                        wordEndsWith_s: wordToDelete ? wordToDelete.endsWith("'s") : false,
-                        action: 'will replace if valid'
-                    });
 
 
                     // Prevent the trigger key from being processed normally
