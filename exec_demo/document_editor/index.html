@@ -504,33 +504,57 @@
 
             try {
                 const range = selection.getRangeAt(0);
-                const textContent = editor.innerText || '';
+                const fullText = editor.innerText || '';
 
-                // Get cursor position in text
-                const preCaretRange = document.createRange();
-                preCaretRange.setStart(editor, 0);
-                preCaretRange.setEnd(range.startContainer, range.startOffset);
+                // Calculate cursor position using TreeWalker (avoids cloneContents corruption)
+                let cursorPos = 0;
+                const walker = document.createTreeWalker(
+                    editor,
+                    NodeFilter.SHOW_TEXT,
+                    null,
+                    false
+                );
 
-                const tempDiv = document.createElement('div');
-                tempDiv.appendChild(preCaretRange.cloneContents());
-                const textBeforeCursor = tempDiv.innerText || '';
-                const cursorPos = textBeforeCursor.length;
+                let currentOffset = 0;
+                while (walker.nextNode()) {
+                    const node = walker.currentNode;
+                    if (node === range.startContainer) {
+                        cursorPos = currentOffset + range.startOffset;
+                        break;
+                    }
+                    currentOffset += node.textContent.length;
+                }
 
-                // Find word at cursor position - allow apostrophes within words for contractions
-                // Match word characters and apostrophes, but not start with apostrophe
-                const wordMatch = textBeforeCursor.match(/(?:^|[^\w'])(\w+(?:'\w*)*)$/);
+                // Get clean text before cursor
+                const textBeforeCursor = fullText.substring(0, cursorPos);
+
+                // Split by whitespace/newlines and take last segment
+                const segments = textBeforeCursor.split(/[\s\n\r]+/);
+                const lastSegment = segments[segments.length - 1] || '';
+
+                // Extract word characters and apostrophes from end of segment
+                const wordMatch = lastSegment.match(/(\w+(?:'\w*)*)$/);
                 const currentWord = wordMatch ? wordMatch[1] : '';
 
+                console.log('🔍 getCurrentWord DEBUG (FIXED):', {
+                    fullText: JSON.stringify(fullText.slice(0, 50)),
+                    cursorPos: cursorPos,
+                    textBeforeCursor: JSON.stringify(textBeforeCursor.slice(-30)),
+                    segments: segments.slice(-3),
+                    lastSegment: JSON.stringify(lastSegment),
+                    currentWord: JSON.stringify(currentWord)
+                });
 
                 return currentWord;
 
             } catch (error) {
+                console.error('Error in getCurrentWord:', error);
                 return '';
             }
         }
 
         // Replace current word with autocorrect suggestion
-        function replaceCurrentWord(wordToDelete, suggestion, triggerKey) {
+        function replaceCurrentWord(wordToDelete, suggestion) {
             try {
                 const selection = window.getSelection();
                 if (selection.rangeCount === 0) return;
@@ -589,8 +613,8 @@
                     selection.addRange(wordRange);
                     document.execCommand('insertText', false, suggestion);
 
-                    // Only add space after multi-word suggestions if trigger wasn't space or punctuation
-                    if (suggestion.includes(' ') && triggerKey !== ' ' && ![',', '.', ';', '/'].includes(triggerKey)) {
+                    // Add space after multi-word suggestions to prevent word joining
+                    if (suggestion.includes(' ')) {
                         document.execCommand('insertText', false, ' ');
                     }
                 } else {
@@ -600,13 +624,18 @@
                         document.execCommand('delete', false, null);
                     }
                     document.execCommand('insertText', false, suggestion);
-                    
-                    // Only add space after multi-word suggestions if trigger wasn't space or punctuation
-                    if (suggestion.includes(' ') && triggerKey !== ' ' && ![',', '.', ';', '/'].includes(triggerKey)) {
+
+                    // Add space after multi-word suggestions to prevent word joining
+                    if (suggestion.includes(' ')) {
+                        document.execCommand('insertText', false, ' ');
+                    }
+
+                    // Add space after multi-word suggestions to prevent word joining
+                    if (suggestion.includes(' ')) {
                         document.execCommand('insertText', false, ' ');
                     }
                 }
-                
+
             } catch (error) {
                 console.error('❌ Error replacing word:', error);
                 // Fallback to simple deletion method
@@ -615,11 +644,6 @@
                         document.execCommand('delete', false, null);
                     }
                     document.execCommand('insertText', false, suggestion);
-                    
-                    // Only add space after multi-word suggestions if trigger wasn't space or punctuation
-                    if (suggestion.includes(' ') && triggerKey !== ' ' && ![',', '.', ';', '/'].includes(triggerKey)) {
-                        document.execCommand('insertText', false, ' ');
-                    }
                 } catch (fallbackError) {
                     console.error('❌ Fallback replacement also failed:', fallbackError);
                 }
@@ -724,22 +748,22 @@
                 const isEnter = e.key === 'Enter';
                 const isSpace = e.key === ' ';
                 const isPunctuation = [',', '.', ';', '/'].includes(e.key);
-                
+
                 if (isEnter || isSpace || isPunctuation) {
                     const wordToDelete = getCurrentWord();
-                    
+
                     // Prevent the trigger key from being processed normally
                     e.preventDefault();
-                    
+
                     // Replace the current word with autocorrect suggestion
                     if (wordToDelete) {
-                        replaceCurrentWord(wordToDelete, currentAutocorrectSuggestion, e.key);
+                        replaceCurrentWord(wordToDelete, currentAutocorrectSuggestion);
                     }
-                    
+
                     // Hide tooltip and clear suggestion
                     hideAutocorrectTooltip();
                     currentAutocorrectSuggestion = null;
-                    
+
                     // Insert the trigger key that was prevented
                     if (e.key === 'Enter') {
                         // Insert line break using insertLineBreak for better contentEditable support
