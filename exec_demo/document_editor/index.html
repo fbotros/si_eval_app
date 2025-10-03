@@ -506,27 +506,15 @@
                 const range = selection.getRangeAt(0);
                 const fullText = editor.innerText || '';
 
-                // Calculate cursor position using TreeWalker (avoids cloneContents corruption)
-                let cursorPos = 0;
-                const walker = document.createTreeWalker(
-                    editor,
-                    NodeFilter.SHOW_TEXT,
-                    null,
-                    false
-                );
-
-                let currentOffset = 0;
-                while (walker.nextNode()) {
-                    const node = walker.currentNode;
-                    if (node === range.startContainer) {
-                        cursorPos = currentOffset + range.startOffset;
-                        break;
-                    }
-                    currentOffset += node.textContent.length;
-                }
-
-                // Get clean text before cursor
-                const textBeforeCursor = fullText.substring(0, cursorPos);
+                // Use a much simpler and more reliable approach
+                // Create a range from start of editor to cursor position
+                const preCaretRange = document.createRange();
+                preCaretRange.setStart(editor, 0);
+                preCaretRange.setEnd(range.startContainer, range.startOffset);
+                
+                // Get the text content of this range
+                const textBeforeCursor = preCaretRange.toString();
+                const cursorPos = textBeforeCursor.length;
 
                 // Split by whitespace/newlines and take last segment
                 const segments = textBeforeCursor.split(/[\s\n\r]+/);
@@ -722,11 +710,15 @@
                 return;
             }
 
+            console.log('🔍 Checking autocorrect for word:', currentWord);
+
             // Test word splitting approach first
             if (editorAutocorrectEngine.findTwoWordSplit) {
                 const twoWordSplit = editorAutocorrectEngine.findTwoWordSplit(currentWord);
+                console.log('🔄 Two-word split result:', twoWordSplit, 'for word:', currentWord);
 
                 if (twoWordSplit && twoWordSplit !== currentWord.toLowerCase()) {
+                    console.log('✅ Using two-word split suggestion:', twoWordSplit);
                     currentAutocorrectSuggestion = twoWordSplit;
                     const cursorPos = getCursorPosition();
                     if (cursorPos) {
@@ -738,15 +730,18 @@
 
             // For regular words, use findClosestWord
             const suggestion = editorAutocorrectEngine.findClosestWord(currentWord);
+            console.log('🔍 findClosestWord result:', suggestion, 'for word:', currentWord);
 
             // Show tooltip if suggestion is different from original input
             if (suggestion && suggestion !== currentWord && suggestion !== currentWord.toLowerCase()) {
+                console.log('✅ Showing autocorrect tooltip:', suggestion);
                 currentAutocorrectSuggestion = suggestion;
                 const cursorPos = getCursorPosition();
                 if (cursorPos) {
                     showAutocorrectTooltip(suggestion, cursorPos.x, cursorPos.y);
                 }
             } else {
+                console.log('❌ No autocorrect suggestion needed');
                 currentAutocorrectSuggestion = null;
                 hideAutocorrectTooltip();
             }
