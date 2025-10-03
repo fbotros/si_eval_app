@@ -816,10 +816,11 @@
             // Check if possessive form is valid (base word exists in dictionary)
             if (currentWord.endsWith("'s")) {
                 const baseWord = currentWord.slice(0, -2); // Remove 's
-            if (editorAutocorrectEngine.dictionarySet && editorAutocorrectEngine.dictionarySet.has(baseWord.toLowerCase())) {
-                currentAutocorrectSuggestion = null;
-                hideAutocorrectTooltip();
-                return;
+                if (editorAutocorrectEngine.dictionarySet && editorAutocorrectEngine.dictionarySet.has(baseWord.toLowerCase())) {
+                    currentAutocorrectSuggestion = null;
+                    hideAutocorrectTooltip();
+                    return;
+                }
             }
 
             // Skip autocorrect for proper nouns (capitalized words)
