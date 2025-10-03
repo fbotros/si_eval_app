@@ -16,7 +16,7 @@
             margin: 0;
             padding: 0;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #888888;
+            background: #ddd;
             min-height: 100vh;
         }
 
@@ -51,8 +51,10 @@
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             border-radius: 4px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25),
-                0 0 0 1px rgba(255, 255, 255, 0.2);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15),
+                0 0 0 1px rgba(255, 255, 255, 0.2),
+                0 8px 24px rgba(0, 0, 0, 0.08),
+                0 2px 8px rgba(0, 0, 0, 0.06);
             overflow: hidden;
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
@@ -196,10 +198,7 @@
             text-decoration: line-through;
         }
 
-        /* Focus styles */
-        .container:focus-within {
-            box-shadow: 0 2px 10px rgba(0, 123, 255, 0.2);
-        }
+        /* Focus styles removed - keep consistent drop shadow */
 
         /* Autocorrect Tooltip - EXACT COPY from typing test modal */
         .autocorrect-tooltip {
@@ -799,17 +798,17 @@
             }
         }
 
-        // Check if cursor is at a word boundary (after whitespace)
+        // Check if current word started at a word boundary (after whitespace)
         function isAtWordBoundary() {
-            const selection = window.getSelection();
-            if (selection.rangeCount === 0) return true; // Default to allow if can't determine
-
             try {
+                const selection = window.getSelection();
+                if (selection.rangeCount === 0) return true;
+
                 const range = selection.getRangeAt(0);
                 let fullText = editor.innerText || '';
                 fullText = fullText.replace(/\n+$/, '');
 
-                // Calculate cursor position (reuse logic from getCurrentWord)
+                // Calculate cursor position using the SAME logic as getCurrentWord
                 let cursorPos = 0;
                 if (range.startContainer === editor) {
                     const childNodes = Array.from(editor.childNodes);
@@ -834,10 +833,25 @@
                     }
                 }
 
-                // Check if we're at position 0 or if previous character is whitespace
-                if (cursorPos === 0) return true;
+                // Apply same cursor position fixes as getCurrentWord
+                if (cursorPos > fullText.length) {
+                    cursorPos = fullText.length;
+                }
+
+                if (range.startContainer.nodeType === Node.TEXT_NODE &&
+                    range.startOffset === range.startContainer.textContent.length) {
+                    const nodeText = range.startContainer.textContent;
+                    const expectedPos = fullText.lastIndexOf(nodeText);
+                    if (expectedPos !== -1 && expectedPos + nodeText.length !== cursorPos) {
+                        cursorPos = expectedPos + nodeText.length;
+                    }
+                }
+
+                // Check if cursor is right after whitespace
+                if (cursorPos === 0) return true; // At start of document
+
                 const prevChar = fullText[cursorPos - 1];
-                return /\s/.test(prevChar); // Returns true if previous character is whitespace
+                return /\s/.test(prevChar); // True if cursor is right after whitespace
             } catch (error) {
                 return true; // Default to allow if error
             }
@@ -845,6 +859,9 @@
 
         // Track autocorrect state - whether it's currently enabled for this typing session
         let autocorrectEnabled = true;
+        let lastTextLength = 0; // Track text length to detect backspacing
+        let justAppliedAutocorrect = false; // Track if we just applied autocorrect
+        let lastCursorPos = 0; // Track cursor position to detect editing vs new typing
 
         // Check for autocorrect suggestions using EXACT logic from typing test
         function checkForAutocorrect() {
@@ -852,14 +869,20 @@
                 return;
             }
 
-            // Don't show autocorrect if we're not at a word boundary and haven't typed whitespace yet
-            if (!autocorrectEnabled) {
-                currentAutocorrectSuggestion = null;
-                hideAutocorrectTooltip();
-                return;
-            }
-
             const currentWord = getCurrentWord();
+
+            // Check if we should re-enable autocorrect (if we're at word boundary or empty)
+            if (!autocorrectEnabled) {
+                if (isAtWordBoundary() || currentWord.length === 0) {
+                    autocorrectEnabled = true;
+                    console.log('✅ Autocorrect re-enabled - at word boundary or empty word');
+                } else {
+                    console.log('❌ Autocorrect suppressed - not at word boundary');
+                    currentAutocorrectSuggestion = null;
+                    hideAutocorrectTooltip();
+                    return;
+                }
+            }
 
             if (currentWord.length < 3) {
                 currentAutocorrectSuggestion = null;
@@ -948,6 +971,25 @@
 
         // Add input listener for autocorrect tooltips (suggestion-only)
         editor.addEventListener('input', function (e) {
+            const currentTextLength = (editor.innerText || '').length;
+
+            // Skip processing if we just applied autocorrect (to avoid false backspace detection)
+            if (justAppliedAutocorrect) {
+                justAppliedAutocorrect = false;
+                lastTextLength = currentTextLength;
+                updateToolbarState();
+                debouncedAutocorrectCheck();
+                return;
+            }
+
+            // Detect actual backspacing by user (not autocorrect-induced text changes)
+            if (currentTextLength < lastTextLength) {
+                // If we're still at a word boundary after backspacing (like "as "), keep autocorrect enabled
+                // If we're in the middle of a word (like "as"), disable autocorrect
+                autocorrectEnabled = isAtWordBoundary();
+            }
+
+            lastTextLength = currentTextLength;
             updateToolbarState();
             debouncedAutocorrectCheck();
         });
@@ -965,8 +1007,9 @@
             // Re-enable autocorrect when typing whitespace (even if previously disabled)
             if (e.key === ' ' || e.key === 'Enter') {
                 autocorrectEnabled = true;
+                justAppliedAutocorrect = false; // Clear the flag when typing whitespace
             }
-            
+
             // Check for autocorrect application triggers
             if (currentAutocorrectSuggestion) {
                 const isEnter = e.key === 'Enter';
@@ -984,6 +1027,7 @@
                     // Replace the current word with autocorrect suggestion
                     if (wordToDelete) {
                         replaceCurrentWord(wordToDelete, currentAutocorrectSuggestion);
+                        justAppliedAutocorrect = true;
                     }
 
                     // Hide tooltip and clear suggestion
