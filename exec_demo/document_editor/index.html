@@ -4,1583 +4,298 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document Editor</title>
+    <title>Simple Document Editor</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Google Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f1f3f4;
-            color: #202124;
-            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #888888;
+            min-height: 100vh;
         }
 
-        .header {
-            background: white;
-            border-bottom: 1px solid #e0e0e0;
-            padding: 16px 24px;
-            box-shadow: 0 1px 3px rgba(60, 64, 67, 0.1);
+        .page-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 20px 40px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
-        .header h1 {
-            font-size: 22px;
-            font-weight: 400;
-            color: #5f6368;
+        .page-title {
+            text-align: left;
+            font-size: 24px;
+            font-weight: 700;
+            color: #2d3748;
             margin: 0;
         }
 
-        .nav-links {
-            margin-top: 8px;
-            font-size: 14px;
-        }
-
-        .nav-links a {
-            color: #1a73e8;
-            text-decoration: none;
-            font-size: 14px;
-            margin-right: 8px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            transition: background-color 0.2s;
-        }
-
-        .nav-links a:hover {
-            background-color: #f1f3f4;
-        }
-
-        .nav-links strong {
-            color: #5f6368;
+        .main-content {
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
         }
 
         .container {
-            max-width: 800px;
-            margin: 40px auto;
-            background: white;
-            box-shadow: 0 4px 6px rgba(60, 64, 67, 0.1);
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .document-header {
-            padding: 24px 32px 16px;
-            border-bottom: 1px solid #e8eaed;
-            background: #fafafa;
-        }
-
-        .document-title {
-            font-size: 18px;
-            font-weight: 500;
-            color: #202124;
-            margin-bottom: 4px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            transition: background-color 0.2s;
-            outline: none;
-        }
-
-        .document-title:hover {
-            background-color: #f1f3f4;
-        }
-
-        .document-title:focus {
-            background-color: #fff;
-            box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
-        }
-
-        .document-subtitle {
-            font-size: 13px;
-            color: #5f6368;
-        }
-
-        .editor-container {
-            padding: 32px;
-            min-height: 600px;
-        }
-
-        .editor {
             width: 100%;
-            min-height: 500px;
-            border: none;
-            outline: none;
-            font-family: 'Google Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 16px;
-            line-height: 1.7;
-            color: #202124;
-            background: transparent;
-            padding: 0;
-            overflow-y: auto;
+            max-width: 800px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 
+                        0 0 0 1px rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        .editor:empty:before {
-            content: attr(data-placeholder);
-            color: #9aa0a6;
-            font-style: italic;
-            pointer-events: none;
+        .header {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 24px 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
         }
 
-        .editor:focus {
-            outline: none;
-        }
-
-        .word-count {
-            position: absolute;
-            bottom: 16px;
-            right: 24px;
-            font-size: 12px;
-            color: #5f6368;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 4px 8px;
-            border-radius: 4px;
-            border: 1px solid #e8eaed;
-        }
-
-        .status-bar {
-            background: #f8f9fa;
-            padding: 12px 32px;
-            border-top: 1px solid #e8eaed;
-            font-size: 13px;
-            color: #5f6368;
-            display: flex;
-            justify-content: space-between;
+        .document-title-container {
+            position: relative;
+            display: inline-flex;
             align-items: center;
+            width: 100%;
         }
 
-        .auto-save {
-            color: #34a853;
+        .document-title-input {
+            border: none;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 20px 16px;
+            font-size: 24px;
+            font-weight: 600;
+            color: #2d3748;
+            border-radius: 12px;
+            margin: 0;
+            outline: none;
+            transition: all 0.3s ease;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .document-title-input:focus {
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .document-title-input:focus + .edit-icon {
+            opacity: 0;
+        }
+
+        .edit-icon {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            opacity: 0.4;
+            pointer-events: none;
+            top: 50%;
+            transform: translateY(-50%);
+            left: 20px; /* Will be dynamically updated */
+            transition: left 0.1s ease;
+        }
+
+        .document-title-input:focus {
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
         .toolbar {
-            background: white;
-            border-bottom: 1px solid #e8eaed;
-            padding: 12px 32px;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
+            padding: 20px 32px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
             display: flex;
-            gap: 16px;
+            gap: 12px;
             align-items: center;
+            flex-wrap: wrap;
         }
 
-        .toolbar-group {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .toolbar-separator {
-            width: 1px;
-            height: 20px;
-            background: #e8eaed;
-        }
-
-        .format-btn {
-            padding: 6px 12px;
-            border: 1px solid transparent;
-            background: transparent;
-            border-radius: 4px;
+        .toolbar button {
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            padding: 12px 16px;
+            cursor: pointer;
             font-size: 14px;
-            color: #5f6368;
-            cursor: pointer;
-            transition: all 0.2s;
+            font-weight: 600;
+            color: #4a5568;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 44px;
+            height: 44px;
         }
 
-        .format-btn:hover {
-            background: #f1f3f4;
-            border-color: #e8eaed;
+        .toolbar button:hover {
+            background: rgba(255, 255, 255, 0.95);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
-        .format-btn.active {
-            background: #e8f0fe;
-            color: #1a73e8;
-            border-color: #1a73e8;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                margin: 16px;
-                border-radius: 0;
-            }
-
-            .editor-container {
-                padding: 24px 20px;
-            }
-
-            .toolbar {
-                padding: 12px 20px;
-                flex-wrap: wrap;
-                gap: 8px;
-            }
-        }
-
-        /* Custom scrollbar for webkit browsers */
-        .editor::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .editor::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .editor::-webkit-scrollbar-thumb {
-            background: #dadce0;
-            border-radius: 3px;
-        }
-
-        .editor::-webkit-scrollbar-thumb:hover {
-            background: #bdc1c6;
-        }
-
-        /* Debug window styles */
-        .debug-window {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            width: 300px;
-            max-height: 400px;
-            background: rgba(0, 0, 0, 0.9);
-            color: #00ff00;
-            font-family: monospace;
-            font-size: 11px;
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 10000;
-            overflow-y: auto;
-            display: none;
-        }
-
-        .debug-window h4 {
-            margin: 0 0 10px 0;
-            color: #ffff00;
-            font-size: 12px;
-            text-align: center;
-        }
-
-        .debug-log {
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid #333;
-            padding: 5px;
-            margin-bottom: 10px;
-            background: rgba(0, 0, 0, 0.5);
-        }
-
-        .debug-log div {
-            margin-bottom: 2px;
-            word-break: break-all;
-        }
-
-        .debug-info {
-            border-top: 1px solid #333;
-            padding-top: 10px;
-        }
-
-        .debug-info div {
-            margin-bottom: 3px;
-        }
-
-        .debug-toggle {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: #333;
+        .toolbar button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            border-color: transparent;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .toolbar .separator {
+            width: 1px;
+            height: 24px;
+            background: rgba(0, 0, 0, 0.1);
+            margin: 0 8px;
+        }
+
+        #document-editor {
+            min-height: 500px;
+            padding: 32px;
+            outline: none;
+            font-size: 18px;
+            line-height: 1.7;
+            color: #2d3748;
+            background: transparent;
             border: none;
-            padding: 5px 10px;
-            border-radius: 3px;
-            font-size: 11px;
-            z-index: 10001;
-            cursor: pointer;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
-        /* Autocorrect Tooltip Styles */
-        .autocorrect-tooltip {
-            position: fixed;
-            background: white;
-            color: #333;
-            padding: 4px 8px;
-            border-radius: 4px;
-            border: 1px solid #1a73e8;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-            pointer-events: none;
-            opacity: 0;
-            transform: translateY(-2px);
-            transition: opacity 0.15s ease, transform 0.15s ease;
-            white-space: nowrap;
-            font-family: 'Google Sans', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 16px;
-            font-weight: normal;
-            line-height: 1.2;
+        #document-editor:focus {
+            outline: none;
         }
 
-        .autocorrect-tooltip.show {
-            opacity: 1;
-            transform: translateY(0);
+        .stats {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
+            padding: 16px 32px;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            color: #718096;
+            font-weight: 500;
         }
 
-        .autocorrect-tooltip::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            right: 8px;
-            border: 5px solid transparent;
-            border-top-color: #1a73e8;
+        /* Format styles for content */
+        .bold {
+            font-weight: bold;
         }
 
-        .autocorrect-tooltip::before {
-            content: '';
-            position: absolute;
-            top: 100%;
-            right: 8px;
-            border: 6px solid transparent;
-            border-top-color: white;
-            margin-top: -1px;
+        .italic {
+            font-style: italic;
+        }
+
+        .underline {
+            text-decoration: underline;
+        }
+
+        .strikethrough {
+            text-decoration: line-through;
+        }
+
+        /* Focus styles */
+        .container:focus-within {
+            box-shadow: 0 2px 10px rgba(0, 123, 255, 0.2);
         }
     </style>
 </head>
 
 <body>
-    <div class="header">
-        <h1>Document Editor</h1>
-        <div class="nav-links">
-            <a href="../">🚀 Typing Test</a> | 📝 <strong>Document Editor</strong>
-        </div>
+    <div class="page-header">
+        <h1 class="page-title">Document Editor</h1>
     </div>
 
-    <div class="container">
-        <div class="document-header">
-            <div class="document-title" id="document-title" contenteditable="true">Untitled Document</div>
-            <div class="document-subtitle">Created just now</div>
-        </div>
-
-        <div class="toolbar">
-            <div class="toolbar-group">
-                <button class="format-btn" id="bold-btn" title="Bold (Ctrl+B)">
-                    <strong>B</strong>
-                </button>
-                <button class="format-btn" id="italic-btn" title="Italic (Ctrl+I)">
-                    <em>I</em>
-                </button>
-                <button class="format-btn" id="underline-btn" title="Underline (Ctrl+U)">
-                    <u>U</u>
-                </button>
+    <div class="main-content">
+        <div class="container">
+            <!-- Document Title -->
+            <div class="header">
+                <div class="document-title-container">
+                    <input type="text" class="document-title-input" value="Untitled Document" id="document-title">
+                    <svg class="edit-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.2929 2.29291C17.6834 1.90238 18.3166 1.90238 18.7071 2.29291L21.7071 5.29291C22.0976 5.68343 22.0976 6.31659 21.7071 6.70712L8.70711 19.7071C8.51957 19.8947 8.26522 20 8 20H5C4.44772 20 4 19.5523 4 19V16C4 15.7348 4.10536 15.4804 4.29289 15.2929L17.2929 2.29291Z" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M15 5L19 9" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <button id="bold-btn" title="Bold (Ctrl+B)"><strong>B</strong></button>
+                <button id="italic-btn" title="Italic (Ctrl+I)"><em>I</em></button>
+                <button id="underline-btn" title="Underline (Ctrl+U)"><u>U</u></button>
             </div>
 
-            <div class="toolbar-separator"></div>
-
-            <div class="toolbar-group">
-                <select class="format-btn" id="font-size" title="Font Size">
-                    <option value="12">12</option>
-                    <option value="14">14</option>
-                    <option value="16" selected>16</option>
-                    <option value="18">18</option>
-                    <option value="20">20</option>
-                    <option value="24">24</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="editor-container" style="position: relative;">
-            <div class="editor" id="document-editor" contenteditable="true" spellcheck="true"
-                data-placeholder="Start writing your document...">This is a sample text document.</div>
-
-            <div class="autocorrect-tooltip" id="autocorrect-tooltip">
-                <span id="correction-text"></span>
+            <!-- Document Editor -->
+            <div id="document-editor" contenteditable="true" spellcheck="false">
+                This is a sample text document.
             </div>
 
-            <div class="word-count" id="word-count">
-                1 word, 6 characters
-            </div>
-        </div>
-
-        <div class="status-bar">
-            <div id="cursor-position">
-                Line 1, Column 1
+            <!-- Stats -->
+            <div class="stats">
+                <div>
+                    <span id="word-count">Words: 0</span> • 
+                    <span id="char-count">Characters: 0</span>
+                </div>
+                <div>Ready to write</div>
             </div>
         </div>
     </div>
-
-    <!-- Debug window for cross-browser event debugging -->
-    <button class="debug-toggle" id="debug-toggle">Debug</button>
-    <div class="debug-window" id="debug-window">
-        <h4>Cross-Browser Autocorrect Debug</h4>
-        <div class="debug-log" id="debug-log"></div>
-        <div class="debug-info">
-            <div>Browser: <span id="browser-info"></span></div>
-            <div>Events: <span id="event-count">0</span></div>
-            <div>Last Key: <span id="last-key">none</span></div>
-            <div>Input Type: <span id="input-type">none</span></div>
-            <div>Current Word: <span id="current-word">none</span></div>
-            <div>Suppressed: <span id="suppression-status">no</span></div>
-        </div>
-    </div>
-
-    <script src="../dictionary-loader.js"></script>
-    <script src="../keyboard-layout.js"></script>
-    <script src="../TrieDictionary.js"></script>
-    <script src="../AutocorrectEngine.js"></script>
 
     <script>
-        // Initialize autocorrect engine for the document editor
-        let editorAutocorrectEngine = null;
-
-        // Sophisticated autocorrect suppression state
-        let charsTypedSinceLastBackspace = 0;
-        let previousInputLength = 0;
-        let inputEventCounter = 0;
-
-        // Advanced suppression tracking for editing scenarios
-        let autocorrectSuppressed = false; // Master suppression flag
-        let suppressionReason = ''; // Track why suppression is active
-
-        // Helper function to reset backspace counter
-        function resetBackspaceCounter(reason) {
-            charsTypedSinceLastBackspace = 0;
-            addDebugLog(`RESET BACKSPACE: ${reason}`);
-        }
-
-        // Activate autocorrect suppression with reason
-        function activateSuppressionMode(reason) {
-            autocorrectSuppressed = true;
-            suppressionReason = reason;
-            addDebugLog(`🚫 SUPPRESSION ACTIVATED: ${reason}`);
-        }
-
-        // Deactivate autocorrect suppression
-        function deactivateSuppressionMode(reason) {
-            autocorrectSuppressed = false;
-            suppressionReason = '';
-            addDebugLog(`✅ SUPPRESSION DEACTIVATED: ${reason}`);
-        }
-
-        // Check if autocorrect should be suppressed
-        function shouldSuppressAutocorrect() {
-            if (autocorrectSuppressed) {
-                addDebugLog(`AUTOCORRECT SUPPRESSED: ${suppressionReason}`);
-                return true;
-            }
-
-            // Legacy basic backspace protection (minimal)
-            const basicSuppression = charsTypedSinceLastBackspace < 1;
-            if (basicSuppression) {
-                addDebugLog(`BASIC SUPPRESSION: need ${1 - charsTypedSinceLastBackspace} more chars after backspace`);
-            }
-
-            return basicSuppression;
-        }
-
-        // Get character at position in editor text
-        function getCharAtPosition(text, position) {
-            if (position < 0 || position >= text.length) return '';
-            return text.charAt(position);
-        }
-
-        // Check if character is whitespace (space, tab, newline)
-        function isWhitespace(char) {
-            return /\s/.test(char) || char === '§'; // Include normalized newline placeholder
-        }
-
-        // Detect if backspace operation crossed whitespace boundary
-        function detectBackspaceCrossedWhitespace(oldText, newText, oldCursorPos, newCursorPos) {
-            addDebugLog(`🔍 BACKSPACE CHECK: oldLen=${oldText.length}, newLen=${newText.length}, oldCursor=${oldCursorPos}, newCursor=${newCursorPos}`);
-
-            // Check if we backspaced (text got shorter and cursor moved left)
-            if (newText.length >= oldText.length || newCursorPos >= oldCursorPos) {
-                addDebugLog(`❌ NOT BACKSPACE: text didn't get shorter or cursor didn't move left`);
-                return false;
-            }
-
-            // Check if any deleted characters included whitespace
-            const deletedStart = newCursorPos;
-            const deletedEnd = oldCursorPos;
-            const deletedText = oldText.substring(deletedStart, deletedEnd);
-
-            addDebugLog(`🔍 DELETED TEXT: "${deletedText}" (start=${deletedStart}, end=${deletedEnd})`);
-
-            const crossedWhitespace = /[\s.,.!?;:"()]/.test(deletedText) || deletedText.includes('§');
-            addDebugLog(`🔍 CROSSED WHITESPACE: ${crossedWhitespace} (contains whitespace or §)`);
-
-            if (crossedWhitespace) {
-                // Check if cursor is now positioned next to non-whitespace
-                const charAtCursor = getCharAtPosition(newText, newCursorPos);
-                const charBeforeCursor = getCharAtPosition(newText, newCursorPos - 1);
-                const charAfterCursor = getCharAtPosition(newText, newCursorPos);
-
-                addDebugLog(`🔍 CHARS AROUND CURSOR: before="${charBeforeCursor}", at="${charAtCursor}", after="${charAfterCursor}"`);
-
-                const nextToNonWhitespace = (!isWhitespace(charBeforeCursor) && charBeforeCursor !== '') ||
-                    (!isWhitespace(charAfterCursor) && charAfterCursor !== '');
-
-                addDebugLog(`🔍 NEXT TO NON-WHITESPACE: ${nextToNonWhitespace}`);
-
-                if (nextToNonWhitespace) {
-                    addDebugLog(`✅ BACKSPACE CROSSED WHITESPACE: deleted "${deletedText}", cursor at non-whitespace`);
-                    return true;
-                } else {
-                    addDebugLog(`❌ BACKSPACE CROSSED WHITESPACE BUT: cursor not at non-whitespace`);
-                }
-            }
-
-            addDebugLog(`❌ BACKSPACE NO WHITESPACE CROSSING`);
-            return false;
-        }
-
-        // Detect if cursor was clicked/positioned next to non-whitespace
-        function detectCursorClickedAtNonWhitespace() {
-            const currentText = normalizeText(getCleanTextFromEditor(editor));
-            const selection = window.getSelection();
-
-            addDebugLog(`🔍 CLICK CHECK: text="${currentText.slice(-10)}", selectionCount=${selection.rangeCount}`);
-
-            if (selection.rangeCount === 0) {
-                addDebugLog(`❌ CLICK CHECK: no selection range`);
-                return false;
-            }
-
-            // Get current cursor position
-            let cursorPos = 0;
-            try {
-                const range = selection.getRangeAt(0);
-                const preCaretRange = range.cloneRange();
-                preCaretRange.selectNodeContents(editor);
-                preCaretRange.setEnd(range.startContainer, range.startOffset);
-
-                const tempDiv = document.createElement('div');
-                tempDiv.appendChild(preCaretRange.cloneContents());
-                const preCaretText = getCleanTextFromEditor(tempDiv);
-                cursorPos = normalizeText(preCaretText).length;
-            } catch (error) {
-                addDebugLog(`❌ CLICK CHECK: error getting cursor position - ${error.message}`);
-                return false;
-            }
-
-            addDebugLog(`🔍 CLICK CURSOR POS: ${cursorPos}`);
-
-            // Check characters around cursor position
-            const charBeforeCursor = getCharAtPosition(currentText, cursorPos - 1);
-            const charAtCursor = getCharAtPosition(currentText, cursorPos);
-
-            addDebugLog(`🔍 CLICK CHARS: before="${charBeforeCursor}", at="${charAtCursor}"`);
-
-            // If cursor is positioned adjacent to non-whitespace characters
-            const nextToNonWhitespace = (!isWhitespace(charBeforeCursor) && charBeforeCursor !== '') ||
-                (!isWhitespace(charAtCursor) && charAtCursor !== '');
-
-            addDebugLog(`🔍 CLICK NEXT TO NON-WHITESPACE: ${nextToNonWhitespace}`);
-
-            if (nextToNonWhitespace) {
-                addDebugLog(`✅ CURSOR AT NON-WHITESPACE: before="${charBeforeCursor}", at="${charAtCursor}"`);
-                return true;
-            } else {
-                addDebugLog(`❌ CURSOR NOT AT NON-WHITESPACE`);
-            }
-
-            return false;
-        }
-
-        // Track cursor position changes for click detection
-        let lastKnownCursorPosition = 0;
-        let lastKnownTextContent = '';
-
-        function updateCursorTracking() {
-            const currentText = normalizeText(getCleanTextFromEditor(editor));
-            const selection = window.getSelection();
-
-            if (selection.rangeCount === 0) return;
-
-            let cursorPos = 0;
-            try {
-                const range = selection.getRangeAt(0);
-                const preCaretRange = range.cloneRange();
-                preCaretRange.selectNodeContents(editor);
-                preCaretRange.setEnd(range.startContainer, range.startOffset);
-
-                const tempDiv = document.createElement('div');
-                tempDiv.appendChild(preCaretRange.cloneContents());
-                const preCaretText = getCleanTextFromEditor(tempDiv);
-                cursorPos = normalizeText(preCaretText).length;
-            } catch (error) {
-                cursorPos = currentText.length;
-            }
-
-            // Check for manual cursor positioning (not from typing)
-            if (currentText === lastKnownTextContent && cursorPos !== lastKnownCursorPosition) {
-                addDebugLog(`CURSOR MOVED: ${lastKnownCursorPosition} -> ${cursorPos} (no text change)`);
-
-                if (detectCursorClickedAtNonWhitespace()) {
-                    activateSuppressionMode('cursor positioned next to non-whitespace');
-                }
-            }
-
-            lastKnownCursorPosition = cursorPos;
-            lastKnownTextContent = currentText;
-        }
-
-        // Simple placeholder for word suppression (future enhancement)
-        function isWordSuppressed(word) {
-            // For now, no words are suppressed - this is for future enhancement
-            return false;
-        }
-
-        async function initializeEditorAutocorrect() {
-            // Load comprehensive dictionary from text file - includes verb forms like "jumped"
-            const baseDictionary = await loadDictionary();
-
-            editorAutocorrectEngine = new AutocorrectEngine({
-                baseWords: baseDictionary,
-                keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {},
-                maxEditDistance: 2,
-                adjacentKeyMultiplier: 0.9,        // Much less aggressive - almost same as regular substitution
-                insertionCost: 0.5,                // Cheaper to make insertions more favorable
-                deletionCost: 1.0,                 // Keep deletions expensive
-                substitutionCost: 1.0,             // Keep substitutions at normal cost
-                apostropheInsertionCost: 0.2,      // Very cheap to add missing apostrophes
-                apostropheDeletionCost: 0.3        // Cheap to remove extra apostrophes
-            });
-        }
-
-        // Editor functionality
+        // Get DOM elements
         const editor = document.getElementById('document-editor');
-        const wordCount = document.getElementById('word-count');
-        const cursorPosition = document.getElementById('cursor-position');
-        const documentTitle = document.getElementById('document-title');
+        const titleInput = document.getElementById('document-title');
+        const wordCountSpan = document.getElementById('word-count');
+        const charCountSpan = document.getElementById('char-count');
 
-        // Formatting state tracking system
-        let formattingRanges = [];  // Array of {type: 'bold'|'italic'|'underline', start: number, end: number}
+        // Formatting buttons
+        const boldBtn = document.getElementById('bold-btn');
+        const italicBtn = document.getElementById('italic-btn');
+        const underlineBtn = document.getElementById('underline-btn');
 
-        // Extract formatting ranges from current contentEditable DOM
-        function extractFormattingRanges() {
-            const ranges = [];
-            const plainText = getCleanTextFromEditor(editor);
-            let currentPos = 0;
-
-            // Walk through DOM to find formatted elements
-            const walker = document.createTreeWalker(
-                editor,
-                NodeFilter.SHOW_ALL,
-                null,
-                false
-            );
-
-            let node;
-            while (node = walker.nextNode()) {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    const parent = node.parentNode;
-                    const text = node.textContent;
-
-                    if (parent !== editor) {
-                        // Check what formatting this text has
-                        const formats = [];
-                        if (parent.tagName === 'B' || parent.tagName === 'STRONG' ||
-                            window.getComputedStyle(parent).fontWeight === 'bold' ||
-                            window.getComputedStyle(parent).fontWeight >= '700') {
-                            formats.push('bold');
-                        }
-                        if (parent.tagName === 'I' || parent.tagName === 'EM' ||
-                            window.getComputedStyle(parent).fontStyle === 'italic') {
-                            formats.push('italic');
-                        }
-                        if (parent.tagName === 'U' ||
-                            window.getComputedStyle(parent).textDecoration.includes('underline')) {
-                            formats.push('underline');
-                        }
-
-                        // Add ranges for each format type
-                        formats.forEach(type => {
-                            ranges.push({
-                                type: type,
-                                start: currentPos,
-                                end: currentPos + text.length
-                            });
-                        });
-                    }
-
-                    currentPos += text.length;
-                } else if (node.nodeType === Node.ELEMENT_NODE &&
-                    (node.tagName === 'DIV' || node.tagName === 'BR')) {
-                    // Account for newlines
-                    currentPos += 1;
-                }
-            }
-
-            return ranges;
-        }
-
-        // Adjust formatting indices when text changes
-        function adjustFormattingRanges(ranges, changePos, oldLength, newLength) {
-            const delta = newLength - oldLength;
-
-            return ranges.map(range => {
-                // If change is before this range, shift the entire range
-                if (changePos <= range.start) {
-                    return {
-                        ...range,
-                        start: range.start + delta,
-                        end: range.end + delta
-                    };
-                }
-                // If change is within the range, extend the end
-                else if (changePos < range.end) {
-                    return {
-                        ...range,
-                        end: range.end + delta
-                    };
-                }
-                // If change is after this range, no adjustment needed
-                else {
-                    return range;
-                }
-            }).filter(range => range.start < range.end); // Remove invalid ranges
-        }
-
-        // Reconstruct formatted content from plain text and formatting ranges
-        function reconstructFormattedContent(plainText, ranges) {
-            if (ranges.length === 0) {
-                // If no formatting, handle newlines directly
-                return plainText.replace(/\n/g, '<br>');
-            }
-
-            // Sort ranges by start position
-            const sortedRanges = [...ranges].sort((a, b) => a.start - b.start);
-
-            let result = '';
-            let currentPos = 0;
-            const openTags = new Map(); // Track which tags are currently open
-
-            // Split text into lines to handle newlines properly in formatting context
-            const lines = plainText.split('\n');
-
-            let charIndex = 0;
-            for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-                const line = lines[lineIndex];
-
-                // Process each character in the line
-                for (let charInLine = 0; charInLine <= line.length; charInLine++) {
-                    const currentCharIndex = charIndex + charInLine;
-
-                    // Close any tags that end at this position
-                    for (const [type, tag] of openTags) {
-                        const shouldClose = sortedRanges.some(range =>
-                            range.type === type && range.end === currentCharIndex
-                        );
-                        if (shouldClose) {
-                            result += `</${tag}>`;
-                            openTags.delete(type);
-                        }
-                    }
-
-                    // Open any tags that start at this position
-                    sortedRanges.forEach(range => {
-                        if (range.start === currentCharIndex && !openTags.has(range.type)) {
-                            const tag = range.type === 'bold' ? 'b' :
-                                range.type === 'italic' ? 'i' : 'u';
-                            result += `<${tag}>`;
-                            openTags.set(range.type, tag);
-                        }
-                    });
-
-                    // Add the actual character (if not past end of line)
-                    if (charInLine < line.length) {
-                        result += line[charInLine];
-                    }
-                }
-
-                // Add line break between lines (except after the last line)
-                if (lineIndex < lines.length - 1) {
-                    charIndex += line.length + 1; // +1 for the newline character
-                    result += '<br>';
-                }
-            }
-
-            // Close any remaining open tags
-            for (const [type, tag] of openTags) {
-                result += `</${tag}>`;
-            }
-
-            return result;
-        }
-
-        // Helper function to get clean text from contentEditable
-        // contentEditable creates <div> elements for newlines, but textContent doesn't convert them to \n
-        function getCleanTextFromEditor(element) {
-            // Create a copy to avoid modifying the original
-            const temp = element.cloneNode(true);
-
-            // Convert <div> elements to newlines
-            const divs = temp.querySelectorAll('div');
-            divs.forEach(div => {
-                // Replace div with newline + its content
-                const newlineNode = document.createTextNode('\n' + div.textContent);
-                div.parentNode.replaceChild(newlineNode, div);
-            });
-
-            // Also handle <br> elements
-            const brs = temp.querySelectorAll('br');
-            brs.forEach(br => {
-                const newlineNode = document.createTextNode('\n');
-                br.parentNode.replaceChild(newlineNode, br);
-            });
-
-            const rawText = temp.textContent || '';
-
-            // Preserve multiple newlines - don't collapse them
-            return rawText;
-        }
-
-        // Word count and character count
-        function updateWordCount() {
-            const text = editor.textContent || editor.innerText || '';
-            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-            const characters = text.length;
-
-            wordCount.textContent = `${words} word${words !== 1 ? 's' : ''}, ${characters} character${characters !== 1 ? 's' : ''}`;
-        }
-
-        // Cursor position tracking
-        function updateCursorPosition() {
-            const selection = window.getSelection();
-            if (selection.rangeCount > 0) {
-                const range = selection.getRangeAt(0);
-
-                // Get text before cursor using simple approach
-                let beforeCursor = '';
-                try {
-                    const preCaretRange = range.cloneRange();
-                    preCaretRange.selectNodeContents(editor);
-                    preCaretRange.setEnd(range.startContainer, range.startOffset);
-                    beforeCursor = preCaretRange.toString();
-                } catch (error) {
-                    beforeCursor = editor.textContent || '';
-                }
-
-                const lines = beforeCursor.split('\n');
-                const line = lines.length;
-                const column = lines[lines.length - 1].length + 1;
-
-                cursorPosition.textContent = `Line ${line}, Column ${column}`;
-            }
-        }
-
-        // Helper function to normalize text by replacing newlines with a special token
-        // This ensures len(text) matches the number of rendered tokens for cursor positioning
-        function normalizeText(text) {
-            return text.replace(/\n/g, '§');
-        }
-
-        // Helper function to denormalize text by replacing special token back to newlines
-        function denormalizeText(text) {
-            return text.replace(/§/g, '\n');
-        }
-
-        // Helper function to check if a character is the newline placeholder or whitespace
-        function isWhitespaceOrNewline(char) {
-            return /\s/.test(char) || char === '§';
-        }
-
-        // Helper function to set cursor position in contentEditable with multi-line support
-        function setCursorPositionInContentEditable(element, position) {
-            // Get clean text to calculate where we need to position cursor
-            const fullText = getCleanTextFromEditor(element);
-            const normalizedFullText = normalizeText(fullText);
-
-            // If position is beyond text length, position at end
-            const targetPos = Math.min(position, normalizedFullText.length);
-
-            // Convert normalized position back to actual DOM position
-            let currentPos = 0;
-            let targetNode = null;
-            let targetOffset = 0;
-
-            // Walk through DOM to find the right text node and offset
-            const walker = document.createTreeWalker(
-                element,
-                NodeFilter.SHOW_TEXT,
-                null,
-                false
-            );
-
-            let node;
-            while (node = walker.nextNode()) {
-                const nodeText = node.textContent;
-                const nodeLength = nodeText.length;
-
-                if (currentPos + nodeLength >= targetPos) {
-                    // Target is in this node
-                    targetNode = node;
-                    targetOffset = targetPos - currentPos;
-                    break;
-                }
-
-                currentPos += nodeLength;
-
-                // Account for newlines between DOM elements
-                if (node.parentNode && (node.parentNode.nextSibling || node.parentNode !== element)) {
-                    if (currentPos + 1 >= targetPos) {
-                        // Position is at the newline
-                        targetNode = node;
-                        targetOffset = nodeLength;
-                        break;
-                    }
-                    currentPos += 1; // For the newline
-                }
-            }
-
-            // If no suitable node found, use last text node or element itself
-            if (!targetNode) {
-                targetNode = element.lastChild || element;
-                targetOffset = targetNode.nodeType === Node.TEXT_NODE ? targetNode.textContent.length : 0;
-            }
-
-            // Set the cursor position
-            const range = document.createRange();
-            const selection = window.getSelection();
-
-            range.setStart(targetNode, Math.min(targetOffset, targetNode.textContent?.length || 0));
-            range.collapse(true);
-
-            selection.removeAllRanges();
-            selection.addRange(range);
-        }
-
-        // Basic formatting
+        // Format functions
         function toggleFormat(command) {
-            // Execute the formatting command
             document.execCommand(command, false, null);
-
-            // Update button state
-            const btn = document.getElementById(command + '-btn');
-            if (btn) {
-                const isActive = document.queryCommandState(command);
-                btn.classList.toggle('active', isActive);
-            }
-
-            // Keep focus on editor
+            updateToolbarState();
             editor.focus();
         }
 
-        // Font size change
-        function changeFontSize(size) {
-            editor.style.fontSize = size + 'px';
+        function updateToolbarState() {
+            boldBtn.classList.toggle('active', document.queryCommandState('bold'));
+            italicBtn.classList.toggle('active', document.queryCommandState('italic'));
+            underlineBtn.classList.toggle('active', document.queryCommandState('underline'));
         }
 
-        // COPY EXACT AUTOCORRECT LOGIC FROM TYPING TEST - NO MODIFICATIONS!
+        function updateWordCount() {
+            const text = editor.innerText || editor.textContent || '';
+            const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+            const chars = text.length;
 
-        // Get the word at a specific cursor position with boundaries
-        function getWordAtPosition(text, position) {
-            if (!text || position < 0 || position > text.length) {
-                return { word: '', start: position, end: position, beforeCursor: '', afterCursor: '' };
-            }
-
-            // Define word boundaries (letters and apostrophes are part of words)
-            // Treat § (newline placeholder) and hyphens as whitespace/punctuation delimiters
-            const wordChar = /[a-zA-Z']/;
-
-            // Find start of word (scan backwards from cursor)
-            let start = position;
-            while (start > 0 && wordChar.test(text[start - 1])) {
-                start--;
-            }
-
-            // Find end of word (scan forwards from cursor)
-            let end = position;
-            while (end < text.length && wordChar.test(text[end])) {
-                end++;
-            }
-
-            // Extract the word and surrounding context
-            const word = text.substring(start, end);
-            const beforeCursor = text.substring(0, position);
-            const afterCursor = text.substring(position);
-
-            return { word, start, end, beforeCursor, afterCursor };
+            wordCountSpan.textContent = `Words: ${words}`;
+            charCountSpan.textContent = `Characters: ${chars}`;
         }
 
-        function getCurrentIncompleteWord() {
-            // Use clean text extraction instead of innerText
-            const currentValue = getCleanTextFromEditor(editor);
-            const selection = window.getSelection();
-            if (selection.rangeCount === 0) return '';
-
-            const range = selection.getRangeAt(0);
-            let cursorPos = 0;
-
-            // Get cursor position in text using consistent text extraction
-            try {
-                const preCaretRange = range.cloneRange();
-                preCaretRange.selectNodeContents(editor);
-                preCaretRange.setEnd(range.startContainer, range.startOffset);
-
-                // Create temporary element to extract text consistently
-                const tempDiv = document.createElement('div');
-                tempDiv.appendChild(preCaretRange.cloneContents());
-                const preCaretText = getCleanTextFromEditor(tempDiv);
-
-                // Normalize for consistent positioning
-                const normalizedPreCaretText = normalizeText(preCaretText);
-                cursorPos = normalizedPreCaretText.length;
-            } catch (error) {
-                cursorPos = normalizeText(currentValue).length;
-            }
-
-            if (!currentValue || cursorPos === undefined) return '';
-
-            // Normalize newlines for consistent character positioning
-            const normalizedValue = normalizeText(currentValue);
-
-            // ONLY consider text before cursor - ignore everything after
-            const textBeforeCursor = normalizedValue.substring(0, cursorPos);
-
-            // Use textBeforeCursor.length as the position (end of text before cursor)
-            const wordAtCursor = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
-
-            return wordAtCursor.word;
-        }
-
-        function calculateCaretPosition(editorElement, cursorPos) {
-            // For contenteditable, use a simpler approach
-            // Get the current selection to find the exact position
-            const selection = window.getSelection();
-            if (selection.rangeCount === 0) {
-                // Fallback to element position
-                const rect = editorElement.getBoundingClientRect();
-                return {
-                    x: rect.left + 50,
-                    y: rect.top - 35
-                };
-            }
-
-            const range = selection.getRangeAt(0);
-            const tempRange = range.cloneRange();
-            tempRange.collapse(true);
-
-            // Create a temporary span to measure position
-            const span = document.createElement('span');
-            span.innerHTML = '&nbsp;';
-            tempRange.insertNode(span);
-
-            const rect = span.getBoundingClientRect();
-
-            // Clean up
-            span.remove();
-
-            return {
-                x: rect.left,
-                y: rect.top // Position tooltip at cursor level
-            };
-        }
-
-        function showAutocorrectTooltip(originalWord, correctedWord) {
-            if (originalWord === correctedWord) {
-                hideAutocorrectTooltip();
-                return;
-            }
-
-            const tooltip = document.getElementById('autocorrect-tooltip');
-            const correctionText = document.getElementById('correction-text');
-
-            // Set only the corrected word as tooltip content immediately
-            correctionText.textContent = correctedWord;
-
-            // Schedule positioning for next frame to avoid blocking current input
-            requestAnimationFrame(() => {
-                const caretPos = calculateCaretPosition(editor, 0);
-                tooltip.style.position = 'fixed';
-                tooltip.style.visibility = 'hidden';
-                tooltip.style.display = 'block';
-
-                // Get tooltip width to position it to the left of cursor
-                const tooltipRect = tooltip.getBoundingClientRect();
-                tooltip.style.left = (caretPos.x - tooltipRect.width + 10) + 'px';
-
-                // Use line height to calculate vertical offset - position closer to text
-                const computedStyle = window.getComputedStyle(editor);
-                const lineHeight = parseInt(computedStyle.lineHeight) || parseInt(computedStyle.fontSize) * 1.2;
-                tooltip.style.top = (caretPos.y - 30) + 'px';
-                tooltip.style.zIndex = '10000';
-                tooltip.style.visibility = 'visible';
-
-                // Show tooltip with animation
-                tooltip.classList.add('show');
-            });
-        }
-
-        function hideAutocorrectTooltip() {
-            const tooltip = document.getElementById('autocorrect-tooltip');
-            tooltip.classList.remove('show');
-        }
-
-        function performAutocorrectPreview() {
-            const incompleteWord = getCurrentIncompleteWord();
-
-            if (incompleteWord.length > 2) {
-                // CHECK SUPPRESSION FOR TOOLTIP PREVIEW TOO
-                if (autocorrectSuppressed) {
-                    addDebugLog(`TOOLTIP SUPPRESSED: ${suppressionReason}`);
-                    hideAutocorrectTooltip();
-                    return;
-                }
-
-                const suggestion = editorAutocorrectEngine.findClosestWordForPreview(incompleteWord.toLowerCase());
-                if (suggestion !== incompleteWord.toLowerCase()) {
-                    showAutocorrectTooltip(incompleteWord, suggestion);
-                } else {
-                    hideAutocorrectTooltip();
-                }
-            } else {
-                hideAutocorrectTooltip();
-            }
-        }
-
-        // Generic function to trigger autocorrect (works for any terminating character)
-        function triggerAutocorrect(terminatingChar = ' ') {
-            hideAutocorrectTooltip();
-
-            // Check SOPHISTICATED suppression using suppression flag BEFORE any modifications
-            const wasSuppressionActive = autocorrectSuppressed;
-            const currentSuppressionReason = suppressionReason;
-
-            // Check basic suppression using CURRENT counter value (before resetting)
-            const basicSuppression = charsTypedSinceLastBackspace < 1;
-
-            // Reset counter after word termination (new word starts) - AFTER checking suppression
-            resetBackspaceCounter('word termination');
-
-            // Apply suppression logic using the state BEFORE any deactivation
-            if (wasSuppressionActive) {
-                addDebugLog(`AUTOCORRECT SUPPRESSED: ${currentSuppressionReason}`);
-                return false;
-            }
-
-            if (!basicSuppression) {
-                addDebugLog(`AUTOCORRECT TRIGGERING: No suppression detected`);
-                return performCursorAwareAutocorrectForContentEditable(terminatingChar);
-            } else {
-                addDebugLog(`AUTOCORRECT SUPPRESSED: Basic backspace protection active (need ${1 - charsTypedSinceLastBackspace} more chars)`);
-            }
-
-            return false;
-        }
-
-        // Function to trigger autocorrect with pre-captured suppression state (fixes timing issues)
-        function triggerAutocorrectWithCapturedState(terminatingChar, capturedSuppressionState, capturedSuppressionReason) {
-            hideAutocorrectTooltip();
-
-            // Check basic suppression using CURRENT counter value (before resetting)
-            const basicSuppression = charsTypedSinceLastBackspace < 1;
-
-            // Reset counter after word termination (new word starts) - AFTER checking suppression
-            resetBackspaceCounter('word termination');
-
-            // Apply suppression logic using the CAPTURED state (before any deactivation occurred)
-            if (capturedSuppressionState) {
-                addDebugLog(`AUTOCORRECT SUPPRESSED: ${capturedSuppressionReason}`);
-                return false;
-            }
-
-            if (!basicSuppression) {
-                addDebugLog(`AUTOCORRECT TRIGGERING: No suppression detected`);
-                return performCursorAwareAutocorrectForContentEditable(terminatingChar);
-            } else {
-                addDebugLog(`AUTOCORRECT SUPPRESSED: Basic backspace protection active (need ${1 - charsTypedSinceLastBackspace} more chars)`);
-            }
-
-            return false;
-        }
-
-        // Cursor-aware autocorrect function adapted for contentEditable - only considers text before cursor
-        function performCursorAwareAutocorrectForContentEditable(appendChar) {
-            try {
-                const selection = window.getSelection();
-                if (selection.rangeCount === 0) return false;
-
-                const range = selection.getRangeAt(0);
-                const currentText = getCleanTextFromEditor(editor);
-
-                // Get cursor position in text using consistent text extraction
-                let cursorPos = 0;
-                try {
-                    const preCaretRange = range.cloneRange();
-                    preCaretRange.selectNodeContents(editor);
-                    preCaretRange.setEnd(range.startContainer, range.startOffset);
-
-                    // Create temporary element to extract text consistently
-                    const tempDiv = document.createElement('div');
-                    tempDiv.appendChild(preCaretRange.cloneContents());
-                    const preCaretText = getCleanTextFromEditor(tempDiv);
-
-                    // Normalize for consistent positioning
-                    const normalizedPreCaretText = normalizeText(preCaretText);
-                    cursorPos = normalizedPreCaretText.length;
-                } catch (error) {
-                    cursorPos = normalizeText(currentText).length;
-                }
-
-                // Normalize text to handle newlines consistently
-                const normalizedText = normalizeText(currentText);
-
-                // Check if the terminating character was actually added to the text
-                // For Enter key, no character is added, so don't subtract from cursor position
-                let adjustedCursorPos = cursorPos;
-                const actualLastChar = normalizedText.charAt(cursorPos - 1);
-
-                // Only subtract 1 if the terminating character is actually in the text
-                if (appendChar !== '\n' && actualLastChar === appendChar) {
-                    adjustedCursorPos = cursorPos - 1;
-                }
-
-                // ONLY work with text before the cursor - ignore everything after
-                const textBeforeCursor = normalizedText.substring(0, adjustedCursorPos);
-                const textAfterCursor = normalizedText.substring(cursorPos); // Everything after cursor
-
-                // Get word that was just completed at the end of the "before cursor" text
-                const wordInfo = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
-
-                if (!wordInfo.word || wordInfo.word.length <= 2) {
-                    return false; // No word or too short to correct
-                }
-
-                // Extract word core - keep original capitalization for the autocorrect engine
-                const wordPattern = /^([^a-zA-Z]*)([a-zA-Z']+)([^a-zA-Z]*)$/;
-                const match = wordInfo.word.match(wordPattern);
-
-                if (!match) return false; // No alphabetic content to correct
-
-                const [, prefixPunct, wordCore, suffixPunct] = match;
-
-                // Pass the original word with capitalization to the autocorrect engine
-                const correctedWord = editorAutocorrectEngine.findClosestWord(wordCore);
-
-                // If a correction was found and it's different from the original
-                if (correctedWord !== wordCore) {
-                    // Reconstruct with original punctuation
-                    const finalCorrectedWord = prefixPunct + correctedWord + suffixPunct;
-
-                    // Rebuild text: [text before word] + [corrected word] + [terminating char] + [text after cursor]
-                    const beforeWord = textBeforeCursor.substring(0, wordInfo.start);
-
-                    // For Enter key, don't add the newline - let browser handle it normally
-                    const appendCharToAdd = appendChar === '\n' ? '' : appendChar;
-                    let newNormalizedText = beforeWord + finalCorrectedWord + appendCharToAdd + textAfterCursor;
-
-                    // Extract current formatting ranges before making changes
-                    formattingRanges = extractFormattingRanges();
-
-                    // Calculate the change details for index adjustment
-                    const changePos = wordInfo.start;
-                    const oldWordLength = wordInfo.word.length;
-                    const newWordLength = finalCorrectedWord.length + (appendChar === '\n' ? 0 : 1);
-
-                    // Adjust formatting ranges to account for the text change
-                    formattingRanges = adjustFormattingRanges(
-                        formattingRanges,
-                        changePos,
-                        oldWordLength,
-                        newWordLength
-                    );
-
-                    // Update text content using formatting-aware approach
-                    const plainNewText = beforeWord + finalCorrectedWord + appendCharToAdd + textAfterCursor;
-                    const finalNewText = denormalizeText(plainNewText);
-
-                    // Reconstruct with formatting preserved
-                    const formattedContent = reconstructFormattedContent(finalNewText, formattingRanges);
-                    editor.innerHTML = formattedContent;
-
-                    // Use a much simpler cursor positioning approach: position at the very end
-                    // This avoids coordinate system confusion between plain text and HTML DOM
-                    try {
-                        const range = document.createRange();
-                        const selection = window.getSelection();
-
-                        // Find the last text node in the editor
-                        const walker = document.createTreeWalker(
-                            editor,
-                            NodeFilter.SHOW_TEXT,
-                            null,
-                            false
-                        );
-
-                        let lastTextNode = null;
-                        let node;
-                        while (node = walker.nextNode()) {
-                            lastTextNode = node;
-                        }
-
-                        if (lastTextNode) {
-                            // Position cursor at the end of the last text node
-                            range.setStart(lastTextNode, lastTextNode.textContent.length);
-                            range.collapse(true);
-                            selection.removeAllRanges();
-                            selection.addRange(range);
-                        } else {
-                            // Fallback: position at end of editor element
-                            range.selectNodeContents(editor);
-                            range.collapse(false);
-                            selection.removeAllRanges();
-                            selection.addRange(range);
-                        }
-                    } catch (e) {
-                        console.log('Cursor positioning error:', e);
-                        // Some browsers might not support selection manipulation
-                    }
-
-                    updateWordCount();
-                    return true; // Correction was made
-                }
-
-                return false; // No correction was made
-            } catch (error) {
-                return false; // Error occurred, don't attempt correction
-            }
-        }
-
-        // Debounced autocorrect preview to prevent blocking on every keystroke
-        let autocorrectPreviewTimer = null;
-        function scheduleAutocorrectPreview() {
-            // Cancel any pending preview
-            if (autocorrectPreviewTimer) {
-                clearTimeout(autocorrectPreviewTimer);
-            }
-
-            // Schedule new preview with minimal delay to not block typing
-            autocorrectPreviewTimer = setTimeout(() => {
-                performAutocorrectPreview();
-                autocorrectPreviewTimer = null;
-            }, 16); // ~1 frame at 60fps for smooth typing
-        }
-
-        // Event listeners - ENHANCED WITH SOPHISTICATED SUPPRESSION
-        editor.addEventListener('input', function (e) {
-            // DEBUG LOGGING FOR INPUT EVENT
-            eventCount++;
-            lastInputType = e.inputType || 'undefined';
-
-            addDebugLog(`INPUT: type="${e.inputType || 'undefined'}", data="${e.data || 'null'}", length=${editor.textContent.length}`);
-
-            // Update debug display
-            if (debugEnabled) {
-                const inputTypeElement = document.getElementById('input-type');
-                if (inputTypeElement) inputTypeElement.textContent = lastInputType;
-                updateDebugDisplay();
-            }
-
-            updateWordCount();
-
-            // CAPTURE SUPPRESSION STATE IMMEDIATELY TO AVOID TIMING ISSUES
-            const capturedSuppressionState = autocorrectSuppressed;
-            const capturedSuppressionReason = suppressionReason;
-
-            // QUEST BROWSER FIX: Use textContent instead of innerText for consistent length
-            // Quest browser adds extra spaces to innerText, causing length mismatches
-            const currentValue = getCleanTextFromEditor(editor);
-            const currentLength = currentValue.length;
-
-            addDebugLog(`QUEST FIX: Using textContent-based extraction instead of innerText`);
-
-            // Enhanced length debugging for Quest browser compatibility
-            const textContent = editor.textContent || '';
-            const innerText = editor.innerText || '';
-            const innerHTML = editor.innerHTML || '';
-
-            addDebugLog(`INPUT text change: length ${previousInputLength} -> ${currentLength}`);
-            addDebugLog(`  innerText: "${currentValue.slice(-5)}" (len=${currentValue.length})`);
-            addDebugLog(`  textContent: "${textContent.slice(-5)}" (len=${textContent.length})`);
-            addDebugLog(`  innerHTML chars: "${innerHTML.slice(-10)}"`);
-
-            // Check for discrepancies between different text extraction methods
-            if (currentValue.length !== textContent.length) {
-                addDebugLog(`  ⚠️ LENGTH MISMATCH: innerText=${currentValue.length} vs textContent=${textContent.length}`);
-            }
-
-            // If input field is empty, hide tooltip
-            if (currentLength === 0) {
-                hideAutocorrectTooltip();
-                resetBackspaceCounter('empty input');
-                deactivateSuppressionMode('empty input');
-                previousInputLength = 0;
-                addDebugLog('INPUT: cleared - resetting state');
-                return;
-            }
-
-            // Store previous state for whitespace crossing detection
-            const oldText = normalizeText(lastKnownTextContent);
-            const newText = normalizeText(currentValue);
-            const oldCursorPos = lastKnownCursorPosition;
-
-            // Get current cursor position
-            const selection = window.getSelection();
-            let newCursorPos = 0;
-            if (selection.rangeCount > 0) {
-                const range = selection.getRangeAt(0);
-                try {
-                    const preCaretRange = range.cloneRange();
-                    preCaretRange.selectNodeContents(editor);
-                    preCaretRange.setEnd(range.startContainer, range.startOffset);
-
-                    const tempDiv = document.createElement('div');
-                    tempDiv.appendChild(preCaretRange.cloneContents());
-                    const preCaretText = getCleanTextFromEditor(tempDiv);
-                    newCursorPos = normalizeText(preCaretText).length;
-                } catch (error) {
-                    newCursorPos = newText.length;
-                }
-            }
-
-            // Reset the correction flag if the user is typing a new character
-            if (currentLength > previousInputLength) {
-                // Count characters typed, but handle space separately
-                const charsAdded = currentLength - previousInputLength;
-
-                // Get the character that was actually just typed (at cursor position - 1)
-                const actualTypedChar = currentValue.charAt(newCursorPos - 1);
-                const isSpaceOrPunct = /[\s.,.!?;:"()]/.test(actualTypedChar);
-
-                // CHECK FOR WHITESPACE DEACTIVATION - typing whitespace reactivates autocorrect
-                if (isWhitespace(actualTypedChar) || actualTypedChar === '§') {
-                    deactivateSuppressionMode('whitespace character typed');
-                }
-
-                // Only count non-space characters toward backspace penalty
-                if (!isSpaceOrPunct) {
-                    charsTypedSinceLastBackspace += charsAdded;
-                }
-
-                // Real-time autocorrect preview (only for non-space chars) - using async processing
-                if (!isSpaceOrPunct) {
-                    // Schedule autocorrect preview to run after current event loop
-                    scheduleAutocorrectPreview();
-                }
-
-                // Handle space/punctuation for autocorrect - USE CAPTURED STATE
-                if (isSpaceOrPunct) {
-                    triggerAutocorrectWithCapturedState(actualTypedChar, capturedSuppressionState, capturedSuppressionReason);
-                }
-            }
-            // If length decreased, count as corrected error (backspace)
-            else if (currentLength < previousInputLength) {
-                // CHECK FOR BACKSPACE CROSSING WHITESPACE - but only if suppression not already active
-                if (!autocorrectSuppressed && detectBackspaceCrossedWhitespace(oldText, newText, oldCursorPos, newCursorPos)) {
-                    activateSuppressionMode('backspaced past whitespace and stopped at non-whitespace');
-                }
-
-                // Reset counter on backspace (suppresses autocorrect until 2+ new chars typed)
-                resetBackspaceCounter('backspace detected');
-
-                // Always hide tooltip after backspace (non-blocking)
-                hideAutocorrectTooltip();
-            }
-
-            // Update cursor tracking for next comparison
-            lastKnownCursorPosition = newCursorPos;
-            lastKnownTextContent = currentValue;
-
-            // Update previous values for next comparison
-            previousInputLength = currentLength;
-        });
-
-        // Update button states based on current selection
-        function updateButtonStates() {
-            document.getElementById('bold-btn').classList.toggle('active', document.queryCommandState('bold'));
-            document.getElementById('italic-btn').classList.toggle('active', document.queryCommandState('italic'));
-            document.getElementById('underline-btn').classList.toggle('active', document.queryCommandState('underline'));
-        }
-
-        editor.addEventListener('keyup', function () {
-            updateCursorPosition();
-            updateButtonStates();
-        });
-
-        editor.addEventListener('click', function () {
-            updateCursorPosition();
-            updateButtonStates();
-            hideAutocorrectTooltip();
-
-            // Update cursor tracking and check for suppression
-            updateCursorTracking();
-        });
-
-        editor.addEventListener('mouseup', function () {
-            updateButtonStates();
-        });
-
-        // Hide tooltip on cursor movement
+        // Event listeners
+        boldBtn.addEventListener('click', () => toggleFormat('bold'));
+        italicBtn.addEventListener('click', () => toggleFormat('italic'));
+        underlineBtn.addEventListener('click', () => toggleFormat('underline'));
+
+        // Keyboard shortcuts
         editor.addEventListener('keydown', function (e) {
-            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
-                e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                hideAutocorrectTooltip();
-            }
-        });
-
-        // Formatting buttons
-        document.getElementById('bold-btn').addEventListener('click', () => toggleFormat('bold'));
-        document.getElementById('italic-btn').addEventListener('click', () => toggleFormat('italic'));
-        document.getElementById('underline-btn').addEventListener('click', () => toggleFormat('underline'));
-
-        document.getElementById('font-size').addEventListener('change', function () {
-            changeFontSize(this.value);
-        });
-
-        // Document title editing
-        documentTitle.addEventListener('input', function () {
-            // Title changed
-        });
-
-        // Cross-browser key detection with fallbacks for Quest/mobile browsers
-        function normalizeKeyEvent(event) {
-            const key = event.key;
-            const code = event.code || '';  // Quest browser sends empty string
-
-            // Create normalized event info for cross-browser compatibility
-            const normalizedEvent = {
-                key: key,
-                code: code,
-                isEnter: false,
-                isSpace: false,
-                isPunctuation: false
-            };
-
-            // Detect Enter key - use multiple detection methods for compatibility
-            if (key === 'Enter' || key === '\n' || key === '\r' ||
-                code === 'Enter' || code === 'NumpadEnter' ||
-                event.keyCode === 13 || event.which === 13) {
-                normalizedEvent.isEnter = true;
-            }
-
-            // Detect space key
-            if (key === ' ' || key === 'Space' || code === 'Space' ||
-                event.keyCode === 32 || event.which === 32) {
-                normalizedEvent.isSpace = true;
-            }
-
-            // Detect punctuation that should trigger autocorrect
-            if (key && /[.,.!?;:"()]/.test(key)) {
-                normalizedEvent.isPunctuation = true;
-            }
-
-            return normalizedEvent;
-        }
-
-        // Perform autocorrect specifically for Enter key (before newline insertion)
-        function performAutocorrectOnEnter(event) {
-            addDebugLog(`ENTER KEY AUTOCORRECT: Triggered for normalized event`);
-            // Trigger autocorrect for Enter key - let browser handle Enter normally
-            return triggerAutocorrect('\n');
-        }
-
-        // Enhanced keyboard shortcuts and Enter key handling with Quest browser support
-        editor.addEventListener('keydown', function (e) {
-            // Normalize the key event for cross-browser compatibility
-            const normalizedEvent = normalizeKeyEvent(e);
-
-            addDebugLog(`NORMALIZED KEY: key="${e.key}", code="${e.code || 'MISSING'}", isEnter=${normalizedEvent.isEnter}, isSpace=${normalizedEvent.isSpace}`);
-
-            // Handle Enter key to trigger autocorrect BEFORE the newline is inserted
-            if (normalizedEvent.isEnter) {
-                addDebugLog('ENTER DETECTED: Hiding tooltip and triggering autocorrect');
-                hideAutocorrectTooltip();
-                performAutocorrectOnEnter(e);
-            }
-
-            // Handle space key for autocorrect trigger (backup for input event)
-            if (normalizedEvent.isSpace) {
-                addDebugLog('SPACE DETECTED: Will trigger autocorrect on next input event');
-            }
-
             if (e.ctrlKey || e.metaKey) {
                 switch (e.key) {
                     case 'b':
@@ -1595,174 +310,82 @@
                         e.preventDefault();
                         toggleFormat('underline');
                         break;
+                    case 'z':
+                        if (e.shiftKey) {
+                            e.preventDefault();
+                            document.execCommand('redo');
+                        } else {
+                            e.preventDefault();
+                            document.execCommand('undo');
+                        }
+                        updateToolbarState();
+                        break;
+                    case 'y':
+                        e.preventDefault();
+                        document.execCommand('redo');
+                        updateToolbarState();
+                        break;
                 }
             }
         });
 
-        // DEBUG WINDOW FUNCTIONALITY - FOR CROSS-BROWSER DEBUGGING
-        let debugEnabled = false;
-        let eventCount = 0;
-        let debugLogEntries = [];
-        const maxLogEntries = 50;
-
-        function detectBrowser() {
-            const userAgent = navigator.userAgent;
-            let browser = 'Unknown';
-
-            if (userAgent.includes('Chrome') && !userAgent.includes('Edge')) {
-                browser = 'Chrome';
-            } else if (userAgent.includes('Firefox')) {
-                browser = 'Firefox';
-            } else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
-                browser = 'Safari';
-            } else if (userAgent.includes('Edge')) {
-                browser = 'Edge';
-            }
-
-            return browser + ' ' + (navigator.platform || 'Unknown Platform');
-        }
-
-        function addDebugLog(message) {
-            if (!debugEnabled) return;
-
-            const timestamp = new Date().toLocaleTimeString();
-            const logEntry = `[${timestamp}] ${message}`;
-
-            debugLogEntries.push(logEntry);
-            if (debugLogEntries.length > maxLogEntries) {
-                debugLogEntries.shift();
-            }
-
-            updateDebugDisplay();
-        }
-
-        function updateDebugDisplay() {
-            if (!debugEnabled) return;
-
-            const logElement = document.getElementById('debug-log');
-            const eventCountElement = document.getElementById('event-count');
-            const browserInfoElement = document.getElementById('browser-info');
-            const lastKeyElement = document.getElementById('last-key');
-            const inputTypeElement = document.getElementById('input-type');
-            const currentWordElement = document.getElementById('current-word');
-            const suppressionElement = document.getElementById('suppression-status');
-
-            if (logElement) {
-                logElement.innerHTML = debugLogEntries.map(entry => `<div>${entry}</div>`).join('');
-                logElement.scrollTop = logElement.scrollHeight;
-            }
-
-            if (eventCountElement) eventCountElement.textContent = eventCount;
-            if (browserInfoElement) browserInfoElement.textContent = detectBrowser();
-            if (inputTypeElement) inputTypeElement.textContent = typeof e !== 'undefined' ? e.inputType || 'undefined' : 'none';
-
-            // FIXED: Don't call shouldSuppressAutocorrect() here as it causes infinite loop
-            if (suppressionElement) suppressionElement.textContent = autocorrectSuppressed ? 'yes' : 'no';
-
-            // Update current word
-            const currentWord = getCurrentIncompleteWord();
-            if (currentWordElement) currentWordElement.textContent = currentWord || 'none';
-        }
-
-        function toggleDebugWindow() {
-            debugEnabled = !debugEnabled;
-            const debugWindow = document.getElementById('debug-window');
-            const debugToggle = document.getElementById('debug-toggle');
-
-            if (debugEnabled) {
-                debugWindow.style.display = 'block';
-                debugToggle.textContent = 'Hide Debug';
-                addDebugLog('Debug window enabled');
-                updateDebugDisplay();
-            } else {
-                debugWindow.style.display = 'none';
-                debugToggle.textContent = 'Debug';
-            }
-        }
-
-        // ENHANCED EVENT HANDLING WITH CROSS-BROWSER COMPATIBILITY
-        // Track multiple event types to debug cross-browser issues
-        let lastKeyPressed = 'none';
-        let lastInputType = 'none';
-
-        // Add comprehensive event listeners for debugging - REPLACE EXISTING HANDLERS
-        function addDebugEventListeners() {
-            // No duplicate input handlers - debug hooks directly into existing handlers
-
-            // Keydown debug handler (separate from main handler)
-            editor.addEventListener('keydown', function (e) {
-                eventCount++;
-                lastKeyPressed = e.key;
-
-                addDebugLog(`KEYDOWN: key="${e.key}", code="${e.code}", ctrl=${e.ctrlKey}, meta=${e.metaKey}`);
-
-                if (debugEnabled) {
-                    const lastKeyElement = document.getElementById('last-key');
-                    if (lastKeyElement) lastKeyElement.textContent = lastKeyPressed;
-                    updateDebugDisplay();
-                }
-            });
-
-            // Keyup debug handler
-            editor.addEventListener('keyup', function (e) {
-                eventCount++;
-                addDebugLog(`KEYUP: key="${e.key}", code="${e.code}"`);
-            });
-
-            // Composition events (important for mobile/IME)
-            editor.addEventListener('compositionstart', function (e) {
-                eventCount++;
-                addDebugLog(`COMPOSITION START: data="${e.data || 'null'}"`);
-            });
-
-            editor.addEventListener('compositionupdate', function (e) {
-                eventCount++;
-                addDebugLog(`COMPOSITION UPDATE: data="${e.data || 'null'}"`);
-            });
-
-            editor.addEventListener('compositionend', function (e) {
-                eventCount++;
-                addDebugLog(`COMPOSITION END: data="${e.data || 'null'}"`);
-            });
-
-            // Before input event (newer browsers)
-            editor.addEventListener('beforeinput', function (e) {
-                eventCount++;
-                addDebugLog(`BEFORE INPUT: type="${e.inputType || 'undefined'}", data="${e.data || 'null'}"`);
-            });
-        }
-
-        // Initialize debug toggle
-        document.addEventListener('DOMContentLoaded', function () {
-            document.getElementById('debug-toggle').addEventListener('click', toggleDebugWindow);
-
-            // Add debug event listeners
-            addDebugEventListeners();
-
-            // Initialize debug display
-            updateDebugDisplay();
+        // Update toolbar state and word count on input
+        editor.addEventListener('input', function () {
+            updateWordCount();
+            updateToolbarState();
         });
+
+        // Update toolbar state on selection change
+        document.addEventListener('selectionchange', function () {
+            if (document.activeElement === editor) {
+                updateToolbarState();
+            }
+        });
+
+        // Focus editor on load
+        editor.addEventListener('focus', function () {
+            // Clear placeholder text on first focus
+            if (editor.innerText === 'Start typing your document here...') {
+                editor.innerHTML = '';
+            }
+        });
+
+        // Function to position the edit icon right after the text
+        function updateEditIconPosition() {
+            const input = document.getElementById('document-title');
+            const icon = document.querySelector('.edit-icon');
+            
+            if (!input || !icon) return;
+            
+            // Create a temporary span to measure text width
+            const tempSpan = document.createElement('span');
+            tempSpan.style.position = 'absolute';
+            tempSpan.style.visibility = 'hidden';
+            tempSpan.style.height = 'auto';
+            tempSpan.style.width = 'auto';
+            tempSpan.style.whiteSpace = 'nowrap';
+            tempSpan.style.fontSize = '24px';
+            tempSpan.style.fontWeight = '600';
+            tempSpan.style.fontFamily = getComputedStyle(input).fontFamily;
+            tempSpan.textContent = input.value || input.placeholder;
+            
+            document.body.appendChild(tempSpan);
+            const textWidth = tempSpan.offsetWidth;
+            document.body.removeChild(tempSpan);
+            
+            // Position icon right after the text (16px padding + text width + 8px gap)
+            icon.style.left = (16 + textWidth + 8) + 'px';
+        }
+
+        // Update icon position when title input changes
+        titleInput.addEventListener('input', updateEditIconPosition);
+        titleInput.addEventListener('focus', updateEditIconPosition);
+        titleInput.addEventListener('blur', updateEditIconPosition);
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', function () {
-            initializeEditorAutocorrect();
-            updateWordCount();
-            updateCursorPosition();
-
-            // Initialize length tracking
-            previousInputLength = (editor.textContent || '').length;
-
-            // Focus the editor
-            editor.focus();
-
-            // Position cursor at end of seed text
-            const range = document.createRange();
-            const selection = window.getSelection();
-            range.selectNodeContents(editor);
-            range.collapse(false);
-            selection.removeAllRanges();
-            selection.addRange(range);
-        });
+        updateWordCount();
+        updateToolbarState();
+        updateEditIconPosition();
     </script>
 </body>
 
