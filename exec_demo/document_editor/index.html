@@ -904,7 +904,7 @@
             if (currentAutocorrectSuggestion) {
                 const isEnter = e.key === 'Enter';
                 const isSpace = e.key === ' ';
-                const isPunctuation = [',', '.', ';', '/', '"', "'"].includes(e.key);
+                const isPunctuation = [',', '.', ';', '/', '"', "'", '?', '!'].includes(e.key);
 
                 if (isEnter || isSpace || isPunctuation) {
                     const wordToDelete = getCurrentWord();
