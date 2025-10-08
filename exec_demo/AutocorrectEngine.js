@@ -476,7 +476,7 @@ class AutocorrectEngine {
      */
     getSingularForm(word) {
         const lowerWord = word.toLowerCase();
-        
+
         // Try -ies -> -y (berries -> berry)
         if (lowerWord.endsWith('ies') && lowerWord.length > 4) {
             const singular = lowerWord.slice(0, -3) + 'y';
@@ -484,7 +484,7 @@ class AutocorrectEngine {
                 return singular;
             }
         }
-        
+
         // Try -es -> -e (boxes -> box, but not roses -> ros)
         if (lowerWord.endsWith('es') && lowerWord.length > 3) {
             const singular = lowerWord.slice(0, -2);
@@ -497,7 +497,7 @@ class AutocorrectEngine {
                 return singularS;
             }
         }
-        
+
         // Try -s -> nothing (cats -> cat)
         if (lowerWord.endsWith('s') && lowerWord.length > 2) {
             const singular = lowerWord.slice(0, -1);
@@ -505,21 +505,37 @@ class AutocorrectEngine {
                 return singular;
             }
         }
-        
+
         return null;
     }
 
     /**
-     * Check if a word is in the dictionary (including plural forms)
+     * Check if a word is in the dictionary (including plural and possessive forms)
      */
     hasWord(word) {
         const lowerWord = word.toLowerCase();
-        
+
         // Check exact match first
         if (this.dictionarySet.has(lowerWord)) {
             return true;
         }
-        
+
+        // Check if it's a possessive form (word's or words')
+        if (lowerWord.includes("'")) {
+            // Handle possessives: mark's -> mark, james's -> james, dogs' -> dogs
+            const withoutApostrophe = lowerWord.replace(/'s$/, '').replace(/'$/, '');
+
+            if (this.dictionarySet.has(withoutApostrophe)) {
+                return true; // Base word exists
+            }
+
+            // Check if it's a possessive plural (dogs' -> dog)
+            const singularOfPossessive = this.getSingularForm(withoutApostrophe);
+            if (singularOfPossessive) {
+                return true;
+            }
+        }
+
         // Check if it's a valid plural form
         const singularForm = this.getSingularForm(lowerWord);
         return singularForm !== null;
