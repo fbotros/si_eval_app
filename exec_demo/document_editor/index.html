@@ -505,28 +505,32 @@
                             selection.addRange(newRange);
                             debugLog('✅ Selection wrapped and preserved');
                         } else {
-                            // No selection - just typing cursor
-                            // Store the desired font size for next keystroke
-                            debugLog('No selection - storing font size for next input');
-                            pendingFontSize = fontSize;
+                            // No selection - place cursor inside a span for future typing
+                            debugLog('No selection - inserting span for cursor');
                             
-                            // Insert an empty span to "mark" the cursor position
                             const span = document.createElement('span');
                             span.style.fontSize = fontSize + 'pt';
-                            span.setAttribute('data-pending-font-size', fontSize);
                             
-                            // Try using a space that will be removed
-                            const textNode = document.createTextNode('');
-                            span.appendChild(textNode);
+                            // Preserve current formatting
+                            const isBold = document.queryCommandState('bold');
+                            const isItalic = document.queryCommandState('italic');
+                            const isUnderline = document.queryCommandState('underline');
+                            if (isBold) span.style.fontWeight = 'bold';
+                            if (isItalic) span.style.fontStyle = 'italic';
+                            if (isUnderline) span.style.textDecoration = 'underline';
+                            
+                            // Insert zero-width space so span has content
+                            const zwsp = document.createTextNode('\u200B');
+                            span.appendChild(zwsp);
                             range.insertNode(span);
                             
-                            // Move cursor to end of span
-                            range.setStartAfter(span);
+                            // Place cursor INSIDE span after zero-width space
+                            range.setStart(span.firstChild, 1);
                             range.collapse(true);
                             selection.removeAllRanges();
                             selection.addRange(range);
                             
-                            debugLog('✅ Pending font size marker inserted');
+                            debugLog('✅ Cursor positioned inside font-sized span');
                         }
                     }
                     
