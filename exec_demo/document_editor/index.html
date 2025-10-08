@@ -192,7 +192,7 @@
             min-height: 1000px;
             padding: 106px 106px 106px 106px;
             outline: none;
-            font-size: 18px;
+            font-size: 11pt;
             line-height: 1.7;
             color: #2d3748;
             background: transparent;
@@ -413,21 +413,35 @@
         }
 
         function changeFontSize(fontSize) {
-            // Convert font size to appropriate format (fontSize uses 1-7 scale, but we can use CSS)
-            document.execCommand('fontSize', false, '7'); // Use a placeholder size
-            // Then manually set the font size using CSS
             const selection = window.getSelection();
             if (selection.rangeCount > 0) {
                 const range = selection.getRangeAt(0);
-                const selectedContent = range.extractContents();
-                const span = document.createElement('span');
-                span.style.fontSize = fontSize + 'pt';
-                span.appendChild(selectedContent);
-                range.insertNode(span);
-                // Move cursor to end of inserted content
-                range.collapse(false);
-                selection.removeAllRanges();
-                selection.addRange(range);
+
+                // Check if there's selected text
+                if (!range.collapsed) {
+                    // Text is selected - apply font size to selection
+                    const selectedContent = range.extractContents();
+                    const span = document.createElement('span');
+                    span.style.fontSize = fontSize + 'pt';
+                    span.appendChild(selectedContent);
+                    range.insertNode(span);
+                    // Move cursor to end of inserted content
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                } else {
+                    // No text selected - insert a styled span for upcoming text
+                    const span = document.createElement('span');
+                    span.style.fontSize = fontSize + 'pt';
+                    // Insert a zero-width space to make the span "stick"
+                    span.appendChild(document.createTextNode('\u200B'));
+                    range.insertNode(span);
+                    // Place cursor inside the span after the zero-width space
+                    range.setStart(span.firstChild, 1);
+                    range.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                }
             }
             updateToolbarState();
             resizeFontSizeSelector();
@@ -488,7 +502,7 @@
             boldBtn.classList.toggle('active', document.queryCommandState('bold'));
             italicBtn.classList.toggle('active', document.queryCommandState('italic'));
             underlineBtn.classList.toggle('active', document.queryCommandState('underline'));
-            
+
             // Update font selector to reflect current font
             try {
                 const currentFont = document.queryCommandValue('fontName');
@@ -497,7 +511,7 @@
                     const cleanFont = currentFont.replace(/["']/g, '').split(',')[0].trim();
                     // Try to match with one of our options
                     const options = Array.from(fontSelector.options);
-                    const matchingOption = options.find(opt => 
+                    const matchingOption = options.find(opt =>
                         opt.value.toLowerCase() === cleanFont.toLowerCase()
                     );
                     if (matchingOption) {
@@ -519,13 +533,47 @@
                     if (container.nodeType === Node.TEXT_NODE) {
                         container = container.parentElement;
                     }
+
+                    // If container is the editor itself, check the previous sibling or last child
+                    if (container === editor) {
+                        // Look for the previous sibling element or the last child
+                        if (range.startOffset > 0 && editor.childNodes[range.startOffset - 1]) {
+                            // There's a previous element at this position
+                            const prevNode = editor.childNodes[range.startOffset - 1];
+                            // Skip tooltip elements
+                            if (prevNode.nodeType === Node.ELEMENT_NODE &&
+                                !prevNode.classList.contains('autocorrect-tooltip')) {
+                                container = prevNode;
+                            } else if (prevNode.nodeType === Node.TEXT_NODE && prevNode.parentElement) {
+                                container = prevNode.parentElement;
+                            }
+                        } else {
+                            // Use the last child in the editor (skip tooltip)
+                            let lastContentChild = null;
+                            for (let i = editor.childNodes.length - 1; i >= 0; i--) {
+                                const node = editor.childNodes[i];
+                                if (node.nodeType === Node.ELEMENT_NODE &&
+                                    !node.classList.contains('autocorrect-tooltip')) {
+                                    lastContentChild = node;
+                                    break;
+                                } else if (node.nodeType === Node.TEXT_NODE) {
+                                    lastContentChild = node.parentElement;
+                                    break;
+                                }
+                            }
+                            if (lastContentChild && lastContentChild !== editor) {
+                                container = lastContentChild;
+                            }
+                        }
+                    }
+
                     if (container && container !== editor) {
                         const fontSize = window.getComputedStyle(container).fontSize;
                         // Convert px to pt (1pt = 1.333px approximately)
                         const fontSizePt = Math.round(parseFloat(fontSize) * 0.75);
                         // Try to match with one of our options
                         const sizeOptions = Array.from(fontSizeSelector.options);
-                        const matchingSize = sizeOptions.find(opt => 
+                        const matchingSize = sizeOptions.find(opt =>
                             parseInt(opt.value) === fontSizePt
                         );
                         if (matchingSize) {
