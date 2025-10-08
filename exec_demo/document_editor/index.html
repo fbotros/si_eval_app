@@ -484,18 +484,13 @@
                 try {
                     debugLog('📏 changeFontSize called', {fontSize: fontSize + 'pt'});
                     
-                    // SIMPLE APPROACH FOR QUEST 3: Just set the editor's base font size
-                    // This will apply to all new text
-                    editor.style.fontSize = fontSize + 'pt';
-                    debugLog('✅ Set editor.style.fontSize directly', {newSize: fontSize + 'pt'});
-                    
-                    // If there's a selection, wrap it in a span with the font size
                     const selection = window.getSelection();
                     if (selection.rangeCount > 0) {
                         const range = selection.getRangeAt(0);
+                        debugLog('Range info', {collapsed: range.collapsed, startOffset: range.startOffset});
                         
                         if (!range.collapsed) {
-                            // Has selection - wrap it
+                            // Has selection - wrap it in a span
                             debugLog('Wrapping selected text');
                             const span = document.createElement('span');
                             span.style.fontSize = fontSize + 'pt';
@@ -503,14 +498,35 @@
                             span.appendChild(contents);
                             range.insertNode(span);
                             
-                            // Reselect
+                            // Reselect the wrapped content
                             const newRange = document.createRange();
                             newRange.selectNodeContents(span);
                             selection.removeAllRanges();
                             selection.addRange(newRange);
-                            debugLog('Selection preserved');
+                            debugLog('✅ Selection wrapped and preserved');
                         } else {
-                            debugLog('No selection - base font size set for future typing');
+                            // No selection - just typing cursor
+                            // Store the desired font size for next keystroke
+                            debugLog('No selection - storing font size for next input');
+                            pendingFontSize = fontSize;
+                            
+                            // Insert an empty span to "mark" the cursor position
+                            const span = document.createElement('span');
+                            span.style.fontSize = fontSize + 'pt';
+                            span.setAttribute('data-pending-font-size', fontSize);
+                            
+                            // Try using a space that will be removed
+                            const textNode = document.createTextNode('');
+                            span.appendChild(textNode);
+                            range.insertNode(span);
+                            
+                            // Move cursor to end of span
+                            range.setStartAfter(span);
+                            range.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            
+                            debugLog('✅ Pending font size marker inserted');
                         }
                     }
                     
