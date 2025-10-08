@@ -192,7 +192,7 @@
             min-height: 1000px;
             padding: 106px 106px 106px 106px;
             outline: none;
-            font-size: 11pt;
+            font-size: 36pt;
             line-height: 1.7;
             color: #2d3748;
             background: transparent;
@@ -304,12 +304,12 @@
             <button id="underline-btn" title="Underline (Ctrl+U)"><u>U</u></button>
             <select id="font-size-selector" title="Font Size">
                 <option value="9">9</option>
-                <option value="11" selected>11</option>
+                <option value="11">11</option>
                 <option value="12">12</option>
                 <option value="16">16</option>
                 <option value="18">18</option>
                 <option value="24">24</option>
-                <option value="36">36</option>
+                <option value="36" selected>36</option>
             </select>
             <select id="font-selector" title="Font Family">
                 <option value="Arial">Arial</option>
@@ -1156,6 +1156,9 @@
             let lastTextLength = 0;
             let lastCursorPosition = 0;
             let lastTextContent = ''; // Track the actual text content
+            
+            // Track pending font size for Quest 3 compatibility
+            let pendingFontSize = '11'; // Default
 
             // Helper to check if the character before cursor is a delimiter (whitespace/punctuation)
             function isDelimiterBeforeCursor() {
@@ -1542,8 +1545,9 @@
             resizeFontSizeSelector(); // Size the font size selector correctly on load
             resizeFontSelector(); // Size the font selector correctly on load
 
-            // Set default font size to 11pt
-            editor.style.fontSize = '11pt';
+            // Set default font size to 36pt for Quest 3 debugging
+            editor.style.fontSize = '36pt';
+            debugLog('🎯 Default font size set to 36pt for debugging');
 
             // Focus the editor on page load so cursor is ready
             editor.focus();
