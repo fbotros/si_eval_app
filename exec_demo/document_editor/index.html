@@ -332,55 +332,11 @@
     <!-- Autocorrect tooltip - positioned outside of contentEditable -->
     <div id="autocorrect-tooltip" class="autocorrect-tooltip"></div>
 
-    <!-- Debug console for Quest 3 debugging -->
-    <div id="debug-console" style="position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); color: #0f0; font-family: monospace; font-size: 11px; max-height: 200px; overflow-y: auto; padding: 10px; z-index: 99999; display: none; border-top: 2px solid #0f0;">
-      <div style="display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #0f0; padding-bottom: 5px;">
-        <strong>Debug Console</strong>
-        <button onclick="document.getElementById('debug-console').style.display='none'" style="background: #f00; color: #fff; border: none; padding: 2px 8px; cursor: pointer;">Close</button>
-      </div>
-      <div id="debug-output"></div>
-    </div>
-    <button id="debug-toggle" onclick="document.getElementById('debug-console').style.display='block'" style="position: fixed; bottom: 10px; right: 10px; z-index: 99998; background: #0f0; color: #000; border: 2px solid #000; padding: 5px 10px; font-weight: bold; cursor: pointer;">Show Debug</button>
 
     <!-- Load external scripts -->
     <script src="../dictionary-loader.js"></script>
     <script src="../AutocorrectEngine.js"></script>
     <script>
-        // Debug logging function
-        function debugLog(message, data) {
-            const debugOutput = document.getElementById('debug-output');
-            if (debugOutput) {
-                const timestamp = new Date().toLocaleTimeString();
-                const logEntry = document.createElement('div');
-                logEntry.style.marginBottom = '3px';
-                logEntry.style.borderBottom = '1px solid #333';
-                logEntry.style.paddingBottom = '3px';
-
-                let dataStr = '';
-                if (data) {
-                    try {
-                        dataStr = ' | ' + JSON.stringify(data);
-                    } catch (e) {
-                        dataStr = ' | [circular data]';
-                    }
-                }
-
-                logEntry.innerHTML = `<span style="color: #666">${timestamp}</span> ${message}${dataStr}`;
-                debugOutput.insertBefore(logEntry, debugOutput.firstChild);
-
-                // Keep only last 50 messages
-                while (debugOutput.children.length > 50) {
-                    debugOutput.removeChild(debugOutput.lastChild);
-                }
-            }
-            console.log(message, data);
-        }
-
-        // Capture all errors
-        window.onerror = function(msg, url, line, col, error) {
-            debugLog('❌ ERROR: ' + msg, {line, col, error: error?.stack});
-            return false;
-        };
 
         // Wait for DOM to be ready
         document.addEventListener('DOMContentLoaded', function () {
@@ -398,7 +354,6 @@
             }
 
             // Formatting buttons
-            const fontSelector = document.getElementById('font-selector');
             const fontSizeSelector = document.getElementById('font-size-selector');
             const boldBtn = document.getElementById('bold-btn');
             const italicBtn = document.getElementById('italic-btn');
@@ -415,112 +370,72 @@
             // Initialize dictionary and autocorrect engine
             async function initializeAutocorrect() {
                 try {
-                    debugLog('🔄 Starting autocorrect initialization...');
                     const dictionary = await loadDictionary('../comprehensive_dictionary.txt');
-                    debugLog('📚 Dictionary loaded', {wordCount: dictionary.length});
 
                     // Create autocorrect engine with dictionary words
                     editorAutocorrectEngine = new AutocorrectEngine();
                     editorAutocorrectEngine.addWords(dictionary);
                     autocorrectReady = true;
-                    debugLog('✅ Autocorrect engine ready!');
                 } catch (error) {
-                    debugLog('❌ Failed to initialize autocorrect', {error: error.message, stack: error.stack});
                     console.error('❌ Failed to initialize autocorrect:', error);
                 }
             }
 
             // Start initialization
-            debugLog('🚀 Editor initialization started');
             initializeAutocorrect();
 
             // Format functions
             function toggleFormat(command) {
                 try {
-                    debugLog(`✨ toggleFormat called for ${command}`);
-
-                    // Save selection state for debugging
-                    const selection = window.getSelection();
-                    debugLog(`Selection before execCommand for ${command}`, {
-                        type: selection.type,
-                        toString: selection.toString().substring(0, 20),
-                        rangeCount: selection.rangeCount
-                    });
-
                     document.execCommand(command, false, null);
-                    debugLog(`execCommand ${command} executed`);
 
                     updateToolbarState();
                     editor.focus();
-                    debugLog(`✅ toggleFormat complete for ${command}`);
                 } catch (error) {
-                    debugLog(`❌ ERROR in toggleFormat for ${command}`, {error: error.message, stack: error.stack});
                 }
             }
 
             function changeFont(fontName) {
                 try {
-                    debugLog('🔤 changeFont called', {fontName});
 
                     // Set manually controlled font family - updateToolbarState will use this
                     manuallySetFontFamily = fontName;
 
                     // Quest 3 fix: Restore saved selection before execCommand
                     const wasRestored = restoreSavedSelection();
-                    debugLog('🔄 Selection restoration attempted', {wasRestored});
 
                     const selection = window.getSelection();
                     const hadSelection = selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed;
 
-                    debugLog('Selection before execCommand', {
-                        type: selection.type,
-                        toString: selection.toString().substring(0, 20),
-                        rangeCount: selection.rangeCount,
-                        hadSelection: hadSelection
-                    });
-
                     // execCommand will maintain selection automatically
                     document.execCommand('fontName', false, fontName);
-                    debugLog('execCommand fontName executed');
 
                     // Update dropdown to show what we just applied
                     fontSelector.value = fontName;
                     resizeFontSelector();
                     editor.focus();
 
-                    debugLog('✅ changeFont complete');
 
                     // Clear the manual override after a short delay
                     setTimeout(() => {
                         manuallySetFontFamily = null;
-                        debugLog('🧹 Cleared manual font family override');
                     }, 100);
                 } catch (error) {
-                    debugLog('❌ ERROR in changeFont', {error: error.message, stack: error.stack});
                 }
             }
 
             function changeFontSize(fontSize) {
                 try {
-                    debugLog('📏 changeFontSize called - USING execCommand like bold/italic', {fontSize});
 
                     // Set manually controlled font size - updateToolbarState will use this
                     manuallySetFontSize = fontSize;
 
                     // Quest 3 fix: Restore saved selection before execCommand
                     const wasRestored = restoreSavedSelection();
-                    debugLog('🔄 Selection restoration attempted', {wasRestored});
 
                     // Save selection state for debugging and restoration
                     const selection = window.getSelection();
                     const hadSelection = selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed;
-
-                    debugLog('Selection before execCommand', {
-                        type: selection.type,
-                        toString: selection.toString().substring(0, 20),
-                        rangeCount: selection.rangeCount,
-                        hadSelection: hadSelection
-                    });
 
                     // Try using execCommand with fontSize (uses HTML size 1-7)
                     // Map our pt sizes to HTML sizes roughly
@@ -539,24 +454,20 @@
                     // execCommand will maintain the selection for us
                     document.execCommand('fontSize', false, htmlSize);
 
-                    debugLog('execCommand fontSize executed', {htmlSize});
 
                     // Update dropdown immediately
                     fontSizeSelector.value = fontSize;
                     resizeFontSizeSelector();
                     editor.focus();
 
-                    debugLog('✅ changeFontSize complete');
 
                     // Clear the manual override after a short delay
                     // This allows next toolbar update to work normally
                     setTimeout(() => {
                         manuallySetFontSize = null;
-                        debugLog('🧹 Cleared manual font size override');
                     }, 100);
 
                 } catch (error) {
-                    debugLog('❌ ERROR in changeFontSize', {error: error.message, stack: error.stack});
                 }
             }
 
@@ -585,30 +496,6 @@
                 return null;
             }
 
-            // Auto-resize font selector to fit current selection
-            function resizeFontSelector() {
-                const selector = document.getElementById('font-selector');
-                if (!selector) return;
-
-                // Create a temporary span to measure text width
-                const tempSpan = document.createElement('span');
-                tempSpan.style.position = 'absolute';
-                tempSpan.style.visibility = 'hidden';
-                tempSpan.style.height = 'auto';
-                tempSpan.style.width = 'auto';
-                tempSpan.style.whiteSpace = 'nowrap';
-                tempSpan.style.fontSize = '14px';
-                tempSpan.style.fontWeight = '600';
-                tempSpan.style.fontFamily = getComputedStyle(selector).fontFamily;
-                tempSpan.textContent = selector.options[selector.selectedIndex].text;
-
-                document.body.appendChild(tempSpan);
-                const textWidth = tempSpan.offsetWidth;
-                document.body.removeChild(tempSpan);
-
-                // Set selector width to text width plus left padding (12px) + right padding for arrow (24px) + buffer (4px)
-                selector.style.width = (textWidth + 40) + 'px';
-            }
 
             // Auto-resize font size selector to fit current selection
             function resizeFontSizeSelector() {
@@ -644,7 +531,6 @@
 
             function updateToolbarState() {
                 if (skipNextToolbarUpdate) {
-                    debugLog('⏭️ Skipping toolbar update');
                     skipNextToolbarUpdate = false;
                     return;
                 }
@@ -656,47 +542,6 @@
                 // Get the element at cursor position
                 const elementAtCursor = getElementAtCursor();
 
-                // Update font family selector AND apply that formatting
-                if (elementAtCursor) {
-                    try {
-                        let fontFamilyToUse = null;
-
-                        // Use manually set font family if available
-                        if (manuallySetFontFamily) {
-                            fontFamilyToUse = manuallySetFontFamily;
-                            debugLog('🎨 Using manually set font family', manuallySetFontFamily);
-                        } else {
-                            // Read from DOM
-                            const computedStyle = window.getComputedStyle(elementAtCursor);
-                            const fontFamily = computedStyle.fontFamily;
-
-                            if (fontFamily) {
-                                // Clean up font name (remove quotes and extra formatting)
-                                const cleanFont = fontFamily.replace(/["']/g, '').split(',')[0].trim();
-                                fontFamilyToUse = cleanFont;
-                            }
-                        }
-
-                        if (fontFamilyToUse) {
-                            // Try to match with one of our options
-                            const options = Array.from(fontSelector.options);
-                            const matchingOption = options.find(opt =>
-                                opt.value.toLowerCase() === fontFamilyToUse.toLowerCase()
-                            );
-                            if (matchingOption) {
-                                fontSelector.value = matchingOption.value;
-                                resizeFontSelector();
-
-                                // Apply this font to cursor so typing will use it
-                                document.execCommand('fontName', false, matchingOption.value);
-                                debugLog('🎯 Applied font from toolbar state', matchingOption.value);
-                            }
-                        }
-                    } catch (e) {
-                        // If fails, keep current selection
-                    }
-                }
-
                 // Update font size selector AND apply that formatting
                 if (elementAtCursor) {
                     try {
@@ -705,7 +550,6 @@
                         // Use manually set font size if available
                         if (manuallySetFontSize) {
                             fontSizeToUse = manuallySetFontSize;
-                            debugLog('🎨 Using manually set font size', manuallySetFontSize);
                         } else {
                             // Read from DOM
                             const computedStyle = window.getComputedStyle(elementAtCursor);
@@ -735,7 +579,6 @@
                                 };
                                 const htmlSize = htmlSizeMap[matchingSize.value] || '2';
                                 document.execCommand('fontSize', false, htmlSize);
-                                debugLog('🎯 Applied font size from toolbar state', matchingSize.value);
                             }
                         }
                     } catch (e) {
@@ -753,29 +596,14 @@
                     const range = selection.getRangeAt(0);
                     let container = range.startContainer;
 
-                    debugLog('🔍 getElementAtCursor - raw container', {
-                        nodeType: container.nodeType,
-                        nodeName: container.nodeName,
-                        textContent: container.textContent?.substring(0, 20),
-                        startOffset: range.startOffset,
-                        childCount: container.childNodes?.length
-                    });
 
                     // FIRST: Check if container is an element node (not editor)
                     // This catches cases where cursor is inside an empty formatted element
                     if (container.nodeType === Node.ELEMENT_NODE && container !== editor) {
                         // Check if this element is empty - if so, look at previous sibling
                         const isEmpty = container.textContent.trim() === '';
-                        debugLog('📦 Container is element node', {
-                            tag: container.tagName,
-                            isEmpty: isEmpty,
-                            textContent: container.textContent,
-                            font: window.getComputedStyle(container).fontFamily,
-                            fontSize: window.getComputedStyle(container).fontSize
-                        });
 
                         if (isEmpty && container.previousSibling) {
-                            debugLog('⬅️ Element is empty, checking previous sibling');
                             let prevSibling = container.previousSibling;
                             // Skip text nodes that are just whitespace
                             while (prevSibling && prevSibling.nodeType === Node.TEXT_NODE && prevSibling.textContent.trim() === '') {
@@ -783,16 +611,8 @@
                             }
                             if (prevSibling) {
                                 if (prevSibling.nodeType === Node.ELEMENT_NODE) {
-                                    debugLog('✅ Using previous sibling element', {
-                                        tag: prevSibling.tagName,
-                                        font: window.getComputedStyle(prevSibling).fontFamily
-                                    });
                                     return prevSibling;
                                 } else if (prevSibling.nodeType === Node.TEXT_NODE && prevSibling.parentElement) {
-                                    debugLog('✅ Using previous sibling text node parent', {
-                                        tag: prevSibling.parentElement.tagName,
-                                        font: window.getComputedStyle(prevSibling.parentElement).fontFamily
-                                    });
                                     return prevSibling.parentElement;
                                 }
                             }
@@ -804,37 +624,19 @@
                     // SECOND: If it's a text node, return its parent (simple and correct)
                     if (container.nodeType === Node.TEXT_NODE) {
                         const parent = container.parentElement;
-
-                        debugLog('📝 Container is text node, returning parent', {
-                            parentTag: parent?.tagName,
-                            offset: range.startOffset,
-                            textLength: container.textContent.length,
-                            parentTextContent: parent?.textContent?.substring(0, 30),
-                            parentFont: window.getComputedStyle(parent).fontFamily,
-                            parentFontSize: window.getComputedStyle(parent).fontSize
-                        });
-
                         return parent;
                     }
 
                     // If container is the editor itself, try to find the actual element at cursor
                     if (container === editor) {
-                        debugLog('📄 Container is editor root, looking for element at cursor position');
-
                         // Check if there's content before the cursor
                         if (range.startOffset > 0) {
                             const nodeBefore = editor.childNodes[range.startOffset - 1];
                             if (nodeBefore) {
                                 if (nodeBefore.nodeType === Node.TEXT_NODE) {
-                                    debugLog('⬅️ Found text node before cursor', {
-                                        parentTag: nodeBefore.parentElement?.tagName
-                                    });
                                     return nodeBefore.parentElement;
                                 } else if (nodeBefore.nodeType === Node.ELEMENT_NODE &&
                                           !nodeBefore.classList?.contains('autocorrect-tooltip')) {
-                                    debugLog('⬅️ Found element before cursor', {
-                                        tag: nodeBefore.tagName
-                                    });
                                     return nodeBefore;
                                 }
                             }
@@ -845,31 +647,20 @@
                             const nodeAt = editor.childNodes[range.startOffset];
                             if (nodeAt) {
                                 if (nodeAt.nodeType === Node.TEXT_NODE) {
-                                    debugLog('➡️ Found text node at cursor', {
-                                        parentTag: nodeAt.parentElement?.tagName
-                                    });
                                     return nodeAt.parentElement;
                                 } else if (nodeAt.nodeType === Node.ELEMENT_NODE &&
                                           !nodeAt.classList?.contains('autocorrect-tooltip')) {
-                                    debugLog('➡️ Found element at cursor', {
-                                        tag: nodeAt.tagName
-                                    });
                                     return nodeAt;
                                 }
                             }
                         }
 
                         // Fallback: use the editor itself
-                        debugLog('🔙 Fallback to editor root');
                         return editor;
                     }
 
-                    debugLog('🎯 Returning container as-is', {
-                        tag: container.tagName
-                    });
                     return container;
                 } catch (e) {
-                    debugLog('⚠️ Error in getElementAtCursor', {error: e.message});
                     return null;
                 }
             }
@@ -879,34 +670,18 @@
             fontSizeSelector.addEventListener('change', (e) => {
                 const beforeValue = e.target.value;
                 const beforeIndex = e.target.selectedIndex;
-                debugLog('📏 Font size dropdown CHANGE event fired', {value: beforeValue, selectedIndex: beforeIndex});
 
                 changeFontSize(e.target.value);
 
-                debugLog('📏 After changeFontSize, dropdown state:', {value: fontSizeSelector.value, selectedIndex: fontSizeSelector.selectedIndex});
 
                 resizeFontSizeSelector();
 
-                debugLog('📏 After resizeFontSizeSelector, dropdown state:', {value: fontSizeSelector.value, selectedIndex: fontSizeSelector.selectedIndex});
-            });
-            fontSelector.addEventListener('change', (e) => {
-                debugLog('🔤 Font family dropdown changed', {value: e.target.value, selectedIndex: e.target.selectedIndex});
-                changeFont(e.target.value);
-                resizeFontSelector();
             });
 
-            // Additional debugging: log clicks on dropdowns
+            // Additional debugging: log clicks on dropdown
             fontSizeSelector.addEventListener('mousedown', () => {
-                debugLog('🖱️ Font size dropdown mousedown');
             });
             fontSizeSelector.addEventListener('focus', () => {
-                debugLog('🎯 Font size dropdown focus');
-            });
-            fontSelector.addEventListener('mousedown', () => {
-                debugLog('🖱️ Font family dropdown mousedown');
-            });
-            fontSelector.addEventListener('focus', () => {
-                debugLog('🎯 Font family dropdown focus');
             });
             boldBtn.addEventListener('click', () => toggleFormat('bold'));
             italicBtn.addEventListener('click', () => toggleFormat('italic'));
@@ -1533,12 +1308,6 @@
                             parent = container;
                         }
 
-                        debugLog('🧹 Cleaning up after delete', {
-                            container: container.nodeName,
-                            parent: parent?.tagName,
-                            isAtEnd: container.nodeType === Node.TEXT_NODE && range.startOffset === container.length
-                        });
-
                         // Check if we're in an empty formatted element (FONT, SPAN, etc.)
                         if (parent && parent !== editor && parent.nodeType === Node.ELEMENT_NODE) {
                             const isEmpty = parent.textContent.trim() === '';
@@ -1546,11 +1315,6 @@
                             if (isEmpty && (parent.tagName === 'FONT' || parent.tagName === 'SPAN')) {
                                 // This element is now empty - remove it and move cursor to previous sibling
                                 const prevSibling = parent.previousSibling;
-
-                                debugLog('🗑️ Removing empty formatted element (cursor inside)', {
-                                    tag: parent.tagName,
-                                    hasPrevSibling: !!prevSibling
-                                });
 
                                 // Remove the empty element
                                 parent.remove();
@@ -1575,7 +1339,6 @@
                                     }
                                     selection.removeAllRanges();
                                     selection.addRange(newRange);
-                                    debugLog('✅ Moved cursor to end of previous sibling');
                                 }
                             }
                         }
@@ -1589,7 +1352,6 @@
                                     (nextNode.tagName === 'FONT' || nextNode.tagName === 'SPAN')) {
                                     const isEmpty = nextNode.textContent.trim() === '';
                                     if (isEmpty) {
-                                        debugLog('🗑️ Removing empty formatted element after cursor', {
                                             tag: nextNode.tagName
                                         });
                                         const toRemove = nextNode;
@@ -1796,10 +1558,6 @@
                 const selection = window.getSelection();
                 if (selection.rangeCount > 0) {
                     savedSelection = selection.getRangeAt(0).cloneRange();
-                    debugLog('💾 Saved selection on blur', {
-                        collapsed: savedSelection.collapsed,
-                        text: savedSelection.toString().substring(0, 20)
-                    });
                 }
             });
 
@@ -1809,10 +1567,6 @@
                     const selection = window.getSelection();
                     selection.removeAllRanges();
                     selection.addRange(savedSelection);
-                    debugLog('🔄 Restored saved selection', {
-                        collapsed: savedSelection.collapsed,
-                        text: savedSelection.toString().substring(0, 20)
-                    });
                     return true;
                 }
                 return false;
@@ -1822,11 +1576,9 @@
             updateToolbarState();
             resizeTitleInput(); // Size the title input correctly on load
             resizeFontSizeSelector(); // Size the font size selector correctly on load
-            resizeFontSelector(); // Size the font selector correctly on load
 
             // Set default font size to 11pt
             editor.style.fontSize = '11pt';
-            debugLog('🎯 Default font size set to 11pt');
 
             // Focus the editor on page load so cursor is ready
             editor.focus();
