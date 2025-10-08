@@ -381,6 +381,7 @@
 
         // Global variable to store current autocorrect suggestion
         let currentAutocorrectSuggestion = null;
+        let wordToReplaceWithSuggestion = null; // Store the word when we show suggestion
 
         // Initialize dictionary and autocorrect engine
         async function initializeAutocorrect() {
@@ -773,30 +774,64 @@
 
               try {
                   const range = selection.getRangeAt(0);
-                  
+
                   // Get FULL editor text using innerText (preserves newlines)
                   const fullEditorText = getEditorText();
+
+                  // Get the full editor text to compare against
+                  const fullEditorText = getEditorText();
                   
-                  // Get text before cursor by cloning content and using innerText
-                  const preCaretRange = range.cloneRange();
-                  preCaretRange.selectNodeContents(editor);
-                  preCaretRange.setEnd(range.endContainer, range.endOffset);
+                  // Calculate cursor position by matching what innerText does
+                  // We'll create a clone up to cursor position and use innerText
+                  let cursorPos = 0;
+                  let foundCursor = false;
                   
-                  // Create temporary element with cloned content to get innerText
-                  const tempDiv = document.createElement('div');
-                  tempDiv.appendChild(preCaretRange.cloneContents());
-                  let textBeforeCursor = tempDiv.innerText || '';
-                  
-                  // Remove tooltip text if present
-                  const tooltip = tempDiv.querySelector('.autocorrect-tooltip');
-                  if (tooltip && tooltip.innerText) {
-                      textBeforeCursor = textBeforeCursor.split(tooltip.innerText).join('');
+                  // Helper to recursively walk nodes and calculate position
+                  function walkNodes(node, isFirstChild) {
+                      if (foundCursor) return;
+                      
+                      // Skip tooltip nodes
+                      if (node.nodeType === Node.ELEMENT_NODE && 
+                          node.classList && node.classList.contains('autocorrect-tooltip')) {
+                          return;
+                      }
+                      
+                      // If this is a text node
+                      if (node.nodeType === Node.TEXT_NODE) {
+                          if (node === range.startContainer) {
+                              // Found the cursor - add only up to the offset
+                              cursorPos += range.startOffset;
+                              foundCursor = true;
+                              return;
+                          } else {
+                              // Add full text length
+                              cursorPos += node.textContent.length;
+                          }
+                      } else if (node.nodeType === Node.ELEMENT_NODE) {
+                          // Check if this element creates a line break
+                          if (node.nodeName === 'BR') {
+                              cursorPos += 1; // BR = newline
+                          } else if (node.nodeName === 'DIV' && node !== editor) {
+                              // DIVs in contentEditable create line breaks
+                              // But ONLY add newline if this isn't the first div AND it has content
+                              if (!isFirstChild && cursorPos > 0) {
+                                  cursorPos += 1;
+                              }
+                          }
+                          
+                          // Walk through children
+                          const children = Array.from(node.childNodes);
+                          for (let i = 0; i < children.length; i++) {
+                              walkNodes(children[i], i === 0 && isFirstChild);
+                              if (foundCursor) break;
+                          }
+                      }
                   }
                   
-                  // Strip trailing newlines to match getEditorText
-                  textBeforeCursor = textBeforeCursor.replace(/\n+$/, '');
-                  
-                  const cursorPos = textBeforeCursor.length;
+                  walkNodes(editor, true);
+
+                  // Get text before cursor from full text
+                  const textBeforeCursor = fullEditorText.substring(0, cursorPos);
                   const preceding3Chars = textBeforeCursor.substring(Math.max(0, cursorPos - 3), cursorPos);
 
                 console.log('🔍 FULL DIAGNOSTIC:');
@@ -991,19 +1026,19 @@
         function getEditorText() {
             // innerText respects the visual layout and newlines
             let text = editor.innerText || '';
-              
+
             // Remove tooltip text if present
             const tooltip = editor.querySelector('.autocorrect-tooltip');
             if (tooltip && tooltip.innerText) {
                 text = text.split(tooltip.innerText).join('');
             }
-              
+
             // Strip only trailing newlines (contentEditable adds these at end)
             text = text.replace(/\n+$/, '');
-              
+
             return text;
         }
-          
+
         // Track autocorrect state - simplified approach
         let autocorrectEnabled = true;
         let justAppliedAutocorrect = false;
@@ -1037,7 +1072,7 @@
                     return;
                 }
             }
-              
+
             console.log('🔍 Checking autocorrect for word:', {
                 currentWord,
                 wordLength: currentWord.length,
@@ -1069,9 +1104,20 @@
 
             // Check for override corrections first
             const lowerWord = currentWord.toLowerCase();
+            
+            console.log('🔎 Looking for correction:', {
+                lowerWord,
+                hasOverrides: !!editorAutocorrectEngine.correctionOverrides,
+                overrideKeys: editorAutocorrectEngine.correctionOverrides ? Object.keys(editorAutocorrectEngine.correctionOverrides).slice(0, 10) : [],
+                found: editorAutocorrectEngine.correctionOverrides ? editorAutocorrectEngine.correctionOverrides[lowerWord] : null
+            });
+            
             if (editorAutocorrectEngine.correctionOverrides && editorAutocorrectEngine.correctionOverrides[lowerWord]) {
                 const suggestion = editorAutocorrectEngine.correctionOverrides[lowerWord];
                 currentAutocorrectSuggestion = suggestion;
+                wordToReplaceWithSuggestion = currentWord; // Store the word we're suggesting to replace
+
+                console.log('✅ Found correction, showing tooltip:', suggestion);
 
                 const cursorPos = getCursorPosition();
                 if (cursorPos) {
@@ -1079,6 +1125,8 @@
                 }
                 return;
             }
+            
+            console.log('❌ No correction found for:', lowerWord);
 
 
             // Test word splitting approach first (using lowercase for lookup)
@@ -1093,6 +1141,10 @@
                     }
 
                     currentAutocorrectSuggestion = finalSuggestion;
+                    wordToReplaceWithSuggestion = currentWord; // STORE the word!
+                      
+                    console.log('✅ Found two-word split:', finalSuggestion);
+                      
                     const cursorPos = getCursorPosition();
                     if (cursorPos) {
                         showAutocorrectTooltip(finalSuggestion, cursorPos.x, cursorPos.y);
@@ -1113,12 +1165,17 @@
                 }
 
                 currentAutocorrectSuggestion = finalSuggestion;
+                wordToReplaceWithSuggestion = currentWord; // STORE the word!
+                  
+                console.log('✅ Found closest word:', finalSuggestion);
+                  
                 const cursorPos = getCursorPosition();
                 if (cursorPos) {
                     showAutocorrectTooltip(finalSuggestion, cursorPos.x, cursorPos.y);
                 }
             } else {
                 currentAutocorrectSuggestion = null;
+                wordToReplaceWithSuggestion = null;
                 hideAutocorrectTooltip();
             }
         }
@@ -1132,77 +1189,76 @@
 
         // Track last typed key to detect space/punctuation
         let lastTypedKey = '';
-          
+
         // Add keydown listener to track what key was pressed
         editor.addEventListener('keydown', function(e) {
             lastTypedKey = e.key;
         });
-          
-        // Helper to get cursor offset in text
+
+        // Helper to get cursor offset in text - uses SAME node-walking logic as getCurrentWord
         function getCursorOffset() {
             const selection = window.getSelection();
             if (!selection.rangeCount) return 0;
-                
+
             const range = selection.getRangeAt(0);
-                
-            // Get the full text using getEditorText
-            const fullText = getEditorText();
-              
-            // Create a temporary clone of editor up to cursor position
-            const tempEditor = editor.cloneNode(true);
-              
-            // Find the equivalent position in the clone
-            let foundNode = null;
-            let foundOffset = 0;
-              
-            function findNodeInClone(original, clone) {
-                if (original === range.startContainer) {
-                    foundNode = clone;
-                    foundOffset = range.startOffset;
-                    return true;
+
+            // Calculate cursor position by walking through the editor's text nodes
+            // This is the SAME logic used in getCurrentWord()
+            let cursorPos = 0;
+            let foundCursor = false;
+
+            function walkNodes(node) {
+                if (foundCursor) return;
+
+                // Skip tooltip nodes
+                if (node.nodeType === Node.ELEMENT_NODE &&
+                    node.classList && node.classList.contains('autocorrect-tooltip')) {
+                    return;
                 }
-                  
-                if (original.childNodes && clone.childNodes) {
-                    for (let i = 0; i < original.childNodes.length; i++) {
-                        if (findNodeInClone(original.childNodes[i], clone.childNodes[i])) {
-                            return true;
+
+                // If this is a text node
+                if (node.nodeType === Node.TEXT_NODE) {
+                    if (node === range.startContainer) {
+                        // Found the cursor - add only up to the offset
+                        cursorPos += range.startOffset;
+                        foundCursor = true;
+                        return;
+                    } else {
+                        // Add full text length
+                        cursorPos += node.textContent.length;
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    // Check if this element is a BR or creates a line break
+                    if (node.nodeName === 'BR') {
+                        cursorPos += 1; // BR = newline
+                    } else if (node.nodeName === 'DIV' && node !== editor) {
+                        // DIVs in contentEditable create line breaks (except the root editor)
+                        const childNodes = Array.from(node.childNodes);
+                        if (childNodes.length > 0) {
+                            // Add newline before the div's content (if not first div)
+                            if (cursorPos > 0) {
+                                cursorPos += 1;
+                            }
                         }
                     }
+
+                    // Walk through children
+                    for (const child of node.childNodes) {
+                        walkNodes(child);
+                        if (foundCursor) break;
+                    }
                 }
-                return false;
             }
-              
-            findNodeInClone(editor, tempEditor);
-              
-            if (foundNode) {
-                // Remove everything after the cursor in the clone
-                const cloneRange = document.createRange();
-                cloneRange.selectNodeContents(tempEditor);
-                cloneRange.setStart(foundNode, foundOffset);
-                cloneRange.deleteContents();
-            }
-              
-            // Now get innerText from the clone (text before cursor)
-            let textBeforeCursor = tempEditor.innerText || '';
-              
-            // Remove tooltip text if present
-            const tooltip = tempEditor.querySelector('.autocorrect-tooltip');
-            if (tooltip && tooltip.innerText) {
-                textBeforeCursor = textBeforeCursor.replace(tooltip.innerText, '');
-            }
-              
-            // Normalize trailing newlines to match getNormalizedEditorText
-            textBeforeCursor = textBeforeCursor.replace(/\n+$/, '');
-              
+
+            walkNodes(editor);
+
             console.log('📍 getCursorOffset:', {
-                offset: textBeforeCursor.length,
-                textBeforeCursor: textBeforeCursor.substring(Math.max(0, textBeforeCursor.length - 20)),
-                fullText: fullText.substring(0, 50)
+                offset: cursorPos
             });
-              
-            return textBeforeCursor.length;
+
+            return cursorPos;
         }
-          
+
         // Add click listener to reset autocorrect state when user clicks to new position
         editor.addEventListener('mousedown', function(e) {
             // Skip if we just applied autocorrect (to avoid interfering with reset)
@@ -1210,19 +1266,19 @@
                 console.log('🚫 Skipping click handler - autocorrect was just applied');
                 return;
             }
-                
+
             // User clicked somewhere - enable autocorrect for new typing session
             setTimeout(() => {
                 autocorrectEnabled = true;
                 console.log('🖱️ Click detected - reset autocorrect enabled');
             }, 0);
         });
-          
+
         // Helper to get consistent text length (matching what getCurrentWord uses)
         function getConsistentTextLength() {
             return getEditorText().length;
         }
-          
+
         // Add input listener for autocorrect tooltips (suggestion-only)
         editor.addEventListener('input', function (e) {
             const currentTextLength = getConsistentTextLength();
@@ -1242,7 +1298,7 @@
 
             // Calculate change in text length
             const textLengthChange = currentTextLength - lastTextLength;
-              
+
             // Simplified logic: disable autocorrect only when backspacing into completed text
             if (textLengthChange < 0) {
                 // Check if we backspaced into text that existed before (cursor moved backward)
@@ -1272,53 +1328,135 @@
             }, 0);
         });
 
+        // Track if we're in the middle of applying autocorrect (to block other inputs)
+        let isApplyingAutocorrect = false;
+
         // Handle autocorrect application triggers and navigation keys
         editor.addEventListener('keydown', function (e) {
+            // Block all input if we're currently applying autocorrect
+            if (isApplyingAutocorrect) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+
+            // Check if this is a trigger key (space, Enter, or punctuation)
+            const isEnter = e.key === 'Enter';
+            const isSpace = e.key === ' ';
+            const isPunctuation = [',', '.', ';', '/', '"', "'", '?', '!'].includes(e.key);
+            const isTriggerKey = isEnter || isSpace || isPunctuation;
+
+            // If it's a trigger key, check for autocorrect BEFORE the key is processed
+            if (isTriggerKey) {
+                // Get the current word BEFORE the space/punctuation is added
+                const currentWord = getCurrentWord();
+                    
+                console.log('🎯 Trigger key pressed:', {
+                    key: e.key,
+                    currentWord,
+                    hasSuggestion: !!currentAutocorrectSuggestion,
+                    storedWord: wordToReplaceWithSuggestion
+                });
+                    
+                // If there's no current suggestion but there's a current word, run full autocorrect check now
+                if (!currentAutocorrectSuggestion && currentWord && currentWord.length >= 3 && autocorrectEnabled) {
+                    const lowerWord = currentWord.toLowerCase();
+                      
+                    // Check overrides first
+                    if (editorAutocorrectEngine.correctionOverrides && 
+                        editorAutocorrectEngine.correctionOverrides[lowerWord]) {
+                        const suggestion = editorAutocorrectEngine.correctionOverrides[lowerWord];
+                        currentAutocorrectSuggestion = suggestion;
+                        wordToReplaceWithSuggestion = currentWord;
+                            
+                        console.log('🎯 Found override correction on trigger key:', {
+                            wordToReplace: currentWord,
+                            suggestion
+                        });
+                    }
+                    // Check for two-word split
+                    else if (editorAutocorrectEngine.findTwoWordSplit) {
+                        const twoWordSplit = editorAutocorrectEngine.findTwoWordSplit(lowerWord);
+                        if (twoWordSplit && twoWordSplit !== lowerWord) {
+                            // Capitalize if original was capitalized
+                            const isCapitalized = currentWord[0] === currentWord[0].toUpperCase();
+                            const finalSuggestion = isCapitalized && twoWordSplit.length > 0
+                                ? twoWordSplit.charAt(0).toUpperCase() + twoWordSplit.slice(1)
+                                : twoWordSplit;
+                                  
+                            currentAutocorrectSuggestion = finalSuggestion;
+                            wordToReplaceWithSuggestion = currentWord;
+                              
+                            console.log('🎯 Found two-word split on trigger key:', {
+                                wordToReplace: currentWord,
+                                suggestion: finalSuggestion
+                            });
+                        }
+                    }
+                }
+            }
+
             // Re-enable autocorrect when typing whitespace (even if previously disabled)
-            if (e.key === ' ' || e.key === 'Enter') {
+            if (isSpace || isEnter) {
                 autocorrectEnabled = true;
                 justAppliedAutocorrect = false; // Clear the flag when typing whitespace
             }
 
-            // Check for autocorrect application triggers
-            if (currentAutocorrectSuggestion) {
-                const isEnter = e.key === 'Enter';
-                const isSpace = e.key === ' ';
-                const isPunctuation = [',', '.', ';', '/', '"', "'", '?', '!'].includes(e.key);
+            // Check for autocorrect application
+            if (currentAutocorrectSuggestion && wordToReplaceWithSuggestion && isTriggerKey) {
+                // Use the stored word that we showed in the tooltip
+                const wordToDelete = wordToReplaceWithSuggestion;
+                const suggestionToApply = currentAutocorrectSuggestion;
 
-                if (isEnter || isSpace || isPunctuation) {
-                    const wordToDelete = getCurrentWord();
+                console.log('🔧 Applying autocorrect:', {
+                    wordToDelete,
+                    suggestionToApply,
+                    triggerKey: e.key
+                });
 
+                // Prevent the trigger key from being processed normally
+                e.preventDefault();
+                e.stopPropagation();
 
+                // Set flag to block other inputs during replacement
+                isApplyingAutocorrect = true;
 
-                    // Prevent the trigger key from being processed normally
-                    e.preventDefault();
+                // Use setTimeout to ensure this runs after any queued events
+                setTimeout(() => {
+                    try {
+                        // Replace the current word with autocorrect suggestion
+                        if (wordToDelete) {
+                            replaceCurrentWord(wordToDelete, suggestionToApply);
+                            justAppliedAutocorrect = true;
+                        }
 
-                    // Replace the current word with autocorrect suggestion
-                    if (wordToDelete) {
-                        replaceCurrentWord(wordToDelete, currentAutocorrectSuggestion);
-                        justAppliedAutocorrect = true;
+                        // Hide tooltip and clear suggestion
+                        hideAutocorrectTooltip();
+                        currentAutocorrectSuggestion = null;
+                        wordToReplaceWithSuggestion = null;
+
+                        // Insert the trigger key that was prevented
+                        if (e.key === 'Enter') {
+                            // Insert line break using insertLineBreak for better contentEditable support
+                            document.execCommand('insertLineBreak', false, null);
+                        } else {
+                            // For space and punctuation, insert the actual character
+                            document.execCommand('insertText', false, e.key);
+                        }
+                    } finally {
+                        // Always clear the flag, even if there's an error
+                        isApplyingAutocorrect = false;
                     }
+                }, 0);
 
-                    // Hide tooltip and clear suggestion
-                    hideAutocorrectTooltip();
-                    currentAutocorrectSuggestion = null;
-
-                    // Insert the trigger key that was prevented
-                    if (e.key === 'Enter') {
-                        // Insert line break using insertLineBreak for better contentEditable support
-                        document.execCommand('insertLineBreak', false, null);
-                    } else {
-                        // For space and punctuation, insert the actual character
-                        document.execCommand('insertText', false, e.key);
-                    }
-                }
+                return false;
             }
 
             // Hide tooltip on navigation keys
             if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
                 hideAutocorrectTooltip();
                 currentAutocorrectSuggestion = null;
+                wordToReplaceWithSuggestion = null;
             }
         });
 
