@@ -686,12 +686,28 @@
 
             // Event listeners
             fontSizeSelector.addEventListener('change', (e) => {
+                debugLog('📏 Font size dropdown changed', {value: e.target.value, selectedIndex: e.target.selectedIndex});
                 changeFontSize(e.target.value);
                 resizeFontSizeSelector();
             });
             fontSelector.addEventListener('change', (e) => {
+                debugLog('🔤 Font family dropdown changed', {value: e.target.value, selectedIndex: e.target.selectedIndex});
                 changeFont(e.target.value);
                 resizeFontSelector();
+            });
+            
+            // Additional debugging: log clicks on dropdowns
+            fontSizeSelector.addEventListener('mousedown', () => {
+                debugLog('🖱️ Font size dropdown mousedown');
+            });
+            fontSizeSelector.addEventListener('focus', () => {
+                debugLog('🎯 Font size dropdown focus');
+            });
+            fontSelector.addEventListener('mousedown', () => {
+                debugLog('🖱️ Font family dropdown mousedown');
+            });
+            fontSelector.addEventListener('focus', () => {
+                debugLog('🎯 Font family dropdown focus');
             });
             boldBtn.addEventListener('click', () => toggleFormat('bold'));
             italicBtn.addEventListener('click', () => toggleFormat('italic'));
