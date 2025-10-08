@@ -194,7 +194,7 @@ class AutocorrectEngine {
             return this.correctionOverrides[part];
         }
 
-        if (this.dictionarySet.has(part)) return part;
+        if (this.hasWord(part)) return part;
 
         // For very short words, be more conservative about corrections
         if (part.length < 2) return null;
@@ -257,7 +257,7 @@ class AutocorrectEngine {
             const firstPart = lowerWord.substring(0, i);
             const secondPart = lowerWord.substring(i);
 
-            if (this.dictionarySet.has(firstPart) && this.dictionarySet.has(secondPart)) {
+            if (this.hasWord(firstPart) && this.hasWord(secondPart)) {
                 return 1;
             }
 
@@ -297,7 +297,7 @@ class AutocorrectEngine {
      * Find two-word split for concatenated words
      */
     findTwoWordSplit(word) {
-        if (word.length < 4 || this.dictionarySet.has(word.toLowerCase())) return null;
+        if (word.length < 4 || this.hasWord(word)) return null;
 
         const lowerWord = word.toLowerCase();
         const isCapitalized = word[0] === word[0].toUpperCase();
@@ -378,7 +378,7 @@ class AutocorrectEngine {
             return this.preserveCapitalization(word, this.correctionOverrides[lowerWord]);
         }
 
-        if (this.dictionarySet.has(lowerWord)) {
+        if (this.hasWord(lowerWord)) {
             return word;
         }
 
