@@ -338,10 +338,56 @@
     <!-- Autocorrect tooltip - positioned outside of contentEditable -->
     <div id="autocorrect-tooltip" class="autocorrect-tooltip"></div>
 
+    <!-- Debug console for Quest 3 debugging -->
+    <div id="debug-console" style="position: fixed; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.9); color: #0f0; font-family: monospace; font-size: 11px; max-height: 200px; overflow-y: auto; padding: 10px; z-index: 99999; display: none; border-top: 2px solid #0f0;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px; border-bottom: 1px solid #0f0; padding-bottom: 5px;">
+        <strong>Debug Console</strong>
+        <button onclick="document.getElementById('debug-console').style.display='none'" style="background: #f00; color: #fff; border: none; padding: 2px 8px; cursor: pointer;">Close</button>
+      </div>
+      <div id="debug-output"></div>
+    </div>
+    <button id="debug-toggle" onclick="document.getElementById('debug-console').style.display='block'" style="position: fixed; bottom: 10px; right: 10px; z-index: 99998; background: #0f0; color: #000; border: 2px solid #000; padding: 5px 10px; font-weight: bold; cursor: pointer;">Show Debug</button>
+
     <!-- Load external scripts -->
     <script src="../dictionary-loader.js"></script>
     <script src="../AutocorrectEngine.js"></script>
     <script>
+        // Debug logging function
+        function debugLog(message, data) {
+            const debugOutput = document.getElementById('debug-output');
+            if (debugOutput) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.style.marginBottom = '3px';
+                logEntry.style.borderBottom = '1px solid #333';
+                logEntry.style.paddingBottom = '3px';
+                
+                let dataStr = '';
+                if (data) {
+                    try {
+                        dataStr = ' | ' + JSON.stringify(data);
+                    } catch (e) {
+                        dataStr = ' | [circular data]';
+                    }
+                }
+                
+                logEntry.innerHTML = `<span style="color: #666">${timestamp}</span> ${message}${dataStr}`;
+                debugOutput.insertBefore(logEntry, debugOutput.firstChild);
+                
+                // Keep only last 50 messages
+                while (debugOutput.children.length > 50) {
+                    debugOutput.removeChild(debugOutput.lastChild);
+                }
+            }
+            console.log(message, data);
+        }
+        
+        // Capture all errors
+        window.onerror = function(msg, url, line, col, error) {
+            debugLog('❌ ERROR: ' + msg, {line, col, error: error?.stack});
+            return false;
+        };
+        
         // Wait for DOM to be ready
         document.addEventListener('DOMContentLoaded', function () {
             initializeEditor();
@@ -375,18 +421,23 @@
             // Initialize dictionary and autocorrect engine
             async function initializeAutocorrect() {
                 try {
+                    debugLog('🔄 Starting autocorrect initialization...');
                     const dictionary = await loadDictionary('../comprehensive_dictionary.txt');
+                    debugLog('📚 Dictionary loaded', {wordCount: dictionary.length});
 
                     // Create autocorrect engine with dictionary words
                     editorAutocorrectEngine = new AutocorrectEngine();
                     editorAutocorrectEngine.addWords(dictionary);
                     autocorrectReady = true;
+                    debugLog('✅ Autocorrect engine ready!');
                 } catch (error) {
+                    debugLog('❌ Failed to initialize autocorrect', {error: error.message, stack: error.stack});
                     console.error('❌ Failed to initialize autocorrect:', error);
                 }
             }
 
             // Start initialization
+            debugLog('🚀 Editor initialization started');
             initializeAutocorrect();
 
             // Format functions
@@ -397,73 +448,100 @@
             }
 
             function changeFont(fontName) {
-                const selection = window.getSelection();
-                const hadSelection = selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed;
+                try {
+                    debugLog('🔤 changeFont called', {fontName});
+                    const selection = window.getSelection();
+                    debugLog('Selection state', {rangeCount: selection.rangeCount, collapsed: selection.rangeCount > 0 ? selection.getRangeAt(0).collapsed : null});
+                    
+                    const hadSelection = selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed;
 
-                document.execCommand('fontName', false, fontName);
+                    document.execCommand('fontName', false, fontName);
+                    debugLog('execCommand fontName executed');
 
-                // If there was a selection, restore it
-                if (hadSelection && selection.rangeCount > 0) {
-                    const range = selection.getRangeAt(0);
-                    // Force the selection to remain visible
-                    setTimeout(() => {
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                    }, 0);
+                    // If there was a selection, restore it
+                    if (hadSelection && selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        // Force the selection to remain visible
+                        setTimeout(() => {
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            debugLog('Selection restored');
+                        }, 0);
+                    }
+
+                    updateToolbarState();
+                    resizeFontSelector();
+                    editor.focus();
+                    debugLog('✅ changeFont complete');
+                } catch (error) {
+                    debugLog('❌ ERROR in changeFont', {error: error.message, stack: error.stack});
                 }
-
-                updateToolbarState();
-                resizeFontSelector();
-                editor.focus();
             }
 
             function changeFontSize(fontSize) {
-                const selection = window.getSelection();
-                if (selection.rangeCount > 0) {
-                    const range = selection.getRangeAt(0);
+                try {
+                    debugLog('📏 changeFontSize called', {fontSize});
+                    const selection = window.getSelection();
+                    debugLog('Selection state', {rangeCount: selection.rangeCount});
+                    
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        debugLog('Range info', {collapsed: range.collapsed, startOffset: range.startOffset});
 
-                    // Check if there's selected text
-                    if (!range.collapsed) {
-                        // Text is selected - apply font size to selection
-                        const selectedContent = range.extractContents();
-                        const span = document.createElement('span');
-                        span.style.fontSize = fontSize + 'pt';
-                        span.appendChild(selectedContent);
-                        range.insertNode(span);
+                        // Check if there's selected text
+                        if (!range.collapsed) {
+                            debugLog('Applying to selection');
+                            // Text is selected - apply font size to selection
+                            const selectedContent = range.extractContents();
+                            const span = document.createElement('span');
+                            span.style.fontSize = fontSize + 'pt';
+                            span.appendChild(selectedContent);
+                            range.insertNode(span);
+                            debugLog('Span inserted');
 
-                        // Select the newly inserted content to preserve selection
-                        const newRange = document.createRange();
-                        newRange.selectNodeContents(span);
-                        selection.removeAllRanges();
-                        selection.addRange(newRange);
-                    } else {
-                        // No text selected - insert a styled span for upcoming text
-                        const span = document.createElement('span');
-                        span.style.fontSize = fontSize + 'pt';
+                            // Select the newly inserted content to preserve selection
+                            const newRange = document.createRange();
+                            newRange.selectNodeContents(span);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                            debugLog('Selection preserved');
+                        } else {
+                            debugLog('Applying at cursor');
+                            // No text selected - insert a styled span for upcoming text
+                            const span = document.createElement('span');
+                            span.style.fontSize = fontSize + 'pt';
 
-                        // Preserve current formatting state
-                        const isBold = document.queryCommandState('bold');
-                        const isItalic = document.queryCommandState('italic');
-                        const isUnderline = document.queryCommandState('underline');
+                            // Preserve current formatting state
+                            const isBold = document.queryCommandState('bold');
+                            const isItalic = document.queryCommandState('italic');
+                            const isUnderline = document.queryCommandState('underline');
+                            debugLog('Current formatting', {isBold, isItalic, isUnderline});
 
-                        // Apply current formatting or explicitly set to normal
-                        span.style.fontWeight = isBold ? 'bold' : 'normal';
-                        span.style.fontStyle = isItalic ? 'italic' : 'normal';
-                        span.style.textDecoration = isUnderline ? 'underline' : 'none';
+                            // Apply current formatting or explicitly set to normal
+                            span.style.fontWeight = isBold ? 'bold' : 'normal';
+                            span.style.fontStyle = isItalic ? 'italic' : 'normal';
+                            span.style.textDecoration = isUnderline ? 'underline' : 'none';
 
-                        // Insert a zero-width space to make the span "stick"
-                        span.appendChild(document.createTextNode('\u200B'));
-                        range.insertNode(span);
-                        // Place cursor inside the span after the zero-width space
-                        range.setStart(span.firstChild, 1);
-                        range.collapse(true);
-                        selection.removeAllRanges();
-                        selection.addRange(range);
+                            // Insert a zero-width space to make the span "stick"
+                            span.appendChild(document.createTextNode('\u200B'));
+                            range.insertNode(span);
+                            debugLog('Span with zero-width space inserted');
+                            
+                            // Place cursor inside the span after the zero-width space
+                            range.setStart(span.firstChild, 1);
+                            range.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            debugLog('Cursor positioned in span');
+                        }
                     }
+                    updateToolbarState();
+                    resizeFontSizeSelector();
+                    editor.focus();
+                    debugLog('✅ changeFontSize complete');
+                } catch (error) {
+                    debugLog('❌ ERROR in changeFontSize', {error: error.message, stack: error.stack});
                 }
-                updateToolbarState();
-                resizeFontSizeSelector();
-                editor.focus();
             }
 
             // Auto-resize font selector to fit current selection
