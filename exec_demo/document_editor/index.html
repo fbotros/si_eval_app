@@ -762,6 +762,10 @@
                 tooltip.classList.remove('show');
                 tooltip.style.opacity = '0';
                 tooltip.style.visibility = 'hidden';
+                // Remove from DOM to prevent contentEditable from creating extra nodes
+                if (tooltip.parentNode) {
+                    tooltip.parentNode.removeChild(tooltip);
+                }
             }
         }
 
@@ -778,24 +782,20 @@
                   // Get FULL editor text using innerText (preserves newlines)
                   const fullEditorText = getEditorText();
 
-                  // Get the full editor text to compare against
-                  const fullEditorText = getEditorText();
-                  
                   // Calculate cursor position by matching what innerText does
-                  // We'll create a clone up to cursor position and use innerText
                   let cursorPos = 0;
                   let foundCursor = false;
-                  
+
                   // Helper to recursively walk nodes and calculate position
                   function walkNodes(node, isFirstChild) {
                       if (foundCursor) return;
-                      
+
                       // Skip tooltip nodes
-                      if (node.nodeType === Node.ELEMENT_NODE && 
+                      if (node.nodeType === Node.ELEMENT_NODE &&
                           node.classList && node.classList.contains('autocorrect-tooltip')) {
                           return;
                       }
-                      
+
                       // If this is a text node
                       if (node.nodeType === Node.TEXT_NODE) {
                           if (node === range.startContainer) {
@@ -818,7 +818,7 @@
                                   cursorPos += 1;
                               }
                           }
-                          
+
                           // Walk through children
                           const children = Array.from(node.childNodes);
                           for (let i = 0; i < children.length; i++) {
@@ -827,7 +827,7 @@
                           }
                       }
                   }
-                  
+
                   walkNodes(editor, true);
 
                   // Get text before cursor from full text
@@ -1104,14 +1104,14 @@
 
             // Check for override corrections first
             const lowerWord = currentWord.toLowerCase();
-            
+
             console.log('🔎 Looking for correction:', {
                 lowerWord,
                 hasOverrides: !!editorAutocorrectEngine.correctionOverrides,
                 overrideKeys: editorAutocorrectEngine.correctionOverrides ? Object.keys(editorAutocorrectEngine.correctionOverrides).slice(0, 10) : [],
                 found: editorAutocorrectEngine.correctionOverrides ? editorAutocorrectEngine.correctionOverrides[lowerWord] : null
             });
-            
+
             if (editorAutocorrectEngine.correctionOverrides && editorAutocorrectEngine.correctionOverrides[lowerWord]) {
                 const suggestion = editorAutocorrectEngine.correctionOverrides[lowerWord];
                 currentAutocorrectSuggestion = suggestion;
@@ -1125,7 +1125,7 @@
                 }
                 return;
             }
-            
+
             console.log('❌ No correction found for:', lowerWord);
 
 
@@ -1142,9 +1142,9 @@
 
                     currentAutocorrectSuggestion = finalSuggestion;
                     wordToReplaceWithSuggestion = currentWord; // STORE the word!
-                      
+
                     console.log('✅ Found two-word split:', finalSuggestion);
-                      
+
                     const cursorPos = getCursorPosition();
                     if (cursorPos) {
                         showAutocorrectTooltip(finalSuggestion, cursorPos.x, cursorPos.y);
@@ -1166,9 +1166,9 @@
 
                 currentAutocorrectSuggestion = finalSuggestion;
                 wordToReplaceWithSuggestion = currentWord; // STORE the word!
-                  
+
                 console.log('✅ Found closest word:', finalSuggestion);
-                  
+
                 const cursorPos = getCursorPosition();
                 if (cursorPos) {
                     showAutocorrectTooltip(finalSuggestion, cursorPos.x, cursorPos.y);
@@ -1350,25 +1350,25 @@
             if (isTriggerKey) {
                 // Get the current word BEFORE the space/punctuation is added
                 const currentWord = getCurrentWord();
-                    
+
                 console.log('🎯 Trigger key pressed:', {
                     key: e.key,
                     currentWord,
                     hasSuggestion: !!currentAutocorrectSuggestion,
                     storedWord: wordToReplaceWithSuggestion
                 });
-                    
+
                 // If there's no current suggestion but there's a current word, run full autocorrect check now
                 if (!currentAutocorrectSuggestion && currentWord && currentWord.length >= 3 && autocorrectEnabled) {
                     const lowerWord = currentWord.toLowerCase();
-                      
+
                     // Check overrides first
-                    if (editorAutocorrectEngine.correctionOverrides && 
+                    if (editorAutocorrectEngine.correctionOverrides &&
                         editorAutocorrectEngine.correctionOverrides[lowerWord]) {
                         const suggestion = editorAutocorrectEngine.correctionOverrides[lowerWord];
                         currentAutocorrectSuggestion = suggestion;
                         wordToReplaceWithSuggestion = currentWord;
-                            
+
                         console.log('🎯 Found override correction on trigger key:', {
                             wordToReplace: currentWord,
                             suggestion
@@ -1383,10 +1383,10 @@
                             const finalSuggestion = isCapitalized && twoWordSplit.length > 0
                                 ? twoWordSplit.charAt(0).toUpperCase() + twoWordSplit.slice(1)
                                 : twoWordSplit;
-                                  
+
                             currentAutocorrectSuggestion = finalSuggestion;
                             wordToReplaceWithSuggestion = currentWord;
-                              
+
                             console.log('🎯 Found two-word split on trigger key:', {
                                 wordToReplace: currentWord,
                                 suggestion: finalSuggestion
