@@ -361,7 +361,7 @@
                 logEntry.style.marginBottom = '3px';
                 logEntry.style.borderBottom = '1px solid #333';
                 logEntry.style.paddingBottom = '3px';
-                
+
                 let dataStr = '';
                 if (data) {
                     try {
@@ -370,10 +370,10 @@
                         dataStr = ' | [circular data]';
                     }
                 }
-                
+
                 logEntry.innerHTML = `<span style="color: #666">${timestamp}</span> ${message}${dataStr}`;
                 debugOutput.insertBefore(logEntry, debugOutput.firstChild);
-                
+
                 // Keep only last 50 messages
                 while (debugOutput.children.length > 50) {
                     debugOutput.removeChild(debugOutput.lastChild);
@@ -381,13 +381,13 @@
             }
             console.log(message, data);
         }
-        
+
         // Capture all errors
         window.onerror = function(msg, url, line, col, error) {
             debugLog('❌ ERROR: ' + msg, {line, col, error: error?.stack});
             return false;
         };
-        
+
         // Wait for DOM to be ready
         document.addEventListener('DOMContentLoaded', function () {
             initializeEditor();
@@ -452,7 +452,7 @@
                     debugLog('🔤 changeFont called', {fontName});
                     const selection = window.getSelection();
                     debugLog('Selection state', {rangeCount: selection.rangeCount, collapsed: selection.rangeCount > 0 ? selection.getRangeAt(0).collapsed : null});
-                    
+
                     const hadSelection = selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed;
 
                     document.execCommand('fontName', false, fontName);
@@ -481,6 +481,20 @@
             function changeFontSize(fontSize) {
                 try {
                     debugLog('📏 changeFontSize called', {fontSize});
+                    
+                    // Save cursor position BEFORE any operations
+                    const initialSelection = window.getSelection();
+                    let savedRange = null;
+                    if (initialSelection.rangeCount > 0) {
+                        savedRange = initialSelection.getRangeAt(0).cloneRange();
+                        debugLog('💾 Initial cursor saved', {
+                            startOffset: savedRange.startOffset,
+                            endOffset: savedRange.endOffset,
+                            collapsed: savedRange.collapsed,
+                            startContainer: savedRange.startContainer.nodeName
+                        });
+                    }
+                    
                     const selection = window.getSelection();
                     debugLog('Selection state', {rangeCount: selection.rangeCount});
                     
@@ -532,12 +546,49 @@
                             range.collapse(true);
                             selection.removeAllRanges();
                             selection.addRange(range);
-                            debugLog('Cursor positioned in span');
+                            debugLog('Cursor positioned in span', {
+                                startOffset: range.startOffset,
+                                collapsed: range.collapsed
+                            });
                         }
                     }
+                    
+                    debugLog('Before updateToolbarState - checking cursor position');
+                    const selBeforeUpdate = window.getSelection();
+                    if (selBeforeUpdate.rangeCount > 0) {
+                        const r = selBeforeUpdate.getRangeAt(0);
+                        debugLog('Cursor before updateToolbarState', {startOffset: r.startOffset, collapsed: r.collapsed});
+                    }
+                    
                     updateToolbarState();
+                    
+                    debugLog('After updateToolbarState - checking cursor position');
+                    const selAfterUpdate = window.getSelection();
+                    if (selAfterUpdate.rangeCount > 0) {
+                        const r = selAfterUpdate.getRangeAt(0);
+                        debugLog('Cursor after updateToolbarState', {startOffset: r.startOffset, collapsed: r.collapsed});
+                    }
+                    
                     resizeFontSizeSelector();
+                    
+                    debugLog('After resizeFontSizeSelector - checking cursor position');
+                    const selAfterResize = window.getSelection();
+                    if (selAfterResize.rangeCount > 0) {
+                        const r = selAfterResize.getRangeAt(0);
+                        debugLog('Cursor after resizeFontSizeSelector', {startOffset: r.startOffset, collapsed: r.collapsed});
+                    }
+                    
                     editor.focus();
+                    
+                    debugLog('After editor.focus() - checking cursor position');
+                    const selAfterFocus = window.getSelection();
+                    if (selAfterFocus.rangeCount > 0) {
+                        const r = selAfterFocus.getRangeAt(0);
+                        debugLog('⚠️ FINAL cursor position', {startOffset: r.startOffset, collapsed: r.collapsed, startContainer: r.startContainer.nodeName});
+                    } else {
+                        debugLog('⚠️ NO SELECTION after editor.focus()!');
+                    }
+                    
                     debugLog('✅ changeFontSize complete');
                 } catch (error) {
                     debugLog('❌ ERROR in changeFontSize', {error: error.message, stack: error.stack});
@@ -686,16 +737,24 @@
 
             // Event listeners
             fontSizeSelector.addEventListener('change', (e) => {
-                debugLog('📏 Font size dropdown changed', {value: e.target.value, selectedIndex: e.target.selectedIndex});
+                const beforeValue = e.target.value;
+                const beforeIndex = e.target.selectedIndex;
+                debugLog('📏 Font size dropdown CHANGE event fired', {value: beforeValue, selectedIndex: beforeIndex});
+                
                 changeFontSize(e.target.value);
+                
+                debugLog('📏 After changeFontSize, dropdown state:', {value: fontSizeSelector.value, selectedIndex: fontSizeSelector.selectedIndex});
+                
                 resizeFontSizeSelector();
+                
+                debugLog('📏 After resizeFontSizeSelector, dropdown state:', {value: fontSizeSelector.value, selectedIndex: fontSizeSelector.selectedIndex});
             });
             fontSelector.addEventListener('change', (e) => {
                 debugLog('🔤 Font family dropdown changed', {value: e.target.value, selectedIndex: e.target.selectedIndex});
                 changeFont(e.target.value);
                 resizeFontSelector();
             });
-            
+
             // Additional debugging: log clicks on dropdowns
             fontSizeSelector.addEventListener('mousedown', () => {
                 debugLog('🖱️ Font size dropdown mousedown');
@@ -1243,7 +1302,7 @@
             let autocorrectTimeout;
             function debouncedAutocorrectCheck() {
                 clearTimeout(autocorrectTimeout);
-                autocorrectTimeout = setTimeout(checkForAutocorrect, 50);
+                autocorrectTimeout = setTimeout(checkForAutocorrect, 200);
             }
 
             // Track last typed key to detect space/punctuation
