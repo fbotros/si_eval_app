@@ -397,7 +397,21 @@
             }
 
             function changeFont(fontName) {
+                const selection = window.getSelection();
+                const hadSelection = selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed;
+                
                 document.execCommand('fontName', false, fontName);
+                
+                // If there was a selection, restore it
+                if (hadSelection && selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    // Force the selection to remain visible
+                    setTimeout(() => {
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    }, 0);
+                }
+                
                 updateToolbarState();
                 resizeFontSelector();
                 editor.focus();
@@ -416,10 +430,12 @@
                         span.style.fontSize = fontSize + 'pt';
                         span.appendChild(selectedContent);
                         range.insertNode(span);
-                        // Move cursor to end of inserted content
-                        range.collapse(false);
+                        
+                        // Select the newly inserted content to preserve selection
+                        const newRange = document.createRange();
+                        newRange.selectNodeContents(span);
                         selection.removeAllRanges();
-                        selection.addRange(range);
+                        selection.addRange(newRange);
                     } else {
                         // No text selected - insert a styled span for upcoming text
                         const span = document.createElement('span');
