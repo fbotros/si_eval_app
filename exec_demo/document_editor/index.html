@@ -485,11 +485,32 @@
                     debugLog('📏 changeFontSize called', {fontSize: fontSize + 'pt'});
                     
                     const selection = window.getSelection();
+                    debugLog('Selection object', {
+                        rangeCount: selection.rangeCount,
+                        type: selection.type,
+                        anchorNode: selection.anchorNode?.nodeName,
+                        focusNode: selection.focusNode?.nodeName,
+                        anchorOffset: selection.anchorOffset,
+                        focusOffset: selection.focusOffset,
+                        toString: selection.toString().substring(0, 50)
+                    });
+                    
                     if (selection.rangeCount > 0) {
                         const range = selection.getRangeAt(0);
-                        debugLog('Range info', {collapsed: range.collapsed, startOffset: range.startOffset});
+                        debugLog('Range details', {
+                            collapsed: range.collapsed,
+                            startOffset: range.startOffset,
+                            endOffset: range.endOffset,
+                            startContainer: range.startContainer?.nodeName,
+                            endContainer: range.endContainer?.nodeName,
+                            toString: range.toString().substring(0, 50)
+                        });
                         
-                        if (!range.collapsed) {
+                        // Check if there's ACTUALLY selected text using toString
+                        const hasActualSelection = range.toString().length > 0 || !range.collapsed;
+                        debugLog('Has actual selection?', {hasActualSelection, textLength: range.toString().length});
+                        
+                        if (hasActualSelection) {
                             // Has selection - wrap it in a span
                             debugLog('Wrapping selected text');
                             const span = document.createElement('span');
