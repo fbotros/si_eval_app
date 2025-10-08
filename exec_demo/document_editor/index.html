@@ -476,7 +476,6 @@
                     
                     const selection = window.getSelection();
                     const hadSelection = selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed;
-                    const savedRange = hadSelection ? selection.getRangeAt(0).cloneRange() : null;
                     
                     debugLog('Selection before execCommand', {
                         type: selection.type,
@@ -485,26 +484,37 @@
                         hadSelection: hadSelection
                     });
 
+                    // execCommand will maintain selection automatically
                     document.execCommand('fontName', false, fontName);
                     debugLog('execCommand fontName executed');
 
-                    // Restore selection after applying font change
-                    if (hadSelection && savedRange) {
+                    // execCommand('fontName') should preserve selection, but restore just in case
+                    if (hadSelection) {
                         setTimeout(() => {
                             try {
-                                selection.removeAllRanges();
-                                selection.addRange(savedRange);
-                                debugLog('✅ Selection restored after font family change');
+                                // Check if selection is still valid
+                                if (selection.rangeCount === 0 || selection.getRangeAt(0).collapsed) {
+                                    debugLog('⚠️ Selection was lost, but execCommand should have preserved it');
+                                } else {
+                                    debugLog('✅ Selection preserved after font family change');
+                                }
                             } catch (e) {
-                                debugLog('⚠️ Could not restore selection', {error: e.message});
+                                debugLog('⚠️ Error checking selection', {error: e.message});
                             }
+                            
+                            updateToolbarState();
+                            resizeFontSelector();
+                            editor.focus();
+                            
+                            debugLog('✅ changeFont complete');
                         }, 0);
+                    } else {
+                        updateToolbarState();
+                        resizeFontSelector();
+                        editor.focus();
+                        debugLog('✅ changeFont complete');
                     }
 
-                    updateToolbarState();
-                    resizeFontSelector();
-                    editor.focus();
-                    debugLog('✅ changeFont complete');
                 } catch (error) {
                     debugLog('❌ ERROR in changeFont', {error: error.message, stack: error.stack});
                 }
@@ -521,7 +531,6 @@
                     // Save selection state for debugging and restoration
                     const selection = window.getSelection();
                     const hadSelection = selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed;
-                    const savedRange = hadSelection ? selection.getRangeAt(0).cloneRange() : null;
                     
                     debugLog('Selection before execCommand', {
                         type: selection.type,
@@ -543,13 +552,24 @@
                     };
                     
                     const htmlSize = htmlSizeMap[fontSize] || '3';
+                    
+                    // execCommand will maintain the selection for us
                     document.execCommand('fontSize', false, htmlSize);
                     
                     debugLog('execCommand fontSize executed', {htmlSize});
                     
                     // Now convert the font tags to spans with pt sizes
                     setTimeout(() => {
+                        // Save the selection that execCommand created (the formatted text)
+                        const currentSelection = window.getSelection();
+                        let rangeToRestore = null;
+                        if (currentSelection.rangeCount > 0) {
+                            rangeToRestore = currentSelection.getRangeAt(0).cloneRange();
+                        }
+                        
                         const fontTags = editor.querySelectorAll('font[size]');
+                        const spansToSelect = [];
+                        
                         fontTags.forEach(fontTag => {
                             const size = fontTag.getAttribute('size');
                             // Find which fontSize this maps to
@@ -567,29 +587,71 @@
                                 span.appendChild(fontTag.firstChild);
                             }
                             fontTag.parentNode.replaceChild(span, fontTag);
+                            spansToSelect.push(span);
                         });
                         debugLog('Converted font tags to span with pt sizes');
                         
-                        // Restore selection after conversion
-                        if (hadSelection && savedRange) {
+                        // Restore selection to encompass all the converted spans
+                        if (hadSelection && spansToSelect.length > 0) {
                             try {
-                                selection.removeAllRanges();
-                                selection.addRange(savedRange);
-                                debugLog('✅ Selection restored after font size change');
+                                const newRange = document.createRange();
+                                // Select from start of first span to end of last span
+                                const firstSpan = spansToSelect[0];
+                                const lastSpan = spansToSelect[spansToSelect.length - 1];
+                                
+                                // Get the first text node in first span
+                                const firstTextNode = getFirstTextNode(firstSpan);
+                                // Get the last text node in last span
+                                const lastTextNode = getLastTextNode(lastSpan);
+                                
+                                if (firstTextNode && lastTextNode) {
+                                    newRange.setStart(firstTextNode, 0);
+                                    newRange.setEnd(lastTextNode, lastTextNode.length);
+                                    
+                                    currentSelection.removeAllRanges();
+                                    currentSelection.addRange(newRange);
+                                    debugLog('✅ Selection restored after font size change');
+                                }
                             } catch (e) {
                                 debugLog('⚠️ Could not restore selection', {error: e.message});
                             }
                         }
+                        
+                        updateToolbarState();
+                        resizeFontSizeSelector();
+                        editor.focus();
+                        
+                        debugLog('✅ changeFontSize complete');
                     }, 0);
                     
-                    updateToolbarState();
-                    resizeFontSizeSelector();
-                    editor.focus();
-                    
-                    debugLog('✅ changeFontSize complete');
                 } catch (error) {
                     debugLog('❌ ERROR in changeFontSize', {error: error.message, stack: error.stack});
                 }
+            }
+            
+            // Helper function to get first text node in an element
+            function getFirstTextNode(element) {
+                if (element.nodeType === Node.TEXT_NODE) {
+                    return element;
+                }
+                for (let child of element.childNodes) {
+                    const textNode = getFirstTextNode(child);
+                    if (textNode) return textNode;
+                }
+                return null;
+            }
+            
+            // Helper function to get last text node in an element
+            function getLastTextNode(element) {
+                if (element.nodeType === Node.TEXT_NODE) {
+                    return element;
+                }
+                const children = Array.from(element.childNodes);
+                for (let i = children.length - 1; i >= 0; i--) {
+                    const textNode = getLastTextNode(children[i]);
+                    if (textNode) return textNode;
+                }
+                return null;
             }
 
             // Auto-resize font selector to fit current selection
@@ -647,72 +709,40 @@
                 italicBtn.classList.toggle('active', document.queryCommandState('italic'));
                 underlineBtn.classList.toggle('active', document.queryCommandState('underline'));
 
-                // Update font selector to reflect current font
-                try {
-                    const currentFont = document.queryCommandValue('fontName');
-                    if (currentFont) {
-                        // Clean up font name (remove quotes and extra formatting)
-                        const cleanFont = currentFont.replace(/["']/g, '').split(',')[0].trim();
-                        // Try to match with one of our options
-                        const options = Array.from(fontSelector.options);
-                        const matchingOption = options.find(opt =>
-                            opt.value.toLowerCase() === cleanFont.toLowerCase()
-                        );
-                        if (matchingOption) {
-                            fontSelector.value = matchingOption.value;
-                            // Resize the dropdown to fit the new font selection
-                            resizeFontSelector();
-                        }
-                    }
-                } catch (e) {
-                    // If queryCommandValue fails, just keep current selection
-                }
-
-                // Update font size selector to reflect current size
-                try {
-                    const selection = window.getSelection();
-                    if (selection.rangeCount > 0) {
-                        const range = selection.getRangeAt(0);
-                        let container = range.startContainer;
-                        if (container.nodeType === Node.TEXT_NODE) {
-                            container = container.parentElement;
-                        }
-
-                        // If container is the editor itself, check the previous sibling or last child
-                        if (container === editor) {
-                            // Look for the previous sibling element or the last child
-                            if (range.startOffset > 0 && editor.childNodes[range.startOffset - 1]) {
-                                // There's a previous element at this position
-                                const prevNode = editor.childNodes[range.startOffset - 1];
-                                // Skip tooltip elements
-                                if (prevNode.nodeType === Node.ELEMENT_NODE &&
-                                    !prevNode.classList.contains('autocorrect-tooltip')) {
-                                    container = prevNode;
-                                } else if (prevNode.nodeType === Node.TEXT_NODE && prevNode.parentElement) {
-                                    container = prevNode.parentElement;
-                                }
-                            } else {
-                                // Use the last child in the editor (skip tooltip)
-                                let lastContentChild = null;
-                                for (let i = editor.childNodes.length - 1; i >= 0; i--) {
-                                    const node = editor.childNodes[i];
-                                    if (node.nodeType === Node.ELEMENT_NODE &&
-                                        !node.classList.contains('autocorrect-tooltip')) {
-                                        lastContentChild = node;
-                                        break;
-                                    } else if (node.nodeType === Node.TEXT_NODE) {
-                                        lastContentChild = node.parentElement;
-                                        break;
-                                    }
-                                }
-                                if (lastContentChild && lastContentChild !== editor) {
-                                    container = lastContentChild;
-                                }
+                // Get the element at cursor position
+                const elementAtCursor = getElementAtCursor();
+                
+                // Update font family selector
+                if (elementAtCursor && elementAtCursor !== editor) {
+                    try {
+                        const computedStyle = window.getComputedStyle(elementAtCursor);
+                        const fontFamily = computedStyle.fontFamily;
+                        
+                        if (fontFamily) {
+                            // Clean up font name (remove quotes and extra formatting)
+                            const cleanFont = fontFamily.replace(/["']/g, '').split(',')[0].trim();
+                            // Try to match with one of our options
+                            const options = Array.from(fontSelector.options);
+                            const matchingOption = options.find(opt =>
+                                opt.value.toLowerCase() === cleanFont.toLowerCase()
+                            );
+                            if (matchingOption) {
+                                fontSelector.value = matchingOption.value;
+                                resizeFontSelector();
                             }
                         }
+                    } catch (e) {
+                        // If fails, keep current selection
+                    }
+                }
 
-                        if (container && container !== editor) {
-                            const fontSize = window.getComputedStyle(container).fontSize;
+                // Update font size selector
+                if (elementAtCursor && elementAtCursor !== editor) {
+                    try {
+                        const computedStyle = window.getComputedStyle(elementAtCursor);
+                        const fontSize = computedStyle.fontSize;
+                        
+                        if (fontSize) {
                             // Convert px to pt (1pt = 1.333px approximately)
                             const fontSizePt = Math.round(parseFloat(fontSize) * 0.75);
                             // Try to match with one of our options
@@ -725,9 +755,62 @@
                                 resizeFontSizeSelector();
                             }
                         }
+                    } catch (e) {
+                        // If fails, keep current selection
                     }
+                }
+            }
+            
+            // Helper function to get the element at cursor position
+            function getElementAtCursor() {
+                try {
+                    const selection = window.getSelection();
+                    if (selection.rangeCount === 0) return null;
+                    
+                    const range = selection.getRangeAt(0);
+                    let container = range.startContainer;
+                    
+                    // If it's a text node, get its parent element
+                    if (container.nodeType === Node.TEXT_NODE) {
+                        return container.parentElement;
+                    }
+                    
+                    // If container is the editor itself, try to find the actual element at cursor
+                    if (container === editor) {
+                        // Check if there's content before the cursor
+                        if (range.startOffset > 0) {
+                            const nodeBefore = editor.childNodes[range.startOffset - 1];
+                            if (nodeBefore) {
+                                if (nodeBefore.nodeType === Node.TEXT_NODE) {
+                                    return nodeBefore.parentElement;
+                                } else if (nodeBefore.nodeType === Node.ELEMENT_NODE && 
+                                          !nodeBefore.classList?.contains('autocorrect-tooltip')) {
+                                    return nodeBefore;
+                                }
+                            }
+                        }
+                        
+                        // Check if there's content at or after the cursor
+                        if (range.startOffset < editor.childNodes.length) {
+                            const nodeAt = editor.childNodes[range.startOffset];
+                            if (nodeAt) {
+                                if (nodeAt.nodeType === Node.TEXT_NODE) {
+                                    return nodeAt.parentElement;
+                                } else if (nodeAt.nodeType === Node.ELEMENT_NODE && 
+                                          !nodeAt.classList?.contains('autocorrect-tooltip')) {
+                                    return nodeAt;
+                                }
+                            }
+                        }
+                        
+                        // Fallback: use the editor itself
+                        return editor;
+                    }
+                    
+                    return container;
                 } catch (e) {
-                    // If query fails, just keep current selection
+                    debugLog('⚠️ Error in getElementAtCursor', {error: e.message});
+                    return null;
                 }
             }
 
