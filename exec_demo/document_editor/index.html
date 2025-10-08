@@ -440,6 +440,12 @@
                         // No text selected - insert a styled span for upcoming text
                         const span = document.createElement('span');
                         span.style.fontSize = fontSize + 'pt';
+                          
+                        // Explicitly set normal weight/style to override any inherited formatting
+                        span.style.fontWeight = 'normal';
+                        span.style.fontStyle = 'normal';
+                        span.style.textDecoration = 'none';
+                          
                         // Insert a zero-width space to make the span "stick"
                         span.appendChild(document.createTextNode('\u200B'));
                         range.insertNode(span);
