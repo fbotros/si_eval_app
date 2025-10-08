@@ -472,10 +472,57 @@ class AutocorrectEngine {
     }
 
     /**
-     * Check if a word is in the dictionary
+     * Get singular form of a potential plural word
+     */
+    getSingularForm(word) {
+        const lowerWord = word.toLowerCase();
+        
+        // Try -ies -> -y (berries -> berry)
+        if (lowerWord.endsWith('ies') && lowerWord.length > 4) {
+            const singular = lowerWord.slice(0, -3) + 'y';
+            if (this.dictionarySet.has(singular)) {
+                return singular;
+            }
+        }
+        
+        // Try -es -> -e (boxes -> box, but not roses -> ros)
+        if (lowerWord.endsWith('es') && lowerWord.length > 3) {
+            const singular = lowerWord.slice(0, -2);
+            if (this.dictionarySet.has(singular)) {
+                return singular;
+            }
+            // Also try removing just -s (roses -> rose)
+            const singularS = lowerWord.slice(0, -1);
+            if (this.dictionarySet.has(singularS)) {
+                return singularS;
+            }
+        }
+        
+        // Try -s -> nothing (cats -> cat)
+        if (lowerWord.endsWith('s') && lowerWord.length > 2) {
+            const singular = lowerWord.slice(0, -1);
+            if (this.dictionarySet.has(singular)) {
+                return singular;
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Check if a word is in the dictionary (including plural forms)
      */
     hasWord(word) {
-        return this.dictionarySet.has(word.toLowerCase());
+        const lowerWord = word.toLowerCase();
+        
+        // Check exact match first
+        if (this.dictionarySet.has(lowerWord)) {
+            return true;
+        }
+        
+        // Check if it's a valid plural form
+        const singularForm = this.getSingularForm(lowerWord);
+        return singularForm !== null;
     }
 
     /**
