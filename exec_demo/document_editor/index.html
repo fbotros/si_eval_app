@@ -444,9 +444,26 @@
 
             // Format functions
             function toggleFormat(command) {
-                document.execCommand(command, false, null);
-                updateToolbarState();
-                editor.focus();
+                try {
+                    debugLog(`✨ toggleFormat called for ${command}`);
+                    
+                    // Save selection state for debugging
+                    const selection = window.getSelection();
+                    debugLog(`Selection before execCommand for ${command}`, {
+                        type: selection.type,
+                        toString: selection.toString().substring(0, 20),
+                        rangeCount: selection.rangeCount
+                    });
+                    
+                    document.execCommand(command, false, null);
+                    debugLog(`execCommand ${command} executed`);
+                    
+                    updateToolbarState();
+                    editor.focus();
+                    debugLog(`✅ toggleFormat complete for ${command}`);
+                } catch (error) {
+                    debugLog(`❌ ERROR in toggleFormat for ${command}`, {error: error.message, stack: error.stack});
+                }
             }
 
             function changeFont(fontName) {
