@@ -501,9 +501,9 @@
                 try {
                     debugLog('📏 changeFontSize called - USING execCommand like bold/italic', {fontSize});
                     
-                    // Use the same approach as bold/italic/underline - just call execCommand!
-                    // The fontSize command uses HTML size 1-7, but we can also wrap in font tags
-                    // Or better: use inline style via execCommand
+                    // Quest 3 fix: Restore saved selection before execCommand
+                    const wasRestored = restoreSavedSelection();
+                    debugLog('🔄 Selection restoration attempted', {wasRestored});
                     
                     // Save selection state for debugging
                     const selection = window.getSelection();
@@ -1525,6 +1525,35 @@
                     hideAutocorrectTooltip();
                 }
             });
+
+            // Save selection when editor loses focus (Quest 3 fix)
+            let savedSelection = null;
+            
+            editor.addEventListener('blur', function() {
+                const selection = window.getSelection();
+                if (selection.rangeCount > 0) {
+                    savedSelection = selection.getRangeAt(0).cloneRange();
+                    debugLog('💾 Saved selection on blur', {
+                        collapsed: savedSelection.collapsed,
+                        text: savedSelection.toString().substring(0, 20)
+                    });
+                }
+            });
+            
+            // Restore selection before dropdown interaction (Quest 3 fix)
+            function restoreSavedSelection() {
+                if (savedSelection) {
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(savedSelection);
+                    debugLog('🔄 Restored saved selection', {
+                        collapsed: savedSelection.collapsed,
+                        text: savedSelection.toString().substring(0, 20)
+                    });
+                    return true;
+                }
+                return false;
+            }
 
             // Initialize
             updateToolbarState();
