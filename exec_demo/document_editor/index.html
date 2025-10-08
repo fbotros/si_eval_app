@@ -399,9 +399,9 @@
             function changeFont(fontName) {
                 const selection = window.getSelection();
                 const hadSelection = selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed;
-                
+
                 document.execCommand('fontName', false, fontName);
-                
+
                 // If there was a selection, restore it
                 if (hadSelection && selection.rangeCount > 0) {
                     const range = selection.getRangeAt(0);
@@ -411,7 +411,7 @@
                         selection.addRange(range);
                     }, 0);
                 }
-                
+
                 updateToolbarState();
                 resizeFontSelector();
                 editor.focus();
@@ -430,7 +430,7 @@
                         span.style.fontSize = fontSize + 'pt';
                         span.appendChild(selectedContent);
                         range.insertNode(span);
-                        
+
                         // Select the newly inserted content to preserve selection
                         const newRange = document.createRange();
                         newRange.selectNodeContents(span);
@@ -440,17 +440,17 @@
                         // No text selected - insert a styled span for upcoming text
                         const span = document.createElement('span');
                         span.style.fontSize = fontSize + 'pt';
-                          
+
                         // Preserve current formatting state
                         const isBold = document.queryCommandState('bold');
                         const isItalic = document.queryCommandState('italic');
                         const isUnderline = document.queryCommandState('underline');
-                          
+
                         // Apply current formatting or explicitly set to normal
                         span.style.fontWeight = isBold ? 'bold' : 'normal';
                         span.style.fontStyle = isItalic ? 'italic' : 'normal';
                         span.style.textDecoration = isUnderline ? 'underline' : 'none';
-                          
+
                         // Insert a zero-width space to make the span "stick"
                         span.appendChild(document.createTextNode('\u200B'));
                         range.insertNode(span);
