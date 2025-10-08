@@ -485,54 +485,72 @@
                     debugLog('📏 changeFontSize called', {fontSize: fontSize + 'pt'});
                     
                     const selection = window.getSelection();
-                    debugLog('Selection object', {
-                        rangeCount: selection.rangeCount,
-                        type: selection.type,
-                        anchorNode: selection.anchorNode?.nodeName,
-                        focusNode: selection.focusNode?.nodeName,
-                        anchorOffset: selection.anchorOffset,
-                        focusOffset: selection.focusOffset,
-                        toString: selection.toString().substring(0, 50)
+                    const hasTextInEditor = editor.textContent.trim().length > 0;
+                    
+                    debugLog('Editor state', {
+                        hasTextInEditor,
+                        textLength: editor.textContent.length,
+                        selectionType: selection.type
                     });
                     
                     if (selection.rangeCount > 0) {
                         const range = selection.getRangeAt(0);
-                        debugLog('Range details', {
-                            collapsed: range.collapsed,
-                            startOffset: range.startOffset,
-                            endOffset: range.endOffset,
-                            startContainer: range.startContainer?.nodeName,
-                            endContainer: range.endContainer?.nodeName,
-                            toString: range.toString().substring(0, 50)
+                        const hasActualSelection = range.toString().length > 0 || !range.collapsed;
+                        
+                        debugLog('Selection check', {
+                            hasActualSelection,
+                            rangeTextLength: range.toString().length,
+                            collapsed: range.collapsed
                         });
                         
-                        // Check if there's ACTUALLY selected text using toString
-                        const hasActualSelection = range.toString().length > 0 || !range.collapsed;
-                        debugLog('Has actual selection?', {hasActualSelection, textLength: range.toString().length});
-                        
                         if (hasActualSelection) {
-                            // Has selection - wrap it in a span
-                            debugLog('Wrapping selected text');
+                            // Normal selection path - wrap selected text
+                            debugLog('✅ Wrapping selected text');
                             const span = document.createElement('span');
                             span.style.fontSize = fontSize + 'pt';
                             const contents = range.extractContents();
                             span.appendChild(contents);
                             range.insertNode(span);
                             
-                            // Reselect the wrapped content
+                            // Reselect
                             const newRange = document.createRange();
                             newRange.selectNodeContents(span);
                             selection.removeAllRanges();
                             selection.addRange(newRange);
-                            debugLog('✅ Selection wrapped and preserved');
-                        } else {
-                            // No selection - place cursor inside a span for future typing
-                            debugLog('No selection - inserting span for cursor');
+                        } else if (hasTextInEditor) {
+                            // QUEST 3 WORKAROUND: Text exists but no selection detected
+                            // Wrap ALL text in the editor with the new font size
+                            debugLog('⚠️ Quest 3 workaround: wrapping ALL text in editor');
                             
                             const span = document.createElement('span');
                             span.style.fontSize = fontSize + 'pt';
                             
-                            // Preserve current formatting
+                            // Extract all contents of editor
+                            const editorRange = document.createRange();
+                            editorRange.selectNodeContents(editor);
+                            const allContents = editorRange.extractContents();
+                            span.appendChild(allContents);
+                            
+                            // Clear editor and insert wrapped content
+                            editor.innerHTML = '';
+                            editor.appendChild(span);
+                            
+                            debugLog('✅ All text wrapped in font size span');
+                            
+                            // Try to restore cursor to end
+                            const newRange = document.createRange();
+                            newRange.selectNodeContents(editor);
+                            newRange.collapse(false);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                        } else {
+                            // Empty editor - insert span for future typing
+                            debugLog('No text yet - inserting span for cursor');
+                            
+                            const span = document.createElement('span');
+                            span.style.fontSize = fontSize + 'pt';
+                            
+                            // Preserve formatting
                             const isBold = document.queryCommandState('bold');
                             const isItalic = document.queryCommandState('italic');
                             const isUnderline = document.queryCommandState('underline');
@@ -540,18 +558,16 @@
                             if (isItalic) span.style.fontStyle = 'italic';
                             if (isUnderline) span.style.textDecoration = 'underline';
                             
-                            // Insert zero-width space so span has content
                             const zwsp = document.createTextNode('\u200B');
                             span.appendChild(zwsp);
                             range.insertNode(span);
                             
-                            // Place cursor INSIDE span after zero-width space
                             range.setStart(span.firstChild, 1);
                             range.collapse(true);
                             selection.removeAllRanges();
-                            selection.addRange(range);
+                            selection.addRange(newRange);
                             
-                            debugLog('✅ Cursor positioned inside font-sized span');
+                            debugLog('✅ Cursor positioned for typing');
                         }
                     }
                     
