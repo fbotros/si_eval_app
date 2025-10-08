@@ -1106,9 +1106,9 @@
 
         // Track autocorrect state - whether it's currently enabled for this typing session
         let autocorrectEnabled = true;
-        let lastTextLength = 0; // Track text length to detect backspacing
-        let justAppliedAutocorrect = false; // Track if we just applied autocorrect
-        let lastCursorPos = 0; // Track cursor position to detect editing vs new typing
+        let lastTextLength = 0;
+        let justAppliedAutocorrect = false;
+        let lastCompletedWordLength = 0; // Track text length at last word boundary
 
         // Check for autocorrect suggestions using EXACT logic from typing test
         function checkForAutocorrect() {
@@ -1124,7 +1124,12 @@
                     autocorrectEnabled = true;
                     console.log('✅ Autocorrect re-enabled - at word boundary or empty word');
                 } else {
-                    console.log('❌ Autocorrect suppressed - not at word boundary');
+                    console.log('❌ Autocorrect suppressed - not at word boundary', {
+                        currentWord,
+                        autocorrectEnabled,
+                        isAtWordBoundary: isAtWordBoundary(),
+                        textLength: (editor.innerText || '').length
+                    });
                     currentAutocorrectSuggestion = null;
                     hideAutocorrectTooltip();
                     return;
@@ -1224,6 +1229,7 @@
             if (justAppliedAutocorrect) {
                 justAppliedAutocorrect = false;
                 lastTextLength = currentTextLength;
+                lastCompletedWordLength = currentTextLength; // Mark this as a completed word boundary
                 updateToolbarState();
                 debouncedAutocorrectCheck();
                 return;
@@ -1231,9 +1237,27 @@
 
             // Detect actual backspacing by user (not autocorrect-induced text changes)
             if (currentTextLength < lastTextLength) {
-                // If we're still at a word boundary after backspacing (like "as "), keep autocorrect enabled
-                // If we're in the middle of a word (like "as"), disable autocorrect
-                autocorrectEnabled = isAtWordBoundary();
+                // Check if we backspaced past the last completed word boundary
+                if (currentTextLength < lastCompletedWordLength) {
+                    // We're backspacing into a previously completed word - disable autocorrect
+                    autocorrectEnabled = false;
+                    console.log('🔴 Autocorrect disabled - backspacing into completed word');
+                } else {
+                    // We're backspacing within the current word we're typing - keep autocorrect enabled
+                    autocorrectEnabled = true;
+                    console.log('🟢 Autocorrect still enabled - backspacing within current word');
+                }
+            } else if (currentTextLength > lastTextLength) {
+                // User is typing forward (adding characters)
+                
+                // If we're at a word boundary, mark this position as a completed word
+                if (isAtWordBoundary()) {
+                    lastCompletedWordLength = currentTextLength;
+                    console.log('📍 Marked completed word boundary at length:', currentTextLength);
+                }
+                
+                // Always enable autocorrect when typing forward
+                autocorrectEnabled = true;
             }
 
             lastTextLength = currentTextLength;
