@@ -771,62 +771,47 @@
             const selection = window.getSelection();
             if (selection.rangeCount === 0) return '';
 
-            try {
-                const range = selection.getRangeAt(0);
-                // Use normalized text for consistency
-                const fullText = getNormalizedEditorText();
-
-                // Get text before cursor using toString() (gives single \n)
-                const preCaretRange = range.cloneRange();
-                preCaretRange.selectNodeContents(editor);
-                preCaretRange.setEnd(range.endContainer, range.endOffset);
-                let rangeTextBefore = preCaretRange.toString();
+              try {
+                  const range = selection.getRangeAt(0);
                   
-                // Remove tooltip text if present
-                const tooltip = editor.querySelector('.autocorrect-tooltip');
-                if (tooltip) {
-                    rangeTextBefore = rangeTextBefore.replace(tooltip.textContent || '', '');
-                }
+                  // Get FULL editor text using innerText (preserves newlines)
+                  const fullEditorText = getEditorText();
                   
-                // Strip trailing newlines to match fullText normalization
-                const rangeTextNormalized = rangeTextBefore.replace(/\n+$/, '');
+                  // Get text before cursor by cloning content and using innerText
+                  const preCaretRange = range.cloneRange();
+                  preCaretRange.selectNodeContents(editor);
+                  preCaretRange.setEnd(range.endContainer, range.endOffset);
                   
-                // Count newlines in normalized range text
-                const newlineCount = (rangeTextNormalized.match(/\n/g) || []).length;
+                  // Create temporary element with cloned content to get innerText
+                  const tempDiv = document.createElement('div');
+                  tempDiv.appendChild(preCaretRange.cloneContents());
+                  let textBeforeCursor = tempDiv.innerText || '';
                   
-                // Since innerText represents line breaks as \n (but browsers may add extras),
-                // we need to match the position. Each \n in toString() corresponds to text in innerText.
-                // Simply use the rangeText length directly since both should match after normalization
-                const cursorPos = rangeTextNormalized.length;
+                  // Remove tooltip text if present
+                  const tooltip = tempDiv.querySelector('.autocorrect-tooltip');
+                  if (tooltip && tooltip.innerText) {
+                      textBeforeCursor = textBeforeCursor.split(tooltip.innerText).join('');
+                  }
+                  
+                  // Strip trailing newlines to match getEditorText
+                  textBeforeCursor = textBeforeCursor.replace(/\n+$/, '');
+                  
+                  const cursorPos = textBeforeCursor.length;
+                  const preceding3Chars = textBeforeCursor.substring(Math.max(0, cursorPos - 3), cursorPos);
 
-                // Get clean text before cursor
-                let textBeforeCursor = fullText.substring(0, cursorPos);
+                console.log('🔍 FULL DIAGNOSTIC:');
+                console.log('  📄 Full editor text:', JSON.stringify(fullEditorText));
+                console.log('  📏 Full editor length:', fullEditorText.length);
+                console.log('  📍 Cursor position:', cursorPos);
+                console.log('  ◀️  3 preceding chars:', JSON.stringify(preceding3Chars));
+                console.log('  ✂️  Text before cursor:', JSON.stringify(textBeforeCursor));
+                console.log('  ✂️  Text before cursor length:', textBeforeCursor.length);
 
-                console.log('📖 getCurrentWord debug:', {
-                    fullText,
-                    fullTextLength: fullText.length,
-                    fullTextChars: JSON.stringify(fullText),
-                    cursorPos,
-                    textBeforeCursor,
-                    textBeforeCursorLength: textBeforeCursor.length,
-                    textBeforeCursorChars: JSON.stringify(textBeforeCursor),
-                    rangeTextBefore,
-                    rangeTextBeforeLength: rangeTextBefore.length,
-                    rangeTextBeforeChars: JSON.stringify(rangeTextBefore)
-                });
-
-                // Extract the current word treating newlines as word boundaries
-                // Match word characters and apostrophes at the end, stopping at any whitespace/newline
+                // Extract word at end - stops at ANY whitespace including \n
                 const wordMatch = textBeforeCursor.match(/[\w']+$/);
                 const currentWord = wordMatch ? wordMatch[0] : '';
 
-                console.log('📖 getCurrentWord result:', {
-                    currentWord,
-                    textBeforeCursor: textBeforeCursor.substring(Math.max(0, textBeforeCursor.length - 30)),
-                    textBeforeCursorLength: textBeforeCursor.length,
-                    cursorPos,
-                    fullTextLength: fullText.length
-                });
+                console.log('  📝 Current word:', currentWord);
 
                 return currentWord;
 
@@ -1002,30 +987,19 @@
             }
         }
 
-        // Helper to get normalized text from editor (single source of truth)
-        function getNormalizedEditorText() {
-            // Create a range covering the entire editor
-            const range = document.createRange();
-            range.selectNodeContents(editor);
+        // Helper to get text - use innerText which preserves newlines from contentEditable
+        function getEditorText() {
+            // innerText respects the visual layout and newlines
+            let text = editor.innerText || '';
               
-            // Use toString() which properly represents content with single newlines
-            let text = range.toString();
-              
-            // Remove tooltip text if present (contains zero-width space)
+            // Remove tooltip text if present
             const tooltip = editor.querySelector('.autocorrect-tooltip');
-            if (tooltip) {
-                const tooltipText = tooltip.textContent || '';
-                text = text.replace(tooltipText, '');
+            if (tooltip && tooltip.innerText) {
+                text = text.split(tooltip.innerText).join('');
             }
               
-            // Normalize trailing newlines only
+            // Strip only trailing newlines (contentEditable adds these at end)
             text = text.replace(/\n+$/, '');
-              
-            console.log('📄 getNormalizedEditorText:', {
-                text: text.substring(0, 100),
-                length: text.length,
-                newlineCount: (text.match(/\n/g) || []).length
-            });
               
             return text;
         }
@@ -1164,15 +1138,15 @@
             lastTypedKey = e.key;
         });
           
-        // Helper to get cursor offset in text (matching getNormalizedEditorText method)
+        // Helper to get cursor offset in text
         function getCursorOffset() {
             const selection = window.getSelection();
             if (!selection.rangeCount) return 0;
-              
+                
             const range = selection.getRangeAt(0);
-              
-            // Get the full text using the same method as getNormalizedEditorText
-            const fullText = getNormalizedEditorText();
+                
+            // Get the full text using getEditorText
+            const fullText = getEditorText();
               
             // Create a temporary clone of editor up to cursor position
             const tempEditor = editor.cloneNode(true);
@@ -1246,7 +1220,7 @@
           
         // Helper to get consistent text length (matching what getCurrentWord uses)
         function getConsistentTextLength() {
-            return getNormalizedEditorText().length;
+            return getEditorText().length;
         }
           
         // Add input listener for autocorrect tooltips (suggestion-only)
