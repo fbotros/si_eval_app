@@ -441,10 +441,15 @@
                         const span = document.createElement('span');
                         span.style.fontSize = fontSize + 'pt';
                           
-                        // Explicitly set normal weight/style to override any inherited formatting
-                        span.style.fontWeight = 'normal';
-                        span.style.fontStyle = 'normal';
-                        span.style.textDecoration = 'none';
+                        // Preserve current formatting state
+                        const isBold = document.queryCommandState('bold');
+                        const isItalic = document.queryCommandState('italic');
+                        const isUnderline = document.queryCommandState('underline');
+                          
+                        // Apply current formatting or explicitly set to normal
+                        span.style.fontWeight = isBold ? 'bold' : 'normal';
+                        span.style.fontStyle = isItalic ? 'italic' : 'normal';
+                        span.style.textDecoration = isUnderline ? 'underline' : 'none';
                           
                         // Insert a zero-width space to make the span "stick"
                         span.appendChild(document.createTextNode('\u200B'));
