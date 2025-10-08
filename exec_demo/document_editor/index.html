@@ -482,94 +482,64 @@
 
             function changeFontSize(fontSize) {
                 try {
-                    debugLog('📏 changeFontSize called', {fontSize: fontSize + 'pt'});
+                    debugLog('📏 changeFontSize called - USING execCommand like bold/italic', {fontSize});
                     
+                    // Use the same approach as bold/italic/underline - just call execCommand!
+                    // The fontSize command uses HTML size 1-7, but we can also wrap in font tags
+                    // Or better: use inline style via execCommand
+                    
+                    // Save selection state for debugging
                     const selection = window.getSelection();
-                    
-                    // CANONICAL SELECTION DETECTION - Multiple methods for reliability
-                    // Method 1: selection.toString() - most reliable across browsers
-                    const selectedText = selection.toString();
-                    
-                    // Method 2: Check selection type (Range vs Caret)
-                    const isRangeType = selection.type === 'Range';
-                    
-                    // Method 3: Compare anchor and focus positions
-                    const hasOffsetDifference = selection.anchorNode !== selection.focusNode || 
-                                               selection.anchorOffset !== selection.focusOffset;
-                    
-                    // Method 4: Range.collapsed check (least reliable on Quest 3)
-                    let isRangeCollapsed = true;
-                    if (selection.rangeCount > 0) {
-                        isRangeCollapsed = selection.getRangeAt(0).collapsed;
-                    }
-                    
-                    // Determine if we have a real selection using multiple signals
-                    const hasSelection = selectedText.length > 0 || isRangeType || hasOffsetDifference || !isRangeCollapsed;
-                    
-                    debugLog('🔍 SELECTION DETECTION', {
-                        selectedTextLength: selectedText.length,
-                        selectedTextPreview: selectedText.substring(0, 20),
-                        selectionType: selection.type,
-                        hasOffsetDifference,
-                        isRangeCollapsed,
-                        FINAL_hasSelection: hasSelection,
-                        anchorNode: selection.anchorNode?.nodeName,
-                        focusNode: selection.focusNode?.nodeName,
-                        anchorOffset: selection.anchorOffset,
-                        focusOffset: selection.focusOffset
+                    debugLog('Selection before execCommand', {
+                        type: selection.type,
+                        toString: selection.toString().substring(0, 20),
+                        rangeCount: selection.rangeCount
                     });
                     
-                    if (hasSelection && selection.rangeCount > 0) {
-                        // SELECTION EXISTS - wrap it
-                        debugLog('✅ PATH: Wrapping selection');
-                        
-                        const range = selection.getRangeAt(0);
-                        const span = document.createElement('span');
-                        span.style.fontSize = fontSize + 'pt';
-                        
-                        const contents = range.extractContents();
-                        span.appendChild(contents);
-                        range.insertNode(span);
-                        
-                        // Reselect the wrapped content
-                        const newRange = document.createRange();
-                        newRange.selectNodeContents(span);
-                        selection.removeAllRanges();
-                        selection.addRange(newRange);
-                        
-                        debugLog('✅ Selection wrapped and preserved');
-                    } else if (selection.rangeCount > 0) {
-                        // NO SELECTION - insert span at cursor for future typing
-                        debugLog('✅ PATH: Inserting span at cursor');
-                        
-                        const range = selection.getRangeAt(0);
-                        const span = document.createElement('span');
-                        span.style.fontSize = fontSize + 'pt';
-                        
-                        // Preserve current formatting
-                        const isBold = document.queryCommandState('bold');
-                        const isItalic = document.queryCommandState('italic');
-                        const isUnderline = document.queryCommandState('underline');
-                        if (isBold) span.style.fontWeight = 'bold';
-                        if (isItalic) span.style.fontStyle = 'italic';
-                        if (isUnderline) span.style.textDecoration = 'underline';
-                        
-                        // Insert zero-width space
-                        const zwsp = document.createTextNode('\u200B');
-                        span.appendChild(zwsp);
-                        range.insertNode(span);
-                        
-                        // Position cursor inside span after zero-width space
-                        range.setStart(span.firstChild, 1);
-                        range.collapse(true);
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                        
-                        debugLog('✅ Cursor positioned inside span');
-                    }
+                    // Try using execCommand with fontSize (uses HTML size 1-7)
+                    // Map our pt sizes to HTML sizes roughly
+                    const htmlSizeMap = {
+                        '9': '1',
+                        '11': '2', 
+                        '12': '3',
+                        '16': '4',
+                        '18': '5',
+                        '24': '6',
+                        '36': '7'
+                    };
+                    
+                    const htmlSize = htmlSizeMap[fontSize] || '3';
+                    document.execCommand('fontSize', false, htmlSize);
+                    
+                    debugLog('execCommand fontSize executed', {htmlSize});
+                    
+                    // Now convert the font tags to spans with pt sizes
+                    setTimeout(() => {
+                        const fontTags = editor.querySelectorAll('font[size]');
+                        fontTags.forEach(fontTag => {
+                            const size = fontTag.getAttribute('size');
+                            // Find which fontSize this maps to
+                            let ptSize = '11';
+                            for (const [pt, html] of Object.entries(htmlSizeMap)) {
+                                if (html === size) {
+                                    ptSize = pt;
+                                    break;
+                                }
+                            }
+                            
+                            const span = document.createElement('span');
+                            span.style.fontSize = ptSize + 'pt';
+                            while (fontTag.firstChild) {
+                                span.appendChild(fontTag.firstChild);
+                            }
+                            fontTag.parentNode.replaceChild(span, fontTag);
+                        });
+                        debugLog('Converted font tags to span with pt sizes');
+                    }, 0);
                     
                     updateToolbarState();
                     resizeFontSizeSelector();
+                    editor.focus();
                     
                     debugLog('✅ changeFontSize complete');
                 } catch (error) {
