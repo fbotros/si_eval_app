@@ -335,6 +335,9 @@
         </div>
     </div>
 
+    <!-- Autocorrect tooltip - positioned outside of contentEditable -->
+    <div id="autocorrect-tooltip" class="autocorrect-tooltip"></div>
+
     <!-- Load external scripts -->
     <script src="../dictionary-loader.js"></script>
     <script src="../AutocorrectEngine.js"></script>
@@ -685,61 +688,48 @@
 
             // Tooltip management functions
             function showAutocorrectTooltip(text, x, y) {
-                let tooltip = document.getElementById('autocorrect-tooltip');
-                if (!tooltip) {
-                    tooltip = document.createElement('div');
-                    tooltip.id = 'autocorrect-tooltip';
-                    tooltip.className = 'autocorrect-tooltip';
-                    // Append to editor container and position relative to it
-                    editor.style.position = 'relative';
-                    editor.appendChild(tooltip);
-                }
+                const tooltip = document.getElementById('autocorrect-tooltip');
+                if (!tooltip) return;
 
                 tooltip.textContent = text;
-
-                // Remove show class first to ensure clean state
                 tooltip.classList.remove('show');
 
-                // Position tooltip - let CSS handle opacity
-                tooltip.style.position = 'absolute'; // Use absolute positioning relative to container
-                tooltip.style.visibility = 'visible';
-                tooltip.style.zIndex = '9999'; // Ensure it's on top
-                tooltip.style.top = y + 'px';
-                tooltip.style.left = '0px'; // Temporary position
-                // Remove debug styling and inline opacity - let CSS handle appearance
-                tooltip.style.backgroundColor = '';
-                tooltip.style.border = '';
-                tooltip.style.opacity = ''; // Remove inline opacity to let CSS class control it
+                // Get the editor's position on the page
+                const editorRect = editor.getBoundingClientRect();
+                const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
 
-                // Force a layout to get measurements
+                // Convert relative coordinates to absolute page coordinates
+                const absoluteX = editorRect.left + scrollLeft + x;
+                const absoluteY = editorRect.top + scrollTop + y;
+
+                tooltip.style.position = 'absolute';
+                tooltip.style.visibility = 'visible';
+                tooltip.style.top = '0px';
+                tooltip.style.left = '0px';
+
+                // Force layout to get measurements
                 const tooltipWidth = tooltip.offsetWidth;
                 const tooltipHeight = tooltip.offsetHeight;
 
-                // Position tooltip near cursor, shifted 10px right, adjusted 3px left for perfect alignment
-                // Position so the arrow (8px from right edge) aligns with cursor, shifted 10px right
-                let finalX = x - tooltipWidth + 8 + 10 - 3;
-                let finalY = y;
+                // Position tooltip - align arrow (8px from right) with cursor, shifted 10px right
+                let finalX = absoluteX - tooltipWidth + 8 + 10 - 3;
+                let finalY = absoluteY;
 
-                // Ensure tooltip doesn't go off the right edge of editor
-                const editorWidth = editor.offsetWidth;
-                if (finalX + tooltipWidth > editorWidth - 10) {
-                    finalX = editorWidth - tooltipWidth - 10;
+                // Ensure tooltip doesn't go off screen edges
+                const viewportWidth = window.innerWidth;
+                if (finalX + tooltipWidth > viewportWidth - 10) {
+                    finalX = viewportWidth - tooltipWidth - 10;
                 }
-
-                // Ensure tooltip doesn't go off the left edge of editor
                 if (finalX < 10) {
                     finalX = 10;
                 }
-
-                // Ensure tooltip doesn't go off the top - position below cursor instead
                 if (finalY < 0) {
-                    finalY = y + 30; // Position below cursor instead
+                    finalY = absoluteY + 30; // Position below cursor
                 }
 
                 tooltip.style.left = finalX + 'px';
                 tooltip.style.top = finalY + 'px';
-
-                // Show the tooltip immediately
                 tooltip.classList.add('show');
             }
 
@@ -747,12 +737,7 @@
                 const tooltip = document.getElementById('autocorrect-tooltip');
                 if (tooltip) {
                     tooltip.classList.remove('show');
-                    tooltip.style.opacity = '0';
                     tooltip.style.visibility = 'hidden';
-                    // Remove from DOM to prevent contentEditable from creating extra nodes
-                    if (tooltip.parentNode) {
-                        tooltip.parentNode.removeChild(tooltip);
-                    }
                 }
             }
 
@@ -776,12 +761,6 @@
                     // Helper to recursively walk nodes and calculate position
                     function walkNodes(node, isFirstChild) {
                         if (foundCursor) return;
-
-                        // Skip tooltip nodes
-                        if (node.nodeType === Node.ELEMENT_NODE &&
-                            node.classList && node.classList.contains('autocorrect-tooltip')) {
-                            return;
-                        }
 
                         // If this is a text node
                         if (node.nodeType === Node.TEXT_NODE) {
@@ -1003,12 +982,6 @@
                 // innerText respects the visual layout and newlines
                 let text = editor.innerText || '';
 
-                // Remove tooltip text if present
-                const tooltip = editor.querySelector('.autocorrect-tooltip');
-                if (tooltip && tooltip.innerText) {
-                    text = text.split(tooltip.innerText).join('');
-                }
-
                 // Strip only trailing newlines (contentEditable adds these at end)
                 text = text.replace(/\n+$/, '');
 
@@ -1174,12 +1147,6 @@
 
                 function walkNodes(node) {
                     if (foundCursor) return;
-
-                    // Skip tooltip nodes
-                    if (node.nodeType === Node.ELEMENT_NODE &&
-                        node.classList && node.classList.contains('autocorrect-tooltip')) {
-                        return;
-                    }
 
                     // If this is a text node
                     if (node.nodeType === Node.TEXT_NODE) {
