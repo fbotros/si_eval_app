@@ -480,113 +480,42 @@
 
             function changeFontSize(fontSize) {
                 try {
-                    debugLog('📏 changeFontSize called', {fontSize});
+                    debugLog('📏 changeFontSize SIMPLIFIED VERSION called', {fontSize});
                     
-                    // Save cursor position BEFORE any operations
+                    // Log initial cursor state
                     const initialSelection = window.getSelection();
-                    let savedRange = null;
                     if (initialSelection.rangeCount > 0) {
-                        savedRange = initialSelection.getRangeAt(0).cloneRange();
-                        debugLog('💾 Initial cursor saved', {
-                            startOffset: savedRange.startOffset,
-                            endOffset: savedRange.endOffset,
-                            collapsed: savedRange.collapsed,
-                            startContainer: savedRange.startContainer.nodeName
-                        });
+                        const r = initialSelection.getRangeAt(0);
+                        debugLog('Initial cursor', {startOffset: r.startOffset, collapsed: r.collapsed});
                     }
                     
-                    const selection = window.getSelection();
-                    debugLog('Selection state', {rangeCount: selection.rangeCount});
+                    // SIMPLEST POSSIBLE: Just use execCommand with fontSize
+                    // This is the standard browser way to change font size
+                    document.execCommand('fontSize', false, fontSize);
+                    debugLog('execCommand fontSize executed');
                     
-                    if (selection.rangeCount > 0) {
-                        const range = selection.getRangeAt(0);
-                        debugLog('Range info', {collapsed: range.collapsed, startOffset: range.startOffset});
-
-                        // Check if there's selected text
-                        if (!range.collapsed) {
-                            debugLog('Applying to selection');
-                            // Text is selected - apply font size to selection
-                            const selectedContent = range.extractContents();
-                            const span = document.createElement('span');
-                            span.style.fontSize = fontSize + 'pt';
-                            span.appendChild(selectedContent);
-                            range.insertNode(span);
-                            debugLog('Span inserted');
-
-                            // Select the newly inserted content to preserve selection
-                            const newRange = document.createRange();
-                            newRange.selectNodeContents(span);
-                            selection.removeAllRanges();
-                            selection.addRange(newRange);
-                            debugLog('Selection preserved');
-                        } else {
-                            debugLog('Applying at cursor');
-                            // No text selected - insert a styled span for upcoming text
-                            const span = document.createElement('span');
-                            span.style.fontSize = fontSize + 'pt';
-
-                            // Preserve current formatting state
-                            const isBold = document.queryCommandState('bold');
-                            const isItalic = document.queryCommandState('italic');
-                            const isUnderline = document.queryCommandState('underline');
-                            debugLog('Current formatting', {isBold, isItalic, isUnderline});
-
-                            // Apply current formatting or explicitly set to normal
-                            span.style.fontWeight = isBold ? 'bold' : 'normal';
-                            span.style.fontStyle = isItalic ? 'italic' : 'normal';
-                            span.style.textDecoration = isUnderline ? 'underline' : 'none';
-
-                            // Insert a zero-width space to make the span "stick"
-                            span.appendChild(document.createTextNode('\u200B'));
-                            range.insertNode(span);
-                            debugLog('Span with zero-width space inserted');
-                            
-                            // Place cursor inside the span after the zero-width space
-                            range.setStart(span.firstChild, 1);
-                            range.collapse(true);
-                            selection.removeAllRanges();
-                            selection.addRange(range);
-                            debugLog('Cursor positioned in span', {
-                                startOffset: range.startOffset,
-                                collapsed: range.collapsed
-                            });
-                        }
-                    }
-                    
-                    debugLog('Before updateToolbarState - checking cursor position');
-                    const selBeforeUpdate = window.getSelection();
-                    if (selBeforeUpdate.rangeCount > 0) {
-                        const r = selBeforeUpdate.getRangeAt(0);
-                        debugLog('Cursor before updateToolbarState', {startOffset: r.startOffset, collapsed: r.collapsed});
+                    // Check cursor after execCommand
+                    const afterExec = window.getSelection();
+                    if (afterExec.rangeCount > 0) {
+                        const r = afterExec.getRangeAt(0);
+                        debugLog('After execCommand', {startOffset: r.startOffset, collapsed: r.collapsed});
                     }
                     
                     updateToolbarState();
-                    
-                    debugLog('After updateToolbarState - checking cursor position');
-                    const selAfterUpdate = window.getSelection();
-                    if (selAfterUpdate.rangeCount > 0) {
-                        const r = selAfterUpdate.getRangeAt(0);
-                        debugLog('Cursor after updateToolbarState', {startOffset: r.startOffset, collapsed: r.collapsed});
-                    }
+                    debugLog('After updateToolbarState');
                     
                     resizeFontSizeSelector();
-                    
-                    debugLog('After resizeFontSizeSelector - checking cursor position');
-                    const selAfterResize = window.getSelection();
-                    if (selAfterResize.rangeCount > 0) {
-                        const r = selAfterResize.getRangeAt(0);
-                        debugLog('Cursor after resizeFontSizeSelector', {startOffset: r.startOffset, collapsed: r.collapsed});
-                    }
+                    debugLog('After resizeFontSizeSelector');
                     
                     editor.focus();
                     
-                    debugLog('After editor.focus() - checking cursor position');
-                    const selAfterFocus = window.getSelection();
-                    if (selAfterFocus.rangeCount > 0) {
-                        const r = selAfterFocus.getRangeAt(0);
-                        debugLog('⚠️ FINAL cursor position', {startOffset: r.startOffset, collapsed: r.collapsed, startContainer: r.startContainer.nodeName});
+                    // Final cursor state
+                    const finalSelection = window.getSelection();
+                    if (finalSelection.rangeCount > 0) {
+                        const r = finalSelection.getRangeAt(0);
+                        debugLog('⚠️ FINAL cursor', {startOffset: r.startOffset, collapsed: r.collapsed});
                     } else {
-                        debugLog('⚠️ NO SELECTION after editor.focus()!');
+                        debugLog('⚠️ NO SELECTION FINAL');
                     }
                     
                     debugLog('✅ changeFontSize complete');
