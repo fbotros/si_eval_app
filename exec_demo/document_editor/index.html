@@ -307,12 +307,12 @@
             <button id="underline-btn" title="Underline (Ctrl+U)"><u>U</u></button>
             <select id="font-size-selector" title="Font Size">
                 <option value="9">9</option>
-                <option value="11">11</option>
+                <option value="11" selected>11</option>
                 <option value="12">12</option>
                 <option value="16">16</option>
                 <option value="18">18</option>
                 <option value="24">24</option>
-                <option value="36" selected>36</option>
+                <option value="36">36</option>
             </select>
             <select id="font-selector" title="Font Family">
                 <option value="Arial">Arial</option>
@@ -469,22 +469,35 @@
             function changeFont(fontName) {
                 try {
                     debugLog('🔤 changeFont called', {fontName});
+                    
+                    // Quest 3 fix: Restore saved selection before execCommand
+                    const wasRestored = restoreSavedSelection();
+                    debugLog('🔄 Selection restoration attempted', {wasRestored});
+                    
                     const selection = window.getSelection();
-                    debugLog('Selection state', {rangeCount: selection.rangeCount, collapsed: selection.rangeCount > 0 ? selection.getRangeAt(0).collapsed : null});
-
                     const hadSelection = selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed;
+                    const savedRange = hadSelection ? selection.getRangeAt(0).cloneRange() : null;
+                    
+                    debugLog('Selection before execCommand', {
+                        type: selection.type,
+                        toString: selection.toString().substring(0, 20),
+                        rangeCount: selection.rangeCount,
+                        hadSelection: hadSelection
+                    });
 
                     document.execCommand('fontName', false, fontName);
                     debugLog('execCommand fontName executed');
 
-                    // If there was a selection, restore it
-                    if (hadSelection && selection.rangeCount > 0) {
-                        const range = selection.getRangeAt(0);
-                        // Force the selection to remain visible
+                    // Restore selection after applying font change
+                    if (hadSelection && savedRange) {
                         setTimeout(() => {
-                            selection.removeAllRanges();
-                            selection.addRange(range);
-                            debugLog('Selection restored');
+                            try {
+                                selection.removeAllRanges();
+                                selection.addRange(savedRange);
+                                debugLog('✅ Selection restored after font family change');
+                            } catch (e) {
+                                debugLog('⚠️ Could not restore selection', {error: e.message});
+                            }
                         }, 0);
                     }
 
@@ -505,12 +518,16 @@
                     const wasRestored = restoreSavedSelection();
                     debugLog('🔄 Selection restoration attempted', {wasRestored});
                     
-                    // Save selection state for debugging
+                    // Save selection state for debugging and restoration
                     const selection = window.getSelection();
+                    const hadSelection = selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed;
+                    const savedRange = hadSelection ? selection.getRangeAt(0).cloneRange() : null;
+                    
                     debugLog('Selection before execCommand', {
                         type: selection.type,
                         toString: selection.toString().substring(0, 20),
-                        rangeCount: selection.rangeCount
+                        rangeCount: selection.rangeCount,
+                        hadSelection: hadSelection
                     });
                     
                     // Try using execCommand with fontSize (uses HTML size 1-7)
@@ -552,6 +569,17 @@
                             fontTag.parentNode.replaceChild(span, fontTag);
                         });
                         debugLog('Converted font tags to span with pt sizes');
+                        
+                        // Restore selection after conversion
+                        if (hadSelection && savedRange) {
+                            try {
+                                selection.removeAllRanges();
+                                selection.addRange(savedRange);
+                                debugLog('✅ Selection restored after font size change');
+                            } catch (e) {
+                                debugLog('⚠️ Could not restore selection', {error: e.message});
+                            }
+                        }
                     }, 0);
                     
                     updateToolbarState();
@@ -1561,9 +1589,9 @@
             resizeFontSizeSelector(); // Size the font size selector correctly on load
             resizeFontSelector(); // Size the font selector correctly on load
 
-            // Set default font size to 36pt for Quest 3 debugging
-            editor.style.fontSize = '36pt';
-            debugLog('🎯 Default font size set to 36pt for debugging');
+            // Set default font size to 11pt
+            editor.style.fontSize = '11pt';
+            debugLog('🎯 Default font size set to 11pt');
 
             // Focus the editor on page load so cursor is ready
             editor.focus();
