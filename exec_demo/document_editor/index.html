@@ -773,162 +773,58 @@
 
             try {
                 const range = selection.getRangeAt(0);
-                let fullText = editor.innerText || '';
+                // Use normalized text for consistency
+                const fullText = getNormalizedEditorText();
 
-                // Strip trailing newlines to avoid cursor position confusion
-                fullText = fullText.replace(/\n+$/, '');
-
-
-                // Calculate cursor position more reliably
-                let cursorPos = 0;
-                let calculationMethod = 'unknown';
-
-                // Handle case where cursor is in the editor element itself (between elements)
-                if (range.startContainer === editor) {
-                    calculationMethod = 'editor-container';
-                    // Count text content of all child nodes before the cursor position
-                    const childNodes = Array.from(editor.childNodes);
-                    for (let i = 0; i < Math.min(range.startOffset, childNodes.length); i++) {
-                        const node = childNodes[i];
-                        if (node.nodeType === Node.TEXT_NODE) {
-                            cursorPos += node.textContent.length;
-                        } else if (node.nodeType === Node.ELEMENT_NODE) {
-                            cursorPos += node.innerText ? node.innerText.length : 0;
-                        }
-                    }
-                } else {
-                    calculationMethod = 'treewalker';
-                    // Use TreeWalker for text nodes
-                    const walker = document.createTreeWalker(
-                        editor,
-                        NodeFilter.SHOW_TEXT,
-                        null,
-                        false
-                    );
-
-                    let currentOffset = 0;
-                    while (walker.nextNode()) {
-                        const node = walker.currentNode;
-                        if (node === range.startContainer) {
-                            cursorPos = currentOffset + range.startOffset;
-                            break;
-                        }
-                        currentOffset += node.textContent.length;
-                    }
+                // Get text before cursor using toString() (gives single \n)
+                const preCaretRange = range.cloneRange();
+                preCaretRange.selectNodeContents(editor);
+                preCaretRange.setEnd(range.endContainer, range.endOffset);
+                let rangeTextBefore = preCaretRange.toString();
+                  
+                // Remove tooltip text if present
+                const tooltip = editor.querySelector('.autocorrect-tooltip');
+                if (tooltip) {
+                    rangeTextBefore = rangeTextBefore.replace(tooltip.textContent || '', '');
                 }
+                  
+                // Strip trailing newlines to match fullText normalization
+                const rangeTextNormalized = rangeTextBefore.replace(/\n+$/, '');
+                  
+                // Count newlines in normalized range text
+                const newlineCount = (rangeTextNormalized.match(/\n/g) || []).length;
+                  
+                // Since innerText represents line breaks as \n (but browsers may add extras),
+                // we need to match the position. Each \n in toString() corresponds to text in innerText.
+                // Simply use the rangeText length directly since both should match after normalization
+                const cursorPos = rangeTextNormalized.length;
 
-                // Always try the fallback method and compare
-                let fallbackCursorPos = 0;
-                try {
-                    // Create a range from the start of editor to current cursor position
-                    const tempRange = document.createRange();
-                    tempRange.setStart(editor, 0);
-                    tempRange.setEnd(range.startContainer, range.startOffset);
-                    const textBeforeRange = tempRange.toString();
-                    fallbackCursorPos = textBeforeRange.length;
-                } catch (error) {
-                    fallbackCursorPos = cursorPos; // Use original if fallback fails
-                }
-
-                // Third method: Use Selection API to get text before cursor
-                let selectionCursorPos = 0;
-                try {
-                    const sel = window.getSelection();
-                    if (sel.rangeCount > 0) {
-                        const tempSel = sel.getRangeAt(0).cloneRange();
-                        tempSel.setStart(editor, 0);
-                        tempSel.setEnd(sel.getRangeAt(0).startContainer, sel.getRangeAt(0).startOffset);
-                        selectionCursorPos = tempSel.toString().length;
-                    }
-                } catch (error) {
-                    selectionCursorPos = cursorPos;
-                }
-
-
-                // Special fix: if cursor is at the end of a text node but position seems off
-                let adjustedForEndOfNode = false;
-                if (range.startContainer.nodeType === Node.TEXT_NODE &&
-                    range.startOffset === range.startContainer.textContent.length &&
-                    cursorPos < fullText.length) {
-
-                    // More robust fix: find where the current text node content ends in the full text
-                    const nodeText = range.startContainer.textContent;
-
-                    // Look for the complete node text starting from around the cursor position
-                    let correctCursorPos = -1;
-
-                    // Search backward from cursor position to find where this node starts
-                    for (let startSearch = Math.max(0, cursorPos - nodeText.length); startSearch <= cursorPos; startSearch++) {
-                        const textSegment = fullText.substring(startSearch, startSearch + nodeText.length);
-                        if (textSegment === nodeText) {
-                            correctCursorPos = startSearch + nodeText.length;
-                            break;
-                        }
-                    }
-
-
-                    // If we found a better cursor position, use it
-                    if (correctCursorPos > cursorPos && correctCursorPos <= fullText.length) {
-                        cursorPos = correctCursorPos;
-                        adjustedForEndOfNode = true;
-                    }
-                }
-
-                // Only use selection method if we haven't already adjusted for end-of-node issue
-                if (!adjustedForEndOfNode && selectionCursorPos !== cursorPos && Math.abs(cursorPos - selectionCursorPos) <= 1) {
-                    cursorPos = selectionCursorPos;
-                }
-
-                // Validate cursor position makes sense
-                if (cursorPos > fullText.length) {
-                    cursorPos = fullText.length;
-                }
-
-                // Additional validation: if we're at the end of a text node but cursor position seems way off
-                let cursorPositionFixed = false;
-                if (range.startContainer.nodeType === Node.TEXT_NODE &&
-                    range.startOffset === range.startContainer.textContent.length) {
-
-                    const nodeText = range.startContainer.textContent;
-                    const expectedPos = fullText.lastIndexOf(nodeText);
-
-                    if (expectedPos !== -1 && expectedPos + nodeText.length !== cursorPos) {
-                        const betterCursorPos = expectedPos + nodeText.length;
-
-
-                        cursorPos = betterCursorPos;
-                        cursorPositionFixed = true;
-                    }
-                }
-
-                // Get clean text before cursor - AFTER cursor position is fixed
+                // Get clean text before cursor
                 let textBeforeCursor = fullText.substring(0, cursorPos);
 
-                // Try range method as backup/comparison
-                let rangeTextBefore = '';
-                try {
-                    // Create a range from start of editor to current cursor position
-                    const textRange = document.createRange();
-                    textRange.setStart(editor, 0);
-                    textRange.setEnd(range.startContainer, range.startOffset);
-                    rangeTextBefore = textRange.toString();
-                    // Strip trailing newlines to match our fullText normalization
-                    rangeTextBefore = rangeTextBefore.replace(/\n+$/, '');
-                } catch (error) {
-                    rangeTextBefore = textBeforeCursor; // Use substring as fallback
-                }
+                console.log('📖 getCurrentWord debug:', {
+                    fullText,
+                    fullTextLength: fullText.length,
+                    cursorPos,
+                    textBeforeCursor,
+                    textBeforeCursorLength: textBeforeCursor.length,
+                    rangeTextBefore,
+                    rangeTextBeforeLength: rangeTextBefore.length,
+                    newlineCount
+                });
 
-                // Debug: Check for mismatch but always use substring method
+                // Extract the current word treating newlines as word boundaries
+                // Match word characters and apostrophes at the end, stopping at any whitespace/newline
+                const wordMatch = textBeforeCursor.match(/[\w']+$/);
+                const currentWord = wordMatch ? wordMatch[0] : '';
 
-
-                // Split by whitespace/newlines and take last segment
-                const segments = textBeforeCursor.split(/[\s\n\r]+/);
-                const lastSegment = segments[segments.length - 1] || '';
-
-                // Extract word characters and apostrophes from end of segment
-                const wordMatch = lastSegment.match(/(\w+(?:'\w*)*)$/);
-                const currentWord = wordMatch ? wordMatch[1] : '';
-
+                console.log('📖 getCurrentWord result:', {
+                    currentWord,
+                    textBeforeCursor: textBeforeCursor.substring(Math.max(0, textBeforeCursor.length - 30)),
+                    textBeforeCursorLength: textBeforeCursor.length,
+                    cursorPos,
+                    fullTextLength: fullText.length
+                });
 
                 return currentWord;
 
@@ -1104,11 +1000,39 @@
             }
         }
 
-        // Track autocorrect state - whether it's currently enabled for this typing session
+        // Helper to get normalized text from editor (single source of truth)
+        function getNormalizedEditorText() {
+            // Create a range covering the entire editor
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+              
+            // Use toString() which properly represents content with single newlines
+            let text = range.toString();
+              
+            // Remove tooltip text if present (contains zero-width space)
+            const tooltip = editor.querySelector('.autocorrect-tooltip');
+            if (tooltip) {
+                const tooltipText = tooltip.textContent || '';
+                text = text.replace(tooltipText, '');
+            }
+              
+            // Normalize trailing newlines only
+            text = text.replace(/\n+$/, '');
+              
+            console.log('📄 getNormalizedEditorText:', {
+                text: text.substring(0, 100),
+                length: text.length,
+                newlineCount: (text.match(/\n/g) || []).length
+            });
+              
+            return text;
+        }
+          
+        // Track autocorrect state - simplified approach
         let autocorrectEnabled = true;
-        let lastTextLength = 0;
         let justAppliedAutocorrect = false;
-        let lastCompletedWordLength = 0; // Track text length at last word boundary
+        let lastTextLength = 0;
+        let lastCursorPosition = 0;
 
         // Check for autocorrect suggestions using EXACT logic from typing test
         function checkForAutocorrect() {
@@ -1128,13 +1052,22 @@
                         currentWord,
                         autocorrectEnabled,
                         isAtWordBoundary: isAtWordBoundary(),
-                        textLength: (editor.innerText || '').length
+                        textLength: (editor.innerText || '').length,
+                        editorInnerText: editor.innerText,
+                        editorTextContent: editor.textContent
                     });
                     currentAutocorrectSuggestion = null;
                     hideAutocorrectTooltip();
                     return;
                 }
             }
+              
+            console.log('🔍 Checking autocorrect for word:', {
+                currentWord,
+                wordLength: currentWord.length,
+                autocorrectEnabled,
+                editorText: editor.innerText.substring(0, 100)
+            });
 
             if (currentWord.length < 3) {
                 currentAutocorrectSuggestion = null;
@@ -1221,46 +1154,136 @@
             autocorrectTimeout = setTimeout(checkForAutocorrect, 50);
         }
 
+        // Track last typed key to detect space/punctuation
+        let lastTypedKey = '';
+          
+        // Add keydown listener to track what key was pressed
+        editor.addEventListener('keydown', function(e) {
+            lastTypedKey = e.key;
+        });
+          
+        // Helper to get cursor offset in text (matching getNormalizedEditorText method)
+        function getCursorOffset() {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return 0;
+              
+            const range = selection.getRangeAt(0);
+              
+            // Get the full text using the same method as getNormalizedEditorText
+            const fullText = getNormalizedEditorText();
+              
+            // Create a temporary clone of editor up to cursor position
+            const tempEditor = editor.cloneNode(true);
+              
+            // Find the equivalent position in the clone
+            let foundNode = null;
+            let foundOffset = 0;
+              
+            function findNodeInClone(original, clone) {
+                if (original === range.startContainer) {
+                    foundNode = clone;
+                    foundOffset = range.startOffset;
+                    return true;
+                }
+                  
+                if (original.childNodes && clone.childNodes) {
+                    for (let i = 0; i < original.childNodes.length; i++) {
+                        if (findNodeInClone(original.childNodes[i], clone.childNodes[i])) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+              
+            findNodeInClone(editor, tempEditor);
+              
+            if (foundNode) {
+                // Remove everything after the cursor in the clone
+                const cloneRange = document.createRange();
+                cloneRange.selectNodeContents(tempEditor);
+                cloneRange.setStart(foundNode, foundOffset);
+                cloneRange.deleteContents();
+            }
+              
+            // Now get innerText from the clone (text before cursor)
+            let textBeforeCursor = tempEditor.innerText || '';
+              
+            // Remove tooltip text if present
+            const tooltip = tempEditor.querySelector('.autocorrect-tooltip');
+            if (tooltip && tooltip.innerText) {
+                textBeforeCursor = textBeforeCursor.replace(tooltip.innerText, '');
+            }
+              
+            // Normalize trailing newlines to match getNormalizedEditorText
+            textBeforeCursor = textBeforeCursor.replace(/\n+$/, '');
+              
+            console.log('📍 getCursorOffset:', {
+                offset: textBeforeCursor.length,
+                textBeforeCursor: textBeforeCursor.substring(Math.max(0, textBeforeCursor.length - 20)),
+                fullText: fullText.substring(0, 50)
+            });
+              
+            return textBeforeCursor.length;
+        }
+          
+        // Add click listener to reset autocorrect state when user clicks to new position
+        editor.addEventListener('mousedown', function(e) {
+            // Skip if we just applied autocorrect (to avoid interfering with reset)
+            if (justAppliedAutocorrect) {
+                console.log('🚫 Skipping click handler - autocorrect was just applied');
+                return;
+            }
+                
+            // User clicked somewhere - enable autocorrect for new typing session
+            setTimeout(() => {
+                autocorrectEnabled = true;
+                console.log('🖱️ Click detected - reset autocorrect enabled');
+            }, 0);
+        });
+          
+        // Helper to get consistent text length (matching what getCurrentWord uses)
+        function getConsistentTextLength() {
+            return getNormalizedEditorText().length;
+        }
+          
         // Add input listener for autocorrect tooltips (suggestion-only)
         editor.addEventListener('input', function (e) {
-            const currentTextLength = (editor.innerText || '').length;
+            const currentTextLength = getConsistentTextLength();
+            const currentCursorPosition = getCursorOffset();
 
-            // Skip processing if we just applied autocorrect (to avoid false backspace detection)
+            // Skip processing if we just applied autocorrect
             if (justAppliedAutocorrect) {
                 justAppliedAutocorrect = false;
                 lastTextLength = currentTextLength;
-                lastCompletedWordLength = currentTextLength; // Mark this as a completed word boundary
+                lastCursorPosition = currentCursorPosition;
+                autocorrectEnabled = true;
+                console.log('✅ Autocorrect applied - reset tracking');
                 updateToolbarState();
                 debouncedAutocorrectCheck();
                 return;
             }
 
-            // Detect actual backspacing by user (not autocorrect-induced text changes)
-            if (currentTextLength < lastTextLength) {
-                // Check if we backspaced past the last completed word boundary
-                if (currentTextLength < lastCompletedWordLength) {
-                    // We're backspacing into a previously completed word - disable autocorrect
+            // Calculate change in text length
+            const textLengthChange = currentTextLength - lastTextLength;
+              
+            // Simplified logic: disable autocorrect only when backspacing into completed text
+            if (textLengthChange < 0) {
+                // Check if we backspaced into text that existed before (cursor moved backward)
+                if (currentCursorPosition < lastCursorPosition - Math.abs(textLengthChange)) {
                     autocorrectEnabled = false;
-                    console.log('🔴 Autocorrect disabled - backspacing into completed word');
+                    console.log('🔴 Autocorrect disabled - backspaced into completed text');
                 } else {
-                    // We're backspacing within the current word we're typing - keep autocorrect enabled
                     autocorrectEnabled = true;
-                    console.log('🟢 Autocorrect still enabled - backspacing within current word');
+                    console.log('🟢 Autocorrect enabled - backspacing within current word');
                 }
-            } else if (currentTextLength > lastTextLength) {
-                // User is typing forward (adding characters)
-                
-                // If we're at a word boundary, mark this position as a completed word
-                if (isAtWordBoundary()) {
-                    lastCompletedWordLength = currentTextLength;
-                    console.log('📍 Marked completed word boundary at length:', currentTextLength);
-                }
-                
+            } else {
                 // Always enable autocorrect when typing forward
                 autocorrectEnabled = true;
             }
 
             lastTextLength = currentTextLength;
+            lastCursorPosition = currentCursorPosition;
             updateToolbarState();
             debouncedAutocorrectCheck();
         });
