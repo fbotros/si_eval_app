@@ -485,90 +485,87 @@
                     debugLog('📏 changeFontSize called', {fontSize: fontSize + 'pt'});
                     
                     const selection = window.getSelection();
-                    const hasTextInEditor = editor.textContent.trim().length > 0;
                     
-                    debugLog('Editor state', {
-                        hasTextInEditor,
-                        textLength: editor.textContent.length,
-                        selectionType: selection.type
+                    // CANONICAL SELECTION DETECTION - Multiple methods for reliability
+                    // Method 1: selection.toString() - most reliable across browsers
+                    const selectedText = selection.toString();
+                    
+                    // Method 2: Check selection type (Range vs Caret)
+                    const isRangeType = selection.type === 'Range';
+                    
+                    // Method 3: Compare anchor and focus positions
+                    const hasOffsetDifference = selection.anchorNode !== selection.focusNode || 
+                                               selection.anchorOffset !== selection.focusOffset;
+                    
+                    // Method 4: Range.collapsed check (least reliable on Quest 3)
+                    let isRangeCollapsed = true;
+                    if (selection.rangeCount > 0) {
+                        isRangeCollapsed = selection.getRangeAt(0).collapsed;
+                    }
+                    
+                    // Determine if we have a real selection using multiple signals
+                    const hasSelection = selectedText.length > 0 || isRangeType || hasOffsetDifference || !isRangeCollapsed;
+                    
+                    debugLog('🔍 SELECTION DETECTION', {
+                        selectedTextLength: selectedText.length,
+                        selectedTextPreview: selectedText.substring(0, 20),
+                        selectionType: selection.type,
+                        hasOffsetDifference,
+                        isRangeCollapsed,
+                        FINAL_hasSelection: hasSelection,
+                        anchorNode: selection.anchorNode?.nodeName,
+                        focusNode: selection.focusNode?.nodeName,
+                        anchorOffset: selection.anchorOffset,
+                        focusOffset: selection.focusOffset
                     });
                     
-                    if (selection.rangeCount > 0) {
+                    if (hasSelection && selection.rangeCount > 0) {
+                        // SELECTION EXISTS - wrap it
+                        debugLog('✅ PATH: Wrapping selection');
+                        
                         const range = selection.getRangeAt(0);
-                        const hasActualSelection = range.toString().length > 0 || !range.collapsed;
+                        const span = document.createElement('span');
+                        span.style.fontSize = fontSize + 'pt';
                         
-                        debugLog('Selection check', {
-                            hasActualSelection,
-                            rangeTextLength: range.toString().length,
-                            collapsed: range.collapsed
-                        });
+                        const contents = range.extractContents();
+                        span.appendChild(contents);
+                        range.insertNode(span);
                         
-                        if (hasActualSelection) {
-                            // Normal selection path - wrap selected text
-                            debugLog('✅ Wrapping selected text');
-                            const span = document.createElement('span');
-                            span.style.fontSize = fontSize + 'pt';
-                            const contents = range.extractContents();
-                            span.appendChild(contents);
-                            range.insertNode(span);
-                            
-                            // Reselect
-                            const newRange = document.createRange();
-                            newRange.selectNodeContents(span);
-                            selection.removeAllRanges();
-                            selection.addRange(newRange);
-                        } else if (hasTextInEditor) {
-                            // QUEST 3 WORKAROUND: Text exists but no selection detected
-                            // Wrap ALL text in the editor with the new font size
-                            debugLog('⚠️ Quest 3 workaround: wrapping ALL text in editor');
-                            
-                            const span = document.createElement('span');
-                            span.style.fontSize = fontSize + 'pt';
-                            
-                            // Extract all contents of editor
-                            const editorRange = document.createRange();
-                            editorRange.selectNodeContents(editor);
-                            const allContents = editorRange.extractContents();
-                            span.appendChild(allContents);
-                            
-                            // Clear editor and insert wrapped content
-                            editor.innerHTML = '';
-                            editor.appendChild(span);
-                            
-                            debugLog('✅ All text wrapped in font size span');
-                            
-                            // Try to restore cursor to end
-                            const newRange = document.createRange();
-                            newRange.selectNodeContents(editor);
-                            newRange.collapse(false);
-                            selection.removeAllRanges();
-                            selection.addRange(newRange);
-                        } else {
-                            // Empty editor - insert span for future typing
-                            debugLog('No text yet - inserting span for cursor');
-                            
-                            const span = document.createElement('span');
-                            span.style.fontSize = fontSize + 'pt';
-                            
-                            // Preserve formatting
-                            const isBold = document.queryCommandState('bold');
-                            const isItalic = document.queryCommandState('italic');
-                            const isUnderline = document.queryCommandState('underline');
-                            if (isBold) span.style.fontWeight = 'bold';
-                            if (isItalic) span.style.fontStyle = 'italic';
-                            if (isUnderline) span.style.textDecoration = 'underline';
-                            
-                            const zwsp = document.createTextNode('\u200B');
-                            span.appendChild(zwsp);
-                            range.insertNode(span);
-                            
-                            range.setStart(span.firstChild, 1);
-                            range.collapse(true);
-                            selection.removeAllRanges();
-                            selection.addRange(newRange);
-                            
-                            debugLog('✅ Cursor positioned for typing');
-                        }
+                        // Reselect the wrapped content
+                        const newRange = document.createRange();
+                        newRange.selectNodeContents(span);
+                        selection.removeAllRanges();
+                        selection.addRange(newRange);
+                        
+                        debugLog('✅ Selection wrapped and preserved');
+                    } else if (selection.rangeCount > 0) {
+                        // NO SELECTION - insert span at cursor for future typing
+                        debugLog('✅ PATH: Inserting span at cursor');
+                        
+                        const range = selection.getRangeAt(0);
+                        const span = document.createElement('span');
+                        span.style.fontSize = fontSize + 'pt';
+                        
+                        // Preserve current formatting
+                        const isBold = document.queryCommandState('bold');
+                        const isItalic = document.queryCommandState('italic');
+                        const isUnderline = document.queryCommandState('underline');
+                        if (isBold) span.style.fontWeight = 'bold';
+                        if (isItalic) span.style.fontStyle = 'italic';
+                        if (isUnderline) span.style.textDecoration = 'underline';
+                        
+                        // Insert zero-width space
+                        const zwsp = document.createTextNode('\u200B');
+                        span.appendChild(zwsp);
+                        range.insertNode(span);
+                        
+                        // Position cursor inside span after zero-width space
+                        range.setStart(span.firstChild, 1);
+                        range.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        
+                        debugLog('✅ Cursor positioned inside span');
                     }
                     
                     updateToolbarState();
