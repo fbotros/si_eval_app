@@ -805,12 +805,14 @@
                 console.log('📖 getCurrentWord debug:', {
                     fullText,
                     fullTextLength: fullText.length,
+                    fullTextChars: JSON.stringify(fullText),
                     cursorPos,
                     textBeforeCursor,
                     textBeforeCursorLength: textBeforeCursor.length,
+                    textBeforeCursorChars: JSON.stringify(textBeforeCursor),
                     rangeTextBefore,
                     rangeTextBeforeLength: rangeTextBefore.length,
-                    newlineCount
+                    rangeTextBeforeChars: JSON.stringify(rangeTextBefore)
                 });
 
                 // Extract the current word treating newlines as word boundaries
