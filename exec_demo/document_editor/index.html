@@ -483,17 +483,27 @@
                     debugLog('📏 changeFontSize called', {fontSize: fontSize + 'pt'});
                     
                     const selection = window.getSelection();
+                    debugLog('Selection check', {rangeCount: selection.rangeCount});
+                    
                     if (selection.rangeCount > 0) {
                         const range = selection.getRangeAt(0);
-                        debugLog('Initial cursor', {startOffset: range.startOffset, collapsed: range.collapsed});
+                        const startContainer = range.startContainer;
+                        const startOffset = range.startOffset;
+                        debugLog('Initial range', {
+                            collapsed: range.collapsed,
+                            startOffset: startOffset,
+                            startContainer: startContainer.nodeName,
+                            textContent: startContainer.textContent?.substring(0, 20)
+                        });
 
                         // Apply font size using CSS style
                         const span = document.createElement('span');
                         span.style.fontSize = fontSize + 'pt';
+                        span.className = 'font-size-applied'; // For debugging
                         
                         if (!range.collapsed) {
                             // Has selection - wrap it
-                            debugLog('Wrapping selection');
+                            debugLog('Path: Wrapping selection');
                             const contents = range.extractContents();
                             span.appendChild(contents);
                             range.insertNode(span);
@@ -503,36 +513,63 @@
                             newRange.selectNodeContents(span);
                             selection.removeAllRanges();
                             selection.addRange(newRange);
-                            debugLog('Selection preserved');
+                            debugLog('Selection wrapped and preserved');
                         } else {
                             // No selection - insert span for future typing
-                            debugLog('Inserting span for cursor');
+                            debugLog('Path: Inserting span at cursor for future typing');
                             
                             // Get current formatting state
                             const isBold = document.queryCommandState('bold');
                             const isItalic = document.queryCommandState('italic');
                             const isUnderline = document.queryCommandState('underline');
+                            debugLog('Current formatting', {isBold, isItalic, isUnderline});
                             
                             if (isBold) span.style.fontWeight = 'bold';
                             if (isItalic) span.style.fontStyle = 'italic';
                             if (isUnderline) span.style.textDecoration = 'underline';
                             
                             // Insert zero-width space
-                            span.appendChild(document.createTextNode('\u200B'));
+                            const zwsp = document.createTextNode('\u200B');
+                            span.appendChild(zwsp);
                             range.insertNode(span);
+                            debugLog('Span inserted into DOM', {spanId: span.className});
                             
                             // Position cursor after zero-width space
-                            range.setStart(span.firstChild, 1);
-                            range.collapse(true);
+                            const newRange = document.createRange();
+                            newRange.setStart(span.firstChild, 1);
+                            newRange.collapse(true);
                             selection.removeAllRanges();
-                            selection.addRange(range);
-                            debugLog('Cursor positioned');
+                            selection.addRange(newRange);
+                            
+                            debugLog('Cursor positioned in span', {
+                                rangeStartOffset: newRange.startOffset,
+                                rangeStartContainer: newRange.startContainer.nodeName,
+                                parentElement: newRange.startContainer.parentElement?.className
+                            });
+                            
+                            // Verify the position stuck
+                            setTimeout(() => {
+                                const verifySelection = window.getSelection();
+                                if (verifySelection.rangeCount > 0) {
+                                    const verifyRange = verifySelection.getRangeAt(0);
+                                    debugLog('⚠️ Cursor position after 10ms', {
+                                        startOffset: verifyRange.startOffset,
+                                        startContainer: verifyRange.startContainer.nodeName,
+                                        parentClass: verifyRange.startContainer.parentElement?.className
+                                    });
+                                }
+                            }, 10);
                         }
+                    } else {
+                        debugLog('⚠️ NO SELECTION RANGE - cannot apply font size');
                     }
                     
                     updateToolbarState();
                     resizeFontSizeSelector();
-                    editor.focus();
+                    
+                    // DON'T call editor.focus() - it might reset cursor on Quest 3
+                    // editor.focus();
+                    debugLog('Skipping editor.focus() to preserve cursor position');
                     
                     debugLog('✅ changeFontSize complete');
                 } catch (error) {
