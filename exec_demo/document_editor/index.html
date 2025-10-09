@@ -842,6 +842,7 @@
 
                 tooltip.style.position = 'absolute';
                 tooltip.style.visibility = 'visible';
+                tooltip.style.display = 'block';  // Reset display in case it was set to 'none'
                 tooltip.style.top = '0px';
                 tooltip.style.left = '0px';
 
@@ -875,6 +876,7 @@
                 if (tooltip) {
                     tooltip.classList.remove('show');
                     tooltip.style.visibility = 'hidden';
+                    tooltip.style.display = 'none';
                 }
             }
 
@@ -1313,6 +1315,20 @@
 
             // Add input listener for autocorrect tooltips (suggestion-only)
             editor.addEventListener('input', function (e) {
+                // If tooltip is visible and user types another character, hide it immediately
+                // But DON'T clear the suggestion state - let checkForAutocorrect handle that
+                if (e.inputType === 'insertText' && e.data && e.data.length === 1) {
+                    const isRegularChar = /[a-zA-Z0-9]/.test(e.data);
+                    const tooltip = document.getElementById('autocorrect-tooltip');
+                    if (isRegularChar && tooltip && tooltip.classList.contains('show')) {
+                        // Just hide the tooltip visually - don't clear state
+                        tooltip.classList.remove('show');
+                        tooltip.style.visibility = 'hidden';
+                        tooltip.style.display = 'none';
+                        // The debounced checkForAutocorrect will update state and show again if needed
+                    }
+                }
+
                 // Clean up empty formatted elements after deletion
                 if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') {
                     const selection = window.getSelection();

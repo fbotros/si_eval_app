@@ -34,6 +34,8 @@ class AutocorrectEngine {
             'cna': 'can',
             'nac': 'can',
             'se': 'we',
+            'ot': 'it',
+            'ut': 'it',
             'taht': 'that',
             'thta': 'that',
             'htat': 'that',
