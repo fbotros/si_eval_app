@@ -20,7 +20,7 @@ class AutocorrectEngine {
         this.dictionarySet = new Set();
         this.trieDictionary = null;
 
-        // Cache for expensive operations
+        // LRU Cache for expensive operations - stores most recently used corrections
         this.correctionCache = new Map();
         this.maxCacheSize = 1000;
 
@@ -239,9 +239,12 @@ class AutocorrectEngine {
         }
         result = bestMatch;
 
-        // Cache the result (limit cache size to prevent memory issues)
-        if (this.correctionCache.size > this.maxCacheSize) {
-            this.correctionCache.clear();
+        // Cache the result using LRU eviction (Least Recently Used)
+        // When cache is full, delete the oldest entry (first item in Map)
+        if (this.correctionCache.size >= this.maxCacheSize) {
+            // Delete first (oldest) entry in the Map
+            const firstKey = this.correctionCache.keys().next().value;
+            this.correctionCache.delete(firstKey);
         }
         this.correctionCache.set(part, result);
 

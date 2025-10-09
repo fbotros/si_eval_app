@@ -191,11 +191,9 @@ function getCurrentIncompleteWord() {
 
     if (!currentValue || cursorPos === undefined) return '';
 
-    // ONLY consider text before cursor - ignore everything after
-    const textBeforeCursor = currentValue.substring(0, cursorPos);
-
-    // Use textBeforeCursor.length as the position (end of text before cursor)
-    const wordAtCursor = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
+    // Directly get word at cursor position without creating substring
+    // This avoids O(n) substring operation for documents with lots of text
+    const wordAtCursor = getWordAtPosition(currentValue, cursorPos);
 
     return wordAtCursor.word;
 }
@@ -221,12 +219,14 @@ function getWordAtPosition(text, position) {
         end++;
     }
 
-    // Extract the word and surrounding context
+    // Extract only the word - DON'T create full-document substrings
+    // This dramatically improves performance as document length increases
     const word = text.substring(start, end);
-    const beforeCursor = text.substring(0, position);
-    const afterCursor = text.substring(position);
 
-    return { word, start, end, beforeCursor, afterCursor };
+    // Note: beforeCursor and afterCursor are expensive and rarely used
+    // If needed, they should be computed lazily by the caller for the specific context
+
+    return { word, start, end };
 }
 
 // Check if cursor is at a word boundary (space, punctuation, start/end of text)
@@ -258,14 +258,17 @@ let caretPositionCache = {
 function getCaretPosition() {
     const element = inputArea;
     const position = element.selectionStart;
-    const currentText = element.value.substring(0, position);
 
-    // Use cached result if text and position haven't changed
-    if (caretPositionCache.lastText === currentText &&
-        caretPositionCache.lastPosition === position &&
+    // Use cached result if position and full text haven't changed
+    // Check full text to detect any changes, avoiding expensive substring
+    if (caretPositionCache.lastPosition === position &&
+        caretPositionCache.lastText === element.value &&
         caretPositionCache.lastResult) {
         return caretPositionCache.lastResult;
     }
+
+    // Only create substring when we actually need to recalculate
+    const currentText = element.value.substring(0, position);
 
     // Reuse or create mirror div to reduce DOM creation overhead
     let div = caretPositionCache.mirrorDiv;
@@ -381,8 +384,8 @@ function hideAutocorrectTooltip() {
 
 // Simple autocorrect suppression logic
 function shouldSuppressAutocorrect() {
-    // Only suppress if we recently used backspace AND haven't typed enough since
-    // Don't suppress based on cursor positioning or clicking
+    // Suppress autocorrect until user has typed 2 or more characters after backspace
+    // This prevents autocorrect from immediately re-applying when user is fixing a word
     return charsTypedSinceLastBackspace < 2;
 }
 
@@ -405,12 +408,10 @@ function performAutocorrectPreview() {
     const currentValue = inputArea.value;
     const cursorPos = inputArea.selectionStart;
 
-    // ONLY consider text before cursor for word detection
-    const textBeforeCursor = currentValue.substring(0, cursorPos);
-
-    // Check if we're editing within an existing word using the correct position relative to textBeforeCursor
-    const wordInfo = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
-    const isWithinWord = wordInfo.word.length > 0 && textBeforeCursor.length > wordInfo.start && textBeforeCursor.length < wordInfo.end;
+    // Check if we're editing within an existing word directly with the full text
+    // This avoids creating the expensive textBeforeCursor substring
+    const wordInfo = getWordAtPosition(currentValue, cursorPos);
+    const isWithinWord = wordInfo.word.length > 0 && cursorPos > wordInfo.start && cursorPos < wordInfo.end;
 
     // Don't show preview if editing within an existing word
     if (isWithinWord) {
@@ -424,24 +425,22 @@ function performAutocorrectPreview() {
         if (shouldSuppressAutocorrect()) {
             hideAutocorrectTooltip();
         } else {
-            // Use requestIdleCallback if available for better performance
-            if (window.requestIdleCallback) {
-                requestIdleCallback(() => {
-                    const suggestion = autocorrectEngine.findClosestWordForPreview(incompleteWord.toLowerCase());
-                    if (suggestion !== incompleteWord.toLowerCase()) {
-                        showAutocorrectTooltip(incompleteWord, suggestion);
-                    } else {
-                        hideAutocorrectTooltip();
-                    }
-                });
-            } else {
-                // Fallback for browsers without requestIdleCallback
+            // Perform autocorrect check with optimized scheduling
+            // Use requestIdleCallback for better performance when available
+            const performSuggestionCheck = () => {
                 const suggestion = autocorrectEngine.findClosestWordForPreview(incompleteWord.toLowerCase());
                 if (suggestion !== incompleteWord.toLowerCase()) {
                     showAutocorrectTooltip(incompleteWord, suggestion);
                 } else {
                     hideAutocorrectTooltip();
                 }
+            };
+
+            // Schedule with requestIdleCallback if available for smoother performance
+            if (window.requestIdleCallback) {
+                requestIdleCallback(performSuggestionCheck);
+            } else {
+                performSuggestionCheck();
             }
         }
     } else {
@@ -1164,7 +1163,7 @@ function feedbackIsDelimiterBeforeCursor() {
 
 function showFeedbackAutocorrectTooltip(text, x, y) {
     const { tooltip, correctionText } = getFeedbackTooltipElements();
-    
+
     correctionText.textContent = text;
     tooltip.classList.remove('show');
 

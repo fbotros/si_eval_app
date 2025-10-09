@@ -1117,6 +1117,7 @@
             let lastTextLength = 0;
             let lastCursorPosition = 0;
             let lastTextContent = ''; // Track the actual text content
+            let charsTypedSinceLastBackspace = 0; // Track characters typed since last backspace
 
             // Track pending font size for Quest 3 compatibility
             let pendingFontSize = '11'; // Default
@@ -1157,6 +1158,13 @@
                         hideAutocorrectTooltip();
                         return;
                     }
+                }
+
+                // Suppress autocorrect until user has typed 2 characters after backspace
+                if (charsTypedSinceLastBackspace < 2) {
+                    currentAutocorrectSuggestion = null;
+                    hideAutocorrectTooltip();
+                    return;
                 }
 
                 if (currentWord.length < 3) {
@@ -1385,7 +1393,12 @@
 
                 // Intelligent suppression logic for backspace
                 if (textLengthChange < 0) {
-                    // User is backspacing/deleting
+                    // User is backspacing/deleting - reset counter and hide tooltip
+                    charsTypedSinceLastBackspace = 0;
+                    hideAutocorrectTooltip();
+                    currentAutocorrectSuggestion = null;
+                    wordToReplaceWithSuggestion = null;
+
                     // Check if we crossed over a delimiter using the OLD text and OLD cursor position
                     const wasAfterDelimiter = lastCursorPosition === 0 ||
                         (lastTextContent.length >= lastCursorPosition &&
@@ -1403,11 +1416,15 @@
                     }
                 } else if (textLengthChange > 0) {
                     // User is typing forward
-                    // Check if we just typed a delimiter
+                    // Increment counter for non-delimiter characters
                     const justTypedDelimiter = isDelimiterBeforeCursor();
 
-                    if (justTypedDelimiter) {
-                        // Just typed a delimiter - re-enable autocorrect
+                    if (!justTypedDelimiter) {
+                        // Typed a regular character - increment counter
+                        charsTypedSinceLastBackspace++;
+                    } else {
+                        // Just typed a delimiter - reset counter and re-enable autocorrect
+                        charsTypedSinceLastBackspace = 0;
                         autocorrectEnabled = true;
                     }
                     // If already enabled, keep it enabled
@@ -1452,7 +1469,9 @@
                     const currentWord = getCurrentWord();
 
                     // If there's no current suggestion but there's a current word, run full autocorrect check now
-                    if (!currentAutocorrectSuggestion && currentWord && currentWord.length >= 3 && autocorrectEnabled) {
+                    // BUT only if autocorrect is enabled AND we're not in backspace suppression mode
+                    if (!currentAutocorrectSuggestion && currentWord && currentWord.length >= 3 && 
+                        autocorrectEnabled && charsTypedSinceLastBackspace >= 2) {
                         // Use findClosestWord for consistency - same logic whether typing fast or slow
                         const suggestion = editorAutocorrectEngine.findClosestWord(currentWord);
 
@@ -1467,6 +1486,7 @@
                 // Re-enable autocorrect when typing whitespace (even if previously disabled)
                 if (isSpace || isEnter) {
                     autocorrectEnabled = true;
+                    charsTypedSinceLastBackspace = 0; // Reset counter on whitespace
                     justAppliedAutocorrect = false; // Clear the flag when typing whitespace
                 }
 
