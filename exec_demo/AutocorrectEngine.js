@@ -44,6 +44,8 @@ class AutocorrectEngine {
             'youa': 'you a',
             'doenst': 'doesn\'t',
             'doesnt': 'doesn\'t',
+            'diesnt': 'doesn\'t',
+            'doent': 'doesn\'t',
             'wont': 'won\'t',
             'cant': 'can\'t',
             'didnt': 'didn\'t',
@@ -266,7 +268,7 @@ class AutocorrectEngine {
 
             if (firstCorrected && secondCorrected) {
                 const totalDistance = this.levenshteinCost(firstPart, firstCorrected) +
-                                    this.levenshteinCost(secondPart, secondCorrected) + 1;
+                                    this.levenshteinCost(secondPart, secondCorrected) + 3.0;
                 if (totalDistance < bestDistance) bestDistance = totalDistance;
             }
         }
@@ -399,6 +401,7 @@ class AutocorrectEngine {
 
         // Check if two-word split is better than single word correction
         const singleWordDistance = this.levenshteinCost(word.toLowerCase(), singleWordCorrection);
+
         const twoWordSplit = this.findTwoWordSplit(word);
 
         if (twoWordSplit) {

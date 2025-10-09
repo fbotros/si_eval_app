@@ -372,8 +372,46 @@
                 try {
                     const dictionary = await loadDictionary('../comprehensive_dictionary.txt');
 
-                    // Create autocorrect engine with dictionary words
-                    editorAutocorrectEngine = new AutocorrectEngine();
+                    // Define QWERTY keyboard neighbor mappings
+                    const keyboardNeighbors = {
+                        'q': ['w', 'a'],
+                        'w': ['q', 'e', 's', 'a'],
+                        'e': ['w', 'r', 'd', 's'],
+                        'r': ['e', 't', 'f', 'd'],
+                        't': ['r', 'y', 'g', 'f'],
+                        'y': ['t', 'u', 'h', 'g'],
+                        'u': ['y', 'i', 'j', 'h'],
+                        'i': ['u', 'o', 'k', 'j'],
+                        'o': ['i', 'p', 'l', 'k'],
+                        'p': ['o', 'l'],
+                        'a': ['q', 'w', 's', 'z'],
+                        's': ['a', 'w', 'e', 'd', 'z', 'x'],
+                        'd': ['s', 'e', 'r', 'f', 'x', 'c'],
+                        'f': ['d', 'r', 't', 'g', 'c', 'v'],
+                        'g': ['f', 't', 'y', 'h', 'v', 'b'],
+                        'h': ['g', 'y', 'u', 'j', 'b', 'n'],
+                        'j': ['h', 'u', 'i', 'k', 'n', 'm'],
+                        'k': ['j', 'i', 'o', 'l', 'm'],
+                        'l': ['k', 'o', 'p'],
+                        'z': ['a', 's', 'x'],
+                        'x': ['z', 's', 'd', 'c'],
+                        'c': ['x', 'd', 'f', 'v'],
+                        'v': ['c', 'f', 'g', 'b'],
+                        'b': ['v', 'g', 'h', 'n'],
+                        'n': ['b', 'h', 'j', 'm'],
+                        'm': ['n', 'j', 'k']
+                    };
+
+                    // Create autocorrect engine with dictionary words and keyboard neighbors
+                    editorAutocorrectEngine = new AutocorrectEngine({
+                        keyboardNeighbors: keyboardNeighbors,
+                        adjacentKeyMultiplier: 0.5,  // Make adjacent key substitutions very cheap
+                        substitutionCost: 1.0,
+                        insertionCost: 0.5,
+                        deletionCost: 1.0,
+                        apostropheInsertionCost: 0.3,  // Increased from 0.2 to make it less attractive
+                        apostropheDeletionCost: 0.4    // Increased from 0.3 to make it less attractive
+                    });
                     editorAutocorrectEngine.addWords(dictionary);
                     autocorrectReady = true;
                 } catch (error) {
@@ -960,25 +998,22 @@
 
                     // Verify we're selecting the right text
                     const selectedText = wordRange.toString();
+
                     if (selectedText === wordToDelete) {
                         // Select and replace the word
                         selection.removeAllRanges();
                         selection.addRange(wordRange);
                         document.execCommand('insertText', false, suggestion);
-
-                        // Don't add extra space - trigger key will handle spacing
                     } else {
                         // Fallback to original method
                         for (let i = 0; i < wordToDelete.length; i++) {
                             document.execCommand('delete', false, null);
                         }
                         document.execCommand('insertText', false, suggestion);
-
-                        // No extra space needed - trigger key will handle proper spacing
                     }
 
                 } catch (error) {
-                    console.error('❌ Error replacing word:', error);
+                    console.error('Error replacing word:', error);
                     // Fallback to simple deletion method
                     try {
                         for (let i = 0; i < wordToDelete.length; i++) {
@@ -986,7 +1021,7 @@
                         }
                         document.execCommand('insertText', false, suggestion);
                     } catch (fallbackError) {
-                        console.error('❌ Fallback replacement also failed:', fallbackError);
+                        console.error('Fallback replacement also failed:', fallbackError);
                     }
                 }
             }
@@ -1153,45 +1188,12 @@
                 // Create lowercase version for dictionary lookup
                 const wordForLookup = isCapitalized ? currentWord.toLowerCase() : currentWord;
 
-                // Check for override corrections first
-                const lowerWord = currentWord.toLowerCase();
-
-                if (editorAutocorrectEngine.correctionOverrides && editorAutocorrectEngine.correctionOverrides[lowerWord]) {
-                    const suggestion = editorAutocorrectEngine.correctionOverrides[lowerWord];
-                    currentAutocorrectSuggestion = suggestion;
-                    wordToReplaceWithSuggestion = currentWord;
-
-                    const cursorPos = getCursorPosition();
-                    if (cursorPos) {
-                        showAutocorrectTooltip(suggestion, cursorPos.x, cursorPos.y);
-                    }
-                    return;
-                }
-
-
-                // Test word splitting approach first (using lowercase for lookup)
-                if (editorAutocorrectEngine.findTwoWordSplit) {
-                    const twoWordSplit = editorAutocorrectEngine.findTwoWordSplit(wordForLookup);
-
-                    if (twoWordSplit && twoWordSplit !== wordForLookup) {
-                        // Capitalize suggestion if original word was capitalized
-                        let finalSuggestion = twoWordSplit;
-                        if (isCapitalized && twoWordSplit.length > 0) {
-                            finalSuggestion = twoWordSplit.charAt(0).toUpperCase() + twoWordSplit.slice(1);
-                        }
-
-                        currentAutocorrectSuggestion = finalSuggestion;
-                        wordToReplaceWithSuggestion = currentWord;
-
-                        const cursorPos = getCursorPosition();
-                        if (cursorPos) {
-                            showAutocorrectTooltip(finalSuggestion, cursorPos.x, cursorPos.y);
-                            return;
-                        }
-                    }
-                }
-
-                // For regular words, use findClosestWord (using lowercase for lookup)
+                // Use findClosestWord for ALL corrections - it handles:
+                // 1. Override corrections (highest priority)
+                // 2. Dictionary lookups
+                // 3. Single-word corrections with cost calculation
+                // 4. Two-word splits with cost calculation
+                // 5. Comparison between single-word and two-word to pick the best
                 const suggestion = editorAutocorrectEngine.findClosestWord(wordForLookup);
 
                 // Show tooltip if suggestion is different from original input
@@ -1448,7 +1450,7 @@
                 // Check if this is a trigger key (space, Enter, or punctuation)
                 const isEnter = e.key === 'Enter';
                 const isSpace = e.key === ' ';
-                const isPunctuation = [',', '.', ';', '/', '"', "'", '?', '!'].includes(e.key);
+                const isPunctuation = [',', '.', ';', '/', '"', '?', '!'].includes(e.key);
                 const isTriggerKey = isEnter || isSpace || isPunctuation;
 
                 // If it's a trigger key, check for autocorrect BEFORE the key is processed
@@ -1458,28 +1460,13 @@
 
                     // If there's no current suggestion but there's a current word, run full autocorrect check now
                     if (!currentAutocorrectSuggestion && currentWord && currentWord.length >= 3 && autocorrectEnabled) {
-                        const lowerWord = currentWord.toLowerCase();
+                        // Use findClosestWord for consistency - same logic whether typing fast or slow
+                        const suggestion = editorAutocorrectEngine.findClosestWord(currentWord);
 
-                        // Check overrides first
-                        if (editorAutocorrectEngine.correctionOverrides &&
-                            editorAutocorrectEngine.correctionOverrides[lowerWord]) {
-                            const suggestion = editorAutocorrectEngine.correctionOverrides[lowerWord];
+                        // Only set as suggestion if it's different from the current word
+                        if (suggestion && suggestion.toLowerCase() !== currentWord.toLowerCase()) {
                             currentAutocorrectSuggestion = suggestion;
                             wordToReplaceWithSuggestion = currentWord;
-                        }
-                        // Check for two-word split
-                        else if (editorAutocorrectEngine.findTwoWordSplit) {
-                            const twoWordSplit = editorAutocorrectEngine.findTwoWordSplit(lowerWord);
-                            if (twoWordSplit && twoWordSplit !== lowerWord) {
-                                // Capitalize if original was capitalized
-                                const isCapitalized = currentWord[0] === currentWord[0].toUpperCase();
-                                const finalSuggestion = isCapitalized && twoWordSplit.length > 0
-                                    ? twoWordSplit.charAt(0).toUpperCase() + twoWordSplit.slice(1)
-                                    : twoWordSplit;
-
-                                currentAutocorrectSuggestion = finalSuggestion;
-                                wordToReplaceWithSuggestion = currentWord;
-                            }
                         }
                     }
                 }
@@ -1492,8 +1479,9 @@
 
                 // Check for autocorrect application
                 if (currentAutocorrectSuggestion && wordToReplaceWithSuggestion && isTriggerKey) {
-                    // Use the stored word that we showed in the tooltip
-                    const wordToDelete = wordToReplaceWithSuggestion;
+                    // CRITICAL: Get the CURRENT word at trigger time, not the stored word
+                    // The user may have continued typing after we showed the tooltip
+                    const wordToDelete = getCurrentWord();
                     const suggestionToApply = currentAutocorrectSuggestion;
 
                     // Prevent the trigger key from being processed normally
