@@ -320,6 +320,7 @@ class AutocorrectEngine {
         let bestSplit = null;
         let bestScore = Infinity;
         let bestCommonScore = Infinity;
+        let isExactMatch = false; // Track if best split was an exact match (no corrections needed)
 
         for (let i = 2; i <= lowerWord.length - 2; i++) {
             const firstPart = lowerWord.substring(0, i);
@@ -332,6 +333,7 @@ class AutocorrectEngine {
                 if (bestScore > 1 || (bestScore === 1 && commonScore < bestCommonScore)) {
                     bestScore = 1;
                     bestCommonScore = commonScore;
+                    isExactMatch = true; // Mark as exact match
                     const twoWordResult = firstPart + ' ' + secondPart;
                     bestSplit = this.preserveCapitalization(word, twoWordResult);
                 }
@@ -353,6 +355,7 @@ class AutocorrectEngine {
                         (totalDistance === bestScore && commonScore < bestCommonScore)) {
                         bestScore = totalDistance;
                         bestCommonScore = commonScore;
+                        isExactMatch = false; // Mark as correction (not exact match)
                         const twoWordResult = firstCorrected + ' ' + secondCorrected;
                         bestSplit = this.preserveCapitalization(word, twoWordResult);
                     }
@@ -361,9 +364,19 @@ class AutocorrectEngine {
         }
 
         // Cache the best distance for getTwoWordSplitDistance to avoid redundant computation
-        // Add 3.0 to match the distance calculation convention
+        // Add 3.0 penalty for corrections to match the behavior of getTwoWordSplitDistance fallback
         const distCacheKey = 'dist_' + lowerWord;
-        this.correctionCache.set(distCacheKey, bestScore === Infinity ? Infinity : bestScore + 3.0);
+        let cachedDistance;
+        if (bestScore === Infinity) {
+            cachedDistance = Infinity;
+        } else if (isExactMatch) {
+            // Both words were exact dictionary matches - no penalty
+            cachedDistance = 1;
+        } else {
+            // One or both words needed correction - add 3.0 penalty
+            cachedDistance = bestScore + 3.0;
+        }
+        this.correctionCache.set(distCacheKey, cachedDistance);
 
         return bestSplit;
     }
@@ -412,7 +425,7 @@ class AutocorrectEngine {
 
         if (!singleWordCorrection || singleWordCorrection === word.toLowerCase()) {
             // Try two-word split if single word correction failed
-            if (twoWordSplit && twoWordDistance <= this.maxEditDistance) {
+            if (twoWordSplit) {
                 return twoWordSplit;
             }
             return word; // No good correction found
@@ -421,7 +434,7 @@ class AutocorrectEngine {
         // Check if two-word split is better than single word correction
         const singleWordDistance = this.levenshteinCost(word.toLowerCase(), singleWordCorrection);
 
-        if (twoWordSplit && twoWordDistance <= this.maxEditDistance) {
+        if (twoWordSplit) {
             // Check if the two-word split uses any override corrections
             const usesOverrideCorrection = this.splitUsesOverrideCorrection(word);
 
