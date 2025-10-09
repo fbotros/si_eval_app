@@ -284,7 +284,7 @@
                 <path d="M10 9H9H8" stroke="#2d3748" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             <div class="document-title-container">
-                <input type="text" class="document-title-input" value="Untitled Document" id="document-title">
+                <input type="text" class="document-title-input" value="Surface Inputs PRD" id="document-title">
                 <svg class="edit-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
                         d="M17.2929 2.29291C17.6834 1.90238 18.3166 1.90238 18.7071 2.29291L21.7071 5.29291C22.0976 5.68343 22.0976 6.31659 21.7071 6.70712L8.70711 19.7071C8.51957 19.8947 8.26522 20 8 20H5C4.44772 20 4 19.5523 4 19V16C4 15.7348 4.10536 15.4804 4.29289 15.2929L17.2929 2.29291Z"
@@ -294,7 +294,8 @@
                 </svg>
             </div>
         </h1>
-        <div style="position: absolute; top: 10px; right: 20px; font-size: 10px; color: #999; font-family: monospace; user-select: none;">
+        <div
+            style="position: absolute; top: 10px; right: 20px; font-size: 10px; color: #999; font-family: monospace; user-select: none;">
             v0.1
         </div>
     </div>
@@ -324,8 +325,7 @@
             <div id="document-editor" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off"
                 autocomplete="off" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false"
                 translate="no" data-ms-editor="false" data-lt-tmp-id="lt-0" data-lt-installed="false"
-                data-grammarly-disable="true">
-            </div>
+                data-grammarly-disable="true"><div><font size="7">Surface Inputs PRD</font></div><div><font size="3"><b>Status</b>: (WIP | RFC | <b>RFC</b>)</font></div><div><font size="3"><b>Editors/Contributors</b>: Ohad Yahalom, Mark Richardson, Fadi Botros, Patrick Grady</font></div><div><font size="3"><b>Last Update</b>: Feb 14, 2025</font></div><div><br></div><div><font size="6">Framing</font></div><div><font size="3">Surface inputs (SI) combines a virtual keyboard and trackpad to support general purpose computing in AR and VR. This document outlines our high level plan for releasing SI and the key requirements for an MVP experience that is good enough to meet the expectations of early adopter users in mixed reality environments.</font></div><div><br></div><div><font size="6">Product Intercept</font></div><div><font size="3">Surface Inputs will launch on Quest 3 as experimental features in V85 (January 2026). We will learn and iterate for day-0 launches on both Phoenix (VR) and Artemis (AR).</font></div></div>
         </div>
     </div>
 
@@ -580,7 +580,7 @@
                 // Get the element at cursor position
                 const elementAtCursor = getElementAtCursor();
 
-                // Update font size selector AND apply that formatting
+                // Update font size selector - ONLY READ, don't apply
                 if (elementAtCursor) {
                     try {
                         let fontSizeToUse = null;
@@ -609,14 +609,7 @@
                             if (matchingSize) {
                                 fontSizeSelector.value = matchingSize.value;
                                 resizeFontSizeSelector();
-
-                                // Apply this font size to cursor so typing will use it
-                                const htmlSizeMap = {
-                                    '9': '1', '11': '2', '13': '3',
-                                    '16': '4', '18': '5', '24': '6', '36': '7'
-                                };
-                                const htmlSize = htmlSizeMap[matchingSize.value] || '2';
-                                document.execCommand('fontSize', false, htmlSize);
+                                // DO NOT call execCommand here - it causes recursive calls during input events
                             }
                         }
                     } catch (e) {
@@ -674,7 +667,7 @@
                                 if (nodeBefore.nodeType === Node.TEXT_NODE) {
                                     return nodeBefore.parentElement;
                                 } else if (nodeBefore.nodeType === Node.ELEMENT_NODE &&
-                                          !nodeBefore.classList?.contains('autocorrect-tooltip')) {
+                                    !nodeBefore.classList?.contains('autocorrect-tooltip')) {
                                     return nodeBefore;
                                 }
                             }
@@ -687,7 +680,7 @@
                                 if (nodeAt.nodeType === Node.TEXT_NODE) {
                                     return nodeAt.parentElement;
                                 } else if (nodeAt.nodeType === Node.ELEMENT_NODE &&
-                                          !nodeAt.classList?.contains('autocorrect-tooltip')) {
+                                    !nodeAt.classList?.contains('autocorrect-tooltip')) {
                                     return nodeAt;
                                 }
                             }
@@ -1540,7 +1533,7 @@
             // Save selection when editor loses focus (Quest 3 fix)
             let savedSelection = null;
 
-            editor.addEventListener('blur', function() {
+            editor.addEventListener('blur', function () {
                 const selection = window.getSelection();
                 if (selection.rangeCount > 0) {
                     savedSelection = selection.getRangeAt(0).cloneRange();
