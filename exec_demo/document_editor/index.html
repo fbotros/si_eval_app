@@ -307,8 +307,8 @@
             <button id="underline-btn" title="Underline (Ctrl+U)"><u>U</u></button>
             <select id="font-size-selector" title="Font Size">
                 <option value="9">9</option>
-                <option value="11" selected>11</option>
-                <option value="12">12</option>
+                <option value="11">11</option>
+                <option value="13" selected>13</option>
                 <option value="16">16</option>
                 <option value="18">18</option>
                 <option value="24">24</option>
@@ -442,7 +442,7 @@
                     const htmlSizeMap = {
                         '9': '1',
                         '11': '2',
-                        '12': '3',
+                        '13': '3',
                         '16': '4',
                         '18': '5',
                         '24': '6',
@@ -574,7 +574,7 @@
 
                                 // Apply this font size to cursor so typing will use it
                                 const htmlSizeMap = {
-                                    '9': '1', '11': '2', '12': '3',
+                                    '9': '1', '11': '2', '13': '3',
                                     '16': '4', '18': '5', '24': '6', '36': '7'
                                 };
                                 const htmlSize = htmlSizeMap[matchingSize.value] || '2';
@@ -1352,8 +1352,6 @@
                                     (nextNode.tagName === 'FONT' || nextNode.tagName === 'SPAN')) {
                                     const isEmpty = nextNode.textContent.trim() === '';
                                     if (isEmpty) {
-                                            tag: nextNode.tagName
-                                        });
                                         const toRemove = nextNode;
                                         nextNode = nextNode.nextSibling; // Move to next before removing
                                         toRemove.remove();
@@ -1577,8 +1575,8 @@
             resizeTitleInput(); // Size the title input correctly on load
             resizeFontSizeSelector(); // Size the font size selector correctly on load
 
-            // Set default font size to 11pt
-            editor.style.fontSize = '11pt';
+            // Set default font size to 13pt
+            editor.style.fontSize = '13pt';
 
             // Focus the editor on page load so cursor is ready
             editor.focus();
