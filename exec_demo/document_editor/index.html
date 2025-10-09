@@ -1470,7 +1470,7 @@
 
                     // If there's no current suggestion but there's a current word, run full autocorrect check now
                     // BUT only if autocorrect is enabled AND we're not in backspace suppression mode
-                    if (!currentAutocorrectSuggestion && currentWord && currentWord.length >= 3 && 
+                    if (!currentAutocorrectSuggestion && currentWord && currentWord.length >= 3 &&
                         autocorrectEnabled && charsTypedSinceLastBackspace >= 2) {
                         // Use findClosestWord for consistency - same logic whether typing fast or slow
                         const suggestion = editorAutocorrectEngine.findClosestWord(currentWord);
