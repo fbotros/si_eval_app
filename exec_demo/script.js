@@ -1027,18 +1027,22 @@ popupOverlay.addEventListener('click', async function(e) {
     }
 });
 
-// Feedback textarea autocorrect functionality
-let feedbackAutocorrectTimer = null;
-let feedbackTooltipCache = { word: null, suggestion: null };
+// Feedback contenteditable autocorrect functionality (same logic as document editor)
+let feedbackAutocorrectEnabled = true;
+let feedbackCurrentAutocorrectSuggestion = null;
+let feedbackWordToReplaceWithSuggestion = null;
+let feedbackLastTextLength = 0;
+let feedbackLastCursorPosition = 0;
+let feedbackLastTextContent = '';
+let feedbackIsApplyingAutocorrect = false;
 
-// Create tooltip element for feedback textarea
+// Create tooltip element for feedback contenteditable
 function createFeedbackTooltip() {
     const tooltip = document.createElement('div');
     tooltip.className = 'autocorrect-tooltip';
     tooltip.id = 'feedback-autocorrect-tooltip';
-    tooltip.style.position = 'fixed';
+    tooltip.style.position = 'absolute';
     tooltip.style.zIndex = '10001'; // Higher than modal
-    tooltip.style.display = 'none';
 
     const textSpan = document.createElement('span');
     textSpan.id = 'feedback-correction-text';
@@ -1060,315 +1064,390 @@ function getFeedbackTooltipElements() {
     return { tooltip: feedbackTooltip, correctionText: feedbackCorrectionText };
 }
 
-// Get current incomplete word in textarea considering cursor position
-function getCurrentIncompleteWordInTextarea(textarea) {
-    const currentValue = textarea.value;
-    const cursorPos = textarea.selectionStart;
-
-    if (!currentValue || cursorPos === undefined) return '';
-
-    // Only consider text before cursor
-    const textBeforeCursor = currentValue.substring(0, cursorPos);
-
-    // Get word at the end of text before cursor
-    const wordAtCursor = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
-
-    return wordAtCursor.word;
+// Feedback contenteditable helper functions (reuses document editor pattern)
+function getFeedbackEditorText() {
+    let text = feedbackInput.innerText || '';
+    text = text.replace(/\n+$/, '');
+    return text;
 }
 
-// Calculate textarea caret position for multi-line text
-function getTextareaCaretPosition(textarea) {
-    const textBeforeCursor = textarea.value.substring(0, textarea.selectionStart);
+function getFeedbackCursorOffset() {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return 0;
 
-    // Create a mirror div to calculate position
-    const mirror = document.createElement('div');
-    const computedStyle = window.getComputedStyle(textarea);
+    const range = selection.getRangeAt(0);
+    let cursorPos = 0;
+    let foundCursor = false;
 
-    // Copy all relevant styles
-    [
-        'width', 'height', 'fontSize', 'fontFamily', 'fontWeight', 'lineHeight',
-        'letterSpacing', 'wordSpacing', 'textIndent', 'textAlign', 'whiteSpace',
-        'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-        'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
-        'boxSizing', 'wordWrap', 'overflowWrap'
-    ].forEach(prop => {
-        mirror.style[prop] = computedStyle[prop];
-    });
+    function walkNodes(node) {
+        if (foundCursor) return;
 
-    // Position off-screen
-    mirror.style.position = 'absolute';
-    mirror.style.visibility = 'hidden';
-    mirror.style.top = '-9999px';
-    mirror.style.left = '-9999px';
-    mirror.style.whiteSpace = 'pre-wrap';
+        if (node.nodeType === Node.TEXT_NODE) {
+            if (node === range.startContainer) {
+                cursorPos += range.startOffset;
+                foundCursor = true;
+                return;
+            } else {
+                cursorPos += node.textContent.length;
+            }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.nodeName === 'BR') {
+                cursorPos += 1;
+            } else if (node.nodeName === 'DIV' && node !== feedbackInput) {
+                if (cursorPos > 0) {
+                    cursorPos += 1;
+                }
+            }
 
-    // Set the text content up to cursor position
-    mirror.textContent = textBeforeCursor;
-
-    // Add a marker span at the cursor position
-    const marker = document.createElement('span');
-    marker.textContent = '|';
-    marker.style.position = 'relative';
-    mirror.appendChild(marker);
-
-    document.body.appendChild(mirror);
-
-    // Get marker position relative to the mirror
-    const markerRect = marker.getBoundingClientRect();
-    const textareaRect = textarea.getBoundingClientRect();
-
-    // Calculate actual position
-    const x = textareaRect.left + (markerRect.left - mirror.getBoundingClientRect().left);
-    const y = textareaRect.top + (markerRect.top - mirror.getBoundingClientRect().top);
-
-    // Cleanup
-    document.body.removeChild(mirror);
-
-    return { x, y };
-}
-
-// Show autocorrect tooltip for feedback textarea
-function showFeedbackAutocorrectTooltip(originalWord, correctedWord) {
-    if (originalWord === correctedWord) {
-        hideFeedbackAutocorrectTooltip();
-        return;
+            for (const child of node.childNodes) {
+                walkNodes(child);
+                if (foundCursor) break;
+            }
+        }
     }
 
-    const { tooltip, correctionText } = getFeedbackTooltipElements();
-
-    // Cache suggestion
-    feedbackTooltipCache.word = originalWord.toLowerCase();
-    feedbackTooltipCache.suggestion = correctedWord;
-
-    // Set tooltip content
-    correctionText.textContent = correctedWord;
-
-    // Position tooltip
-    requestAnimationFrame(() => {
-        const caretPos = getTextareaCaretPosition(feedbackInput);
-
-        tooltip.style.display = 'block';
-        tooltip.style.visibility = 'hidden';
-
-        // Get tooltip dimensions
-        const tooltipRect = tooltip.getBoundingClientRect();
-
-        // Position to the left of cursor, above the current line
-        tooltip.style.left = (caretPos.x - tooltipRect.width + 10) + 'px';
-        tooltip.style.top = (caretPos.y - 35) + 'px'; // 35px above cursor
-        tooltip.style.visibility = 'visible';
-
-        // Show with animation
-        tooltip.classList.add('show');
-    });
+    walkNodes(feedbackInput);
+    return cursorPos;
 }
 
-// Hide feedback textarea tooltip
+function getFeedbackCurrentWord() {
+    if (!autocorrectEngine) return '';
+
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return '';
+
+    try {
+        const fullEditorText = getFeedbackEditorText();
+        const cursorPos = getFeedbackCursorOffset();
+
+        const textBeforeCursor = fullEditorText.substring(0, cursorPos);
+        const wordMatch = textBeforeCursor.match(/[\w']+$/);
+        const currentWord = wordMatch ? wordMatch[0] : '';
+
+        return currentWord;
+    } catch (error) {
+        return '';
+    }
+}
+
+function getFeedbackCursorPosition() {
+    const selection = window.getSelection();
+    if (selection.rangeCount === 0) return null;
+
+    try {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        const editorRect = feedbackInput.getBoundingClientRect();
+
+        return {
+            x: rect.left - editorRect.left,
+            y: rect.top - editorRect.top - 35
+        };
+    } catch (error) {
+        return null;
+    }
+}
+
+function feedbackIsDelimiterBeforeCursor() {
+    try {
+        const fullText = getFeedbackEditorText();
+        const cursorPos = getFeedbackCursorOffset();
+
+        if (cursorPos === 0) return true;
+
+        const charBeforeCursor = fullText[cursorPos - 1];
+        return /[\s,;.!?'"\/\-]/.test(charBeforeCursor);
+    } catch (error) {
+        return true;
+    }
+}
+
+function showFeedbackAutocorrectTooltip(text, x, y) {
+    const { tooltip, correctionText } = getFeedbackTooltipElements();
+    
+    correctionText.textContent = text;
+    tooltip.classList.remove('show');
+
+    const editorRect = feedbackInput.getBoundingClientRect();
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+
+    const absoluteX = editorRect.left + scrollLeft + x;
+    const absoluteY = editorRect.top + scrollTop + y;
+
+    tooltip.style.position = 'absolute';
+    tooltip.style.visibility = 'visible';
+    tooltip.style.top = '0px';
+    tooltip.style.left = '0px';
+
+    const tooltipWidth = tooltip.offsetWidth;
+
+    let finalX = absoluteX - tooltipWidth + 8 + 10 - 3;
+    let finalY = absoluteY;
+
+    const viewportWidth = window.innerWidth;
+    if (finalX + tooltipWidth > viewportWidth - 10) {
+        finalX = viewportWidth - tooltipWidth - 10;
+    }
+    if (finalX < 10) {
+        finalX = 10;
+    }
+    if (finalY < 0) {
+        finalY = absoluteY + 30;
+    }
+
+    tooltip.style.left = finalX + 'px';
+    tooltip.style.top = finalY + 'px';
+    tooltip.classList.add('show');
+}
+
 function hideFeedbackAutocorrectTooltip() {
     const { tooltip } = getFeedbackTooltipElements();
     tooltip.classList.remove('show');
-    feedbackTooltipCache.word = null;
-    feedbackTooltipCache.suggestion = null;
+    tooltip.style.visibility = 'hidden';
 }
 
-// Debounced autocorrect preview for feedback textarea
-function scheduleFeedbackAutocorrectPreview() {
-    if (feedbackAutocorrectTimer) {
-        clearTimeout(feedbackAutocorrectTimer);
+function checkFeedbackForAutocorrect() {
+    if (!autocorrectEngine) return;
+
+    const currentWord = getFeedbackCurrentWord();
+
+    if (!feedbackAutocorrectEnabled) {
+        if (currentWord.length === 0 || feedbackIsDelimiterBeforeCursor()) {
+            feedbackAutocorrectEnabled = true;
+        } else {
+            feedbackCurrentAutocorrectSuggestion = null;
+            hideFeedbackAutocorrectTooltip();
+            return;
+        }
     }
 
-    feedbackAutocorrectTimer = setTimeout(() => {
-        performFeedbackAutocorrectPreview();
-        feedbackAutocorrectTimer = null;
-    }, 16); // Same 16ms delay as main typing test
-}
-
-// Perform autocorrect preview for feedback textarea
-function performFeedbackAutocorrectPreview() {
-    const currentValue = feedbackInput.value;
-    const cursorPos = feedbackInput.selectionStart;
-
-    // Only consider text before cursor
-    const textBeforeCursor = currentValue.substring(0, cursorPos);
-
-    // Check if we're editing within an existing word
-    const wordInfo = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
-    const isWithinWord = wordInfo.word.length > 0 &&
-                        textBeforeCursor.length > wordInfo.start &&
-                        textBeforeCursor.length < wordInfo.end;
-
-    // Don't show preview if editing within an existing word
-    if (isWithinWord) {
+    if (currentWord.length < 3) {
+        feedbackCurrentAutocorrectSuggestion = null;
         hideFeedbackAutocorrectTooltip();
         return;
     }
 
-    const incompleteWord = getCurrentIncompleteWordInTextarea(feedbackInput);
+    const isCapitalized = currentWord[0] === currentWord[0].toUpperCase() && currentWord.length > 1;
+    const wordForLookup = isCapitalized ? currentWord.toLowerCase() : currentWord;
 
-    if (incompleteWord.length > 2) {
-        // Use idle callback if available for better performance
-        if (window.requestIdleCallback) {
-            requestIdleCallback(() => {
-                const suggestion = autocorrectEngine.findClosestWordForPreview(incompleteWord.toLowerCase());
-                if (suggestion !== incompleteWord.toLowerCase()) {
-                    showFeedbackAutocorrectTooltip(incompleteWord, suggestion);
-                } else {
-                    hideFeedbackAutocorrectTooltip();
-                }
-            });
-        } else {
-            const suggestion = autocorrectEngine.findClosestWordForPreview(incompleteWord.toLowerCase());
-            if (suggestion !== incompleteWord.toLowerCase()) {
-                showFeedbackAutocorrectTooltip(incompleteWord, suggestion);
-            } else {
-                hideFeedbackAutocorrectTooltip();
-            }
+    const suggestion = autocorrectEngine.findClosestWord(wordForLookup);
+
+    if (suggestion && suggestion !== wordForLookup && suggestion !== currentWord.toLowerCase()) {
+        let finalSuggestion = suggestion;
+        if (isCapitalized && suggestion.length > 0) {
+            finalSuggestion = suggestion.charAt(0).toUpperCase() + suggestion.slice(1);
+        }
+
+        feedbackCurrentAutocorrectSuggestion = finalSuggestion;
+        feedbackWordToReplaceWithSuggestion = currentWord;
+
+        const cursorPos = getFeedbackCursorPosition();
+        if (cursorPos) {
+            showFeedbackAutocorrectTooltip(finalSuggestion, cursorPos.x, cursorPos.y);
         }
     } else {
+        feedbackCurrentAutocorrectSuggestion = null;
+        feedbackWordToReplaceWithSuggestion = null;
         hideFeedbackAutocorrectTooltip();
     }
 }
 
-// Trigger autocorrect for feedback textarea
-function triggerFeedbackAutocorrect(terminatingChar = ' ') {
-    hideFeedbackAutocorrectTooltip();
+let feedbackAutocorrectTimeout;
+function debouncedFeedbackAutocorrectCheck() {
+    clearTimeout(feedbackAutocorrectTimeout);
+    feedbackAutocorrectTimeout = setTimeout(checkFeedbackForAutocorrect, 200);
+}
 
-    const currentText = feedbackInput.value;
-    const cursorPos = feedbackInput.selectionStart;
+function replaceFeedbackCurrentWord(wordToDelete, suggestion) {
+    try {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return;
 
-    // Check if the terminating character was actually added
-    let adjustedCursorPos = cursorPos;
-    const actualLastChar = currentText.charAt(cursorPos - 1);
+        const range = selection.getRangeAt(0);
+        const wordRange = document.createRange();
 
-    // Only subtract 1 if the terminating character is in the text
-    if (terminatingChar !== '\n' && actualLastChar === terminatingChar) {
-        adjustedCursorPos = cursorPos - 1;
-    }
+        let startContainer = range.startContainer;
+        let startOffset = range.startOffset;
+        let remainingChars = wordToDelete.length;
 
-    // Work with text before cursor
-    const textBeforeCursor = currentText.substring(0, adjustedCursorPos);
-    const textAfterCursor = currentText.substring(cursorPos);
+        while (remainingChars > 0 && startContainer) {
+            if (startContainer.nodeType === Node.TEXT_NODE) {
+                const availableChars = startOffset;
+                const charsToTake = Math.min(remainingChars, availableChars);
 
-    // Get word that was just completed
-    const wordInfo = getWordAtPosition(textBeforeCursor, textBeforeCursor.length);
+                startOffset -= charsToTake;
+                remainingChars -= charsToTake;
 
-    if (!wordInfo.word || wordInfo.word.length <= 2) {
-        return false; // No word or too short to correct
-    }
-
-    // Extract word core with punctuation
-    const wordPattern = /^([^a-zA-Z]*)([a-zA-Z']+)([^a-zA-Z]*)$/;
-    const match = wordInfo.word.match(wordPattern);
-
-    if (!match) return false; // No alphabetic content to correct
-
-    const [, prefixPunct, wordCore, suffixPunct] = match;
-    let correctedWord;
-
-    // Use cached suggestion if available
-    if (feedbackTooltipCache.word === wordCore.toLowerCase() && feedbackTooltipCache.suggestion) {
-        correctedWord = feedbackTooltipCache.suggestion;
-    } else {
-        correctedWord = autocorrectEngine.findClosestWord(wordCore);
-    }
-
-    // Apply correction if different from original
-    if (correctedWord !== wordCore && correctedWord !== wordCore.toLowerCase()) {
-        const finalCorrectedWord = prefixPunct + correctedWord + suffixPunct;
-
-        // Rebuild text
-        const beforeWord = textBeforeCursor.substring(0, wordInfo.start);
-        const newText = beforeWord + finalCorrectedWord + terminatingChar + textAfterCursor;
-
-        // Update textarea
-        feedbackInput.value = newText;
-
-        // Position cursor after corrected word and terminating character
-        // Only add +1 if there's actually a terminating character
-        const terminatingCharLength = terminatingChar.length;
-        const newCursorPos = beforeWord.length + finalCorrectedWord.length + terminatingCharLength;
-        try {
-            feedbackInput.selectionStart = newCursorPos;
-            feedbackInput.selectionEnd = newCursorPos;
-        } catch (e) {
-            // Browser compatibility fallback
+                if (remainingChars > 0) {
+                    const walker = document.createTreeWalker(
+                        feedbackInput,
+                        NodeFilter.SHOW_TEXT,
+                        null,
+                        false
+                    );
+                    walker.currentNode = startContainer;
+                    const prevNode = walker.previousNode();
+                    if (prevNode) {
+                        startContainer = prevNode;
+                        startOffset = prevNode.textContent.length;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
         }
 
-        // Clear cache
-        feedbackTooltipCache.word = null;
-        feedbackTooltipCache.suggestion = null;
+        wordRange.setStart(startContainer, startOffset);
+        wordRange.setEnd(range.startContainer, range.startOffset);
 
-        return true;
+        const selectedText = wordRange.toString();
+
+        if (selectedText === wordToDelete) {
+            selection.removeAllRanges();
+            selection.addRange(wordRange);
+            document.execCommand('insertText', false, suggestion);
+        } else {
+            for (let i = 0; i < wordToDelete.length; i++) {
+                document.execCommand('delete', false, null);
+            }
+            document.execCommand('insertText', false, suggestion);
+        }
+    } catch (error) {
+        try {
+            for (let i = 0; i < wordToDelete.length; i++) {
+                document.execCommand('delete', false, null);
+            }
+            document.execCommand('insertText', false, suggestion);
+        } catch (fallbackError) {
+            // Ignore
+        }
     }
-
-    return false;
 }
 
 // Handle feedback input events
 feedbackInput.addEventListener('input', function(e) {
-    // Schedule autocorrect preview for real-time suggestions
-    scheduleFeedbackAutocorrectPreview();
-});
+    const currentTextContent = getFeedbackEditorText();
+    const currentTextLength = currentTextContent.length;
+    const currentCursorPosition = getFeedbackCursorOffset();
 
-// Handle feedback keydown events for autocorrect triggers
-feedbackInput.addEventListener('keydown', function(e) {
-    // Allow normal text input behavior in feedback box
-    e.stopPropagation();
-
-    // Hide tooltip on arrow key navigation
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
-        hideFeedbackAutocorrectTooltip();
+    if (feedbackIsApplyingAutocorrect) {
+        feedbackIsApplyingAutocorrect = false;
+        feedbackLastTextContent = currentTextContent;
+        feedbackLastTextLength = currentTextLength;
+        feedbackLastCursorPosition = currentCursorPosition;
+        feedbackAutocorrectEnabled = true;
+        debouncedFeedbackAutocorrectCheck();
+        return;
     }
 
-    // Trigger autocorrect on space
-    if (e.key === ' ') {
-        // Let the space be added first, then trigger autocorrect
-        setTimeout(() => triggerFeedbackAutocorrect(' '), 0);
-    }
+    const textLengthChange = currentTextLength - feedbackLastTextLength;
 
-    // Trigger autocorrect on Enter (for line breaks)
-    if (e.key === 'Enter') {
-        // Check if there's an active tooltip suggestion
-        const { tooltip } = getFeedbackTooltipElements();
-        const hasActiveSuggestion = feedbackTooltipCache.word && feedbackTooltipCache.suggestion;
+    if (textLengthChange < 0) {
+        const wasAfterDelimiter = feedbackLastCursorPosition === 0 ||
+            (feedbackLastTextContent.length >= feedbackLastCursorPosition &&
+                /[\s,;.!?'"\/\-]/.test(feedbackLastTextContent[feedbackLastCursorPosition - 1]));
+        const isAfterDelimiter = feedbackIsDelimiterBeforeCursor();
 
-        if (hasActiveSuggestion) {
-            // Prevent the default Enter behavior temporarily
-            e.preventDefault();
-
-            // Apply autocorrect first, then add the newline
-            const correctionApplied = triggerFeedbackAutocorrect('');
-
-            // Now manually insert the newline
-            const currentPos = feedbackInput.selectionStart;
-            const currentText = feedbackInput.value;
-            const newText = currentText.slice(0, currentPos) + '\n' + currentText.slice(currentPos);
-            feedbackInput.value = newText;
-
-            // Position cursor after the newline
-            const newCursorPos = currentPos + 1;
-            feedbackInput.selectionStart = newCursorPos;
-            feedbackInput.selectionEnd = newCursorPos;
+        if (wasAfterDelimiter && !isAfterDelimiter) {
+            feedbackAutocorrectEnabled = false;
+        } else if (!wasAfterDelimiter && !isAfterDelimiter) {
+            // Keep current state
         } else {
-            // No active suggestion, allow normal Enter behavior
-            // Let the newline be added first, then trigger autocorrect for the completed word
-            setTimeout(() => triggerFeedbackAutocorrect('\n'), 0);
+            feedbackAutocorrectEnabled = true;
+        }
+    } else if (textLengthChange > 0) {
+        const justTypedDelimiter = feedbackIsDelimiterBeforeCursor();
+
+        if (justTypedDelimiter) {
+            feedbackAutocorrectEnabled = true;
         }
     }
 
-    // Trigger autocorrect on common punctuation
-    if (['.', ',', '!', '?', ';', ':'].includes(e.key)) {
-        setTimeout(() => triggerFeedbackAutocorrect(e.key), 0);
+    feedbackLastTextContent = currentTextContent;
+    feedbackLastTextLength = currentTextLength;
+    feedbackLastCursorPosition = currentCursorPosition;
+    debouncedFeedbackAutocorrectCheck();
+});
+
+// Handle feedback clicks
+feedbackInput.addEventListener('mousedown', function(e) {
+    setTimeout(() => {
+        feedbackAutocorrectEnabled = feedbackIsDelimiterBeforeCursor();
+    }, 0);
+});
+
+// Handle feedback keydown events
+feedbackInput.addEventListener('keydown', function(e) {
+    if (feedbackIsApplyingAutocorrect) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
     }
-});
 
-// Handle feedback textarea clicks and selection changes
-feedbackInput.addEventListener('click', function() {
-    hideFeedbackAutocorrectTooltip();
-});
+    const isEnter = e.key === 'Enter';
+    const isSpace = e.key === ' ';
+    const isPunctuation = [',', '.', ';', '/', '"', '?', '!'].includes(e.key);
+    const isTriggerKey = isEnter || isSpace || isPunctuation;
 
-feedbackInput.addEventListener('selectionchange', function() {
-    hideFeedbackAutocorrectTooltip();
+    if (isTriggerKey) {
+        const currentWord = getFeedbackCurrentWord();
+
+        if (!feedbackCurrentAutocorrectSuggestion && currentWord && currentWord.length >= 3 && feedbackAutocorrectEnabled) {
+            const suggestion = autocorrectEngine.findClosestWord(currentWord);
+
+            if (suggestion && suggestion.toLowerCase() !== currentWord.toLowerCase()) {
+                feedbackCurrentAutocorrectSuggestion = suggestion;
+                feedbackWordToReplaceWithSuggestion = currentWord;
+            }
+        }
+    }
+
+    if (isSpace || isEnter) {
+        feedbackAutocorrectEnabled = true;
+    }
+
+    if (feedbackCurrentAutocorrectSuggestion && feedbackWordToReplaceWithSuggestion && isTriggerKey) {
+        const wordToDelete = getFeedbackCurrentWord();
+        const suggestionToApply = feedbackCurrentAutocorrectSuggestion;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        feedbackIsApplyingAutocorrect = true;
+
+        setTimeout(() => {
+            try {
+                if (wordToDelete) {
+                    replaceFeedbackCurrentWord(wordToDelete, suggestionToApply);
+                }
+
+                hideFeedbackAutocorrectTooltip();
+                feedbackCurrentAutocorrectSuggestion = null;
+                feedbackWordToReplaceWithSuggestion = null;
+
+                if (e.key === 'Enter') {
+                    document.execCommand('insertLineBreak', false, null);
+                } else {
+                    document.execCommand('insertText', false, e.key);
+                }
+            } finally {
+                feedbackIsApplyingAutocorrect = false;
+            }
+        }, 0);
+
+        return false;
+    }
+
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+        hideFeedbackAutocorrectTooltip();
+        feedbackCurrentAutocorrectSuggestion = null;
+        feedbackWordToReplaceWithSuggestion = null;
+    }
+
+    e.stopPropagation();
 });
 
 // Configure input area to disable browser autocorrect

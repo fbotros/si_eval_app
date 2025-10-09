@@ -284,17 +284,20 @@
             background: rgba(255, 255, 255, 0.1);
             color: white;
             font-size: 1rem;
-            resize: vertical;
             min-height: 240px;
             box-sizing: border-box;
+            overflow-y: auto;
+            outline: none;
+            text-align: left;
         }
 
-        .feedback-input::placeholder {
+        .feedback-input[contenteditable]:empty:before {
+            content: attr(data-placeholder);
             color: rgba(255, 255, 255, 0.7);
+            pointer-events: none;
         }
 
         .feedback-input:focus {
-            outline: none;
             border-color: rgba(255, 255, 255, 0.6);
             background: rgba(255, 255, 255, 0.15);
         }
@@ -467,8 +470,9 @@
             </div>
             <div class="feedback-section">
                 <div class="feedback-label">Give us feedback!</div>
-                <textarea class="feedback-input" id="feedback-input"
-                    placeholder="Share your thoughts about surface keyboard..."></textarea>
+                <div class="feedback-input" id="feedback-input" contenteditable="true"
+                    data-placeholder="Share your thoughts about surface keyboard..." spellcheck="false"
+                    autocorrect="off" autocapitalize="off" autocomplete="off"></div>
             </div>
         </div>
     </div>
