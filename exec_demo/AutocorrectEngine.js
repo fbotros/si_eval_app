@@ -253,9 +253,19 @@ class AutocorrectEngine {
 
     /**
      * Calculate distance for two-word split
+     * Returns cached result from findTwoWordSplit to avoid redundant computation
      */
     getTwoWordSplitDistance(word) {
         const lowerWord = word.toLowerCase();
+        const cacheKey = 'dist_' + lowerWord;
+        
+        // Check if we already calculated this during findTwoWordSplit
+        if (this.correctionCache.has(cacheKey)) {
+            return this.correctionCache.get(cacheKey);
+        }
+        
+        // This shouldn't happen if findTwoWordSplit was called first,
+        // but we'll calculate it just in case
         let bestDistance = Infinity;
 
         for (let i = 2; i <= lowerWord.length - 2; i++) {
@@ -300,6 +310,7 @@ class AutocorrectEngine {
 
     /**
      * Find two-word split for concatenated words
+     * Caches the distance result to avoid redundant computation when getTwoWordSplitDistance is called
      */
     findTwoWordSplit(word) {
         if (word.length < 4 || this.hasWord(word)) return null;
@@ -349,6 +360,11 @@ class AutocorrectEngine {
             }
         }
 
+        // Cache the best distance for getTwoWordSplitDistance to avoid redundant computation
+        // Add 3.0 to match the distance calculation convention
+        const distCacheKey = 'dist_' + lowerWord;
+        this.correctionCache.set(distCacheKey, bestScore === Infinity ? Infinity : bestScore + 3.0);
+
         return bestSplit;
     }
 
@@ -390,14 +406,14 @@ class AutocorrectEngine {
         // Always use our own best correction logic for more reliable results
         const singleWordCorrection = this.findBestCorrectionForPart(lowerWord);
 
+        // Calculate two-word split once (it caches the distance for us)
+        const twoWordSplit = this.findTwoWordSplit(word);
+        const twoWordDistance = twoWordSplit ? this.getTwoWordSplitDistance(word) : Infinity;
+
         if (!singleWordCorrection || singleWordCorrection === word.toLowerCase()) {
             // Try two-word split if single word correction failed
-            const twoWordSplit = this.findTwoWordSplit(word);
-            if (twoWordSplit) {
-                const twoWordDistance = this.getTwoWordSplitDistance(word);
-                if (twoWordDistance <= this.maxEditDistance) {
-                    return twoWordSplit;
-                }
+            if (twoWordSplit && twoWordDistance <= this.maxEditDistance) {
+                return twoWordSplit;
             }
             return word; // No good correction found
         }
@@ -405,11 +421,7 @@ class AutocorrectEngine {
         // Check if two-word split is better than single word correction
         const singleWordDistance = this.levenshteinCost(word.toLowerCase(), singleWordCorrection);
 
-        const twoWordSplit = this.findTwoWordSplit(word);
-
-        if (twoWordSplit) {
-            const twoWordDistance = this.getTwoWordSplitDistance(word);
-
+        if (twoWordSplit && twoWordDistance <= this.maxEditDistance) {
             // Check if the two-word split uses any override corrections
             const usesOverrideCorrection = this.splitUsesOverrideCorrection(word);
 
@@ -419,10 +431,9 @@ class AutocorrectEngine {
                 this.getWordFrequencyScore(splitWords[0]) <= 150 &&
                 this.getWordFrequencyScore(splitWords[1]) <= 150;
 
-            if (twoWordDistance <= this.maxEditDistance &&
-                (twoWordDistance < singleWordDistance ||
-                 (twoWordDistance === singleWordDistance && usesOverrideCorrection) ||
-                 (bothWordsVeryCommon && twoWordDistance <= singleWordDistance + 1))) {
+            if (twoWordDistance < singleWordDistance ||
+                (twoWordDistance === singleWordDistance && usesOverrideCorrection) ||
+                (bothWordsVeryCommon && twoWordDistance <= singleWordDistance + 1)) {
                 return twoWordSplit;
             }
         }
