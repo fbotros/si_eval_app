@@ -258,12 +258,12 @@ class AutocorrectEngine {
     getTwoWordSplitDistance(word) {
         const lowerWord = word.toLowerCase();
         const cacheKey = 'dist_' + lowerWord;
-        
+
         // Check if we already calculated this during findTwoWordSplit
         if (this.correctionCache.has(cacheKey)) {
             return this.correctionCache.get(cacheKey);
         }
-        
+
         // This shouldn't happen if findTwoWordSplit was called first,
         // but we'll calculate it just in case
         let bestDistance = Infinity;
@@ -273,7 +273,7 @@ class AutocorrectEngine {
             const secondPart = lowerWord.substring(i);
 
             if (this.hasWord(firstPart) && this.hasWord(secondPart)) {
-                return 1;
+                return 0.3;  // Space insertion is very cheap for exact matches
             }
 
             const firstCorrected = this.findBestCorrectionForPart(firstPart);
@@ -281,7 +281,7 @@ class AutocorrectEngine {
 
             if (firstCorrected && secondCorrected) {
                 const totalDistance = this.levenshteinCost(firstPart, firstCorrected) +
-                                    this.levenshteinCost(secondPart, secondCorrected) + 3.0;
+                                    this.levenshteinCost(secondPart, secondCorrected) + this.insertionCost;
                 if (totalDistance < bestDistance) bestDistance = totalDistance;
             }
         }
@@ -330,8 +330,10 @@ class AutocorrectEngine {
                 // Perfect match - calculate commonality score for tie-breaking
                 const commonScore = this.getWordFrequencyScore(firstPart) + this.getWordFrequencyScore(secondPart);
 
-                if (bestScore > 1 || (bestScore === 1 && commonScore < bestCommonScore)) {
-                    bestScore = 1;
+                // Exact matches have distance 0 (no correction needed)
+                // Compare against bestScore - prefer exact match over any correction
+                if (bestScore > 0 || (bestScore === 0 && commonScore < bestCommonScore)) {
+                    bestScore = 0;  // Exact match = 0 distance
                     bestCommonScore = commonScore;
                     isExactMatch = true; // Mark as exact match
                     const twoWordResult = firstPart + ' ' + secondPart;
@@ -346,13 +348,21 @@ class AutocorrectEngine {
                 const totalDistance = this.levenshteinCost(firstPart, firstCorrected) +
                                     this.levenshteinCost(secondPart, secondCorrected);
 
-                if (totalDistance <= this.maxEditDistance) {
+                // Skip if no correction was actually needed (both parts are exact matches)
+                // This prevents the correction path from overwriting exact matches with distance 0
+                const needsCorrection = firstPart !== firstCorrected || secondPart !== secondCorrected;
+
+                if (needsCorrection && totalDistance <= this.maxEditDistance) {
                     // Calculate commonality score for the corrected words
                     const commonScore = this.getWordFrequencyScore(firstCorrected) + this.getWordFrequencyScore(secondCorrected);
 
-                    // Prefer lower distance first, then lower commonality score as tiebreaker
-                    if (totalDistance < bestScore ||
-                        (totalDistance === bestScore && commonScore < bestCommonScore)) {
+                    // Prefer lower distance first
+                    // If distances are equal, prefer exact matches over corrections
+                    // If both are corrections (or both exact), use commonality score as tiebreaker
+                    const shouldReplace = totalDistance < bestScore ||
+                        (totalDistance === bestScore && !isExactMatch && commonScore < bestCommonScore);
+
+                    if (shouldReplace) {
                         bestScore = totalDistance;
                         bestCommonScore = commonScore;
                         isExactMatch = false; // Mark as correction (not exact match)
@@ -364,17 +374,18 @@ class AutocorrectEngine {
         }
 
         // Cache the best distance for getTwoWordSplitDistance to avoid redundant computation
-        // Add 3.0 penalty for corrections to match the behavior of getTwoWordSplitDistance fallback
+        // The cost should be: correction cost + space insertion cost
         const distCacheKey = 'dist_' + lowerWord;
         let cachedDistance;
         if (bestScore === Infinity) {
             cachedDistance = Infinity;
         } else if (isExactMatch) {
-            // Both words were exact dictionary matches - no penalty
-            cachedDistance = 1;
+            // Both words were exact dictionary matches - just the cost of inserting a space
+            cachedDistance = 0.3;
         } else {
-            // One or both words needed correction - add 3.0 penalty
-            cachedDistance = bestScore + 3.0;
+            // One or both words needed correction - add insertion cost for the space
+            // Space insertion should cost the same as any other character insertion
+            cachedDistance = bestScore + this.insertionCost;
         }
         this.correctionCache.set(distCacheKey, cachedDistance);
 
