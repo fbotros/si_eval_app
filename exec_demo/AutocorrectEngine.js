@@ -33,6 +33,7 @@ class AutocorrectEngine {
             'nad': 'and',
             'cna': 'can',
             'nac': 'can',
+            'se': 'we',
             'taht': 'that',
             'thta': 'that',
             'htat': 'that',
