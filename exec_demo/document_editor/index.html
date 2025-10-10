@@ -1203,29 +1203,13 @@
                     }
                 }
 
-                // Check if word is capitalized (for preserving capitalization in suggestions)
-                const isCapitalized = currentWord[0] === currentWord[0].toUpperCase() && currentWord.length > 1;
-
-                // Create lowercase version for dictionary lookup
-                const wordForLookup = isCapitalized ? currentWord.toLowerCase() : currentWord;
-
-                // Use findClosestWord for ALL corrections - it handles:
-                // 1. Override corrections (highest priority)
-                // 2. Dictionary lookups
-                // 3. Single-word corrections with cost calculation
-                // 4. Two-word splits with cost calculation
-                // 5. Comparison between single-word and two-word to pick the best
-                // Use fallback only for final corrections (when hitting space), not for previews
-                const suggestion = editorAutocorrectEngine.findClosestWord(wordForLookup, { useFallback: false });
+                // Pass the original word with capitalization preserved
+                // AutocorrectEngine will handle skipping, lowercase conversion, and capitalization preservation internally
+                const suggestion = editorAutocorrectEngine.findClosestWord(currentWord, { useFallback: false });
 
                 // Show tooltip if suggestion is different from original input
-                if (suggestion && suggestion !== wordForLookup && suggestion !== currentWord.toLowerCase()) {
-                    // Capitalize suggestion if original word was capitalized
+                if (suggestion && suggestion !== currentWord && suggestion.toLowerCase() !== currentWord.toLowerCase()) {
                     let finalSuggestion = suggestion;
-                    if (isCapitalized && suggestion.length > 0) {
-                        finalSuggestion = suggestion.charAt(0).toUpperCase() + suggestion.slice(1);
-                    }
-
                     currentAutocorrectSuggestion = finalSuggestion;
                     wordToReplaceWithSuggestion = currentWord;
 

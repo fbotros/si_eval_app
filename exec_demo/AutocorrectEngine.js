@@ -569,7 +569,9 @@ class AutocorrectEngine {
         }
 
         // Skip if all caps (2+ letters) - likely an acronym
-        if (word.length >= 2 && word === word.toUpperCase()) {
+        // Check if all alphabetic characters are uppercase
+        const alphaChars = word.replace(/[^a-zA-Z]/g, '');
+        if (alphaChars.length >= 2 && alphaChars === alphaChars.toUpperCase()) {
             return true;
         }
 
