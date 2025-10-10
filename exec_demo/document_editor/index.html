@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Doc Editor</title>
+    <script src="../dictionary-loader.js"></script>
+    <script src="../keyboard-layout.js"></script>
+    <script src="../TrieDictionary.js"></script>
     <style>
         * {
             margin: 0;
@@ -331,8 +333,7 @@
     <div id="autocorrect-tooltip" class="autocorrect-tooltip"></div>
 
 
-    <!-- Load external scripts -->
-    <script src="../dictionary-loader.js"></script>
+    <!-- Load external scripts (already loaded in head) -->
     <script src="../AutocorrectEngine.js"></script>
     <script>
 
@@ -368,7 +369,7 @@
             // Initialize dictionary and autocorrect engine
             async function initializeAutocorrect() {
                 try {
-                    const dictionary = await loadDictionary('../comprehensive_dictionary.txt');
+                    const dictionary = await loadDictionary(); // Use default (hybrid_dictionary.txt)
 
                     // Define QWERTY keyboard neighbor mappings
                     const keyboardNeighbors = {

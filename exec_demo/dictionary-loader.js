@@ -31,10 +31,10 @@ async function loadDictionary() {
 
             if (currentPath.includes('/typing_test/') || currentPath.includes('/document_editor/')) {
                 // We're in a subdirectory - use parent directory
-                dictionaryPath = '../comprehensive_dictionary.txt';
+                dictionaryPath = '../hybrid_dictionary.txt';
             } else {
                 // We're in the main exec_demo directory
-                dictionaryPath = './comprehensive_dictionary.txt';
+                dictionaryPath = './hybrid_dictionary.txt';
             }
 
             console.log(`Loading dictionary from: ${dictionaryPath}`);

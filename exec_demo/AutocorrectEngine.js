@@ -24,6 +24,9 @@ class AutocorrectEngine {
         this.correctionCache = new Map();
         this.maxCacheSize = 1000;
 
+        // Incremental autocorrect state
+        this.incrementalState = null;
+
         // Common typo correction overrides - these get checked first for instant corrections
         this.correctionOverrides = options.correctionOverrides || {
             'teh': 'the',
@@ -86,6 +89,23 @@ class AutocorrectEngine {
     }
 
     /**
+     * Check if the length difference between input and correction is acceptable
+     * Max difference: 1 char for strings <= 10, or ceil(10%) for longer strings
+     */
+    isLengthDifferenceAcceptable(inputWord, correctionWord) {
+        const inputLength = inputWord.length;
+        const correctionLength = correctionWord.length;
+        const lengthDiff = Math.abs(inputLength - correctionLength);
+
+        if (inputLength <= 10) {
+            return lengthDiff <= 1;
+        }
+
+        const maxDiff = Math.ceil(inputLength * 0.1);
+        return lengthDiff <= maxDiff;
+    }
+
+    /**
      * Get word frequency score - lower score means more common word
      */
     getWordFrequencyScore(word) {
@@ -104,8 +124,18 @@ class AutocorrectEngine {
      * Initialize TrieDictionary with current words
      */
     initializeTrieDictionary() {
-        if (typeof TrieDictionary !== 'undefined') {
+        if (typeof TrieDictionary !== 'undefined' && this.dictionary.length > 0) {
+            console.log(`🚀 Initializing Quest 3-optimized TrieDictionary with ${this.dictionary.length} words...`);
+            // Set keyboardNeighbors globally for TrieDictionary to access
+            if (typeof window !== 'undefined') {
+                window.keyboardNeighbors = this.keyboardNeighbors;
+            } else if (typeof global !== 'undefined') {
+                global.keyboardNeighbors = this.keyboardNeighbors;
+            }
             this.trieDictionary = new TrieDictionary(this.adjacentKeyMultiplier, this.dictionary);
+            console.log(`✅ TrieDictionary initialized - using hybrid dictionary for wicked fast lookups`);
+        } else if (typeof TrieDictionary === 'undefined') {
+            console.warn('⚠️ TrieDictionary class not found - falling back to brute force search');
         }
     }
 
@@ -218,6 +248,10 @@ class AutocorrectEngine {
         if (this.trieDictionary) {
             // Get candidates from trie - this should return a small set (50-200 words)
             candidates = this.trieDictionary.search(part, this.maxEditDistance);
+            console.log(`🔍 TrieDictionary found ${candidates.length} candidates for "${part}"`);
+            if (part.includes('fantastic')) {
+                console.log('📝 Top candidates:', candidates.slice(0, 5));
+            }
         } else {
             // Brute force fallback - check all dictionary words
             candidates = this.dictionary.map(word => ({ word: word }));
@@ -225,12 +259,27 @@ class AutocorrectEngine {
 
 
         let bestFrequencyScore = Infinity;
+        let rejectedByLength = 0;
 
         // Now only run expensive Levenshtein on the small candidate set
         for (const candidate of candidates) {
             const candidateWord = candidate.word;
+
+            // Check length difference constraint first (cheap check)
+            if (!this.isLengthDifferenceAcceptable(part, candidateWord)) {
+                rejectedByLength++;
+                if (part.includes('fantastic') && candidateWord === 'fantastic') {
+                    console.log(`❌ Length check FAILED: "${part}" (${part.length}) → "${candidateWord}" (${candidateWord.length})`);
+                }
+                continue;
+            }
+
             const cost = this.levenshteinCost(part, candidateWord);
             const frequencyScore = this.getWordFrequencyScore(candidateWord);
+
+            if (part.includes('fantastic') && candidateWord === 'fantastic') {
+                console.log(`✅ Length check OK: "${part}" → "${candidateWord}", cost=${cost}, maxDist=${this.maxEditDistance}`);
+            }
 
             // Prefer lower cost first, then lower frequency score (more common words) as tiebreaker
             if (cost <= this.maxEditDistance &&
@@ -241,6 +290,10 @@ class AutocorrectEngine {
             }
         }
         result = bestMatch;
+
+        if (part.includes('fantastic')) {
+            console.log(`🎯 Final result for "${part}": "${result}" (rejected ${rejectedByLength} by length)`);
+        }
 
         // Cache the result using LRU eviction (Least Recently Used)
         // When cache is full, delete the oldest entry (first item in Map)
@@ -254,146 +307,6 @@ class AutocorrectEngine {
         return result;
     }
 
-    /**
-     * Calculate distance for two-word split
-     * Returns cached result from findTwoWordSplit to avoid redundant computation
-     */
-    getTwoWordSplitDistance(word) {
-        const lowerWord = word.toLowerCase();
-        const cacheKey = 'dist_' + lowerWord;
-
-        // Check if we already calculated this during findTwoWordSplit
-        if (this.correctionCache.has(cacheKey)) {
-            return this.correctionCache.get(cacheKey);
-        }
-
-        // This shouldn't happen if findTwoWordSplit was called first,
-        // but we'll calculate it just in case
-        let bestDistance = Infinity;
-
-        for (let i = 2; i <= lowerWord.length - 2; i++) {
-            const firstPart = lowerWord.substring(0, i);
-            const secondPart = lowerWord.substring(i);
-
-            if (this.hasWord(firstPart) && this.hasWord(secondPart)) {
-                return 0.3;  // Space insertion is very cheap for exact matches
-            }
-
-            const firstCorrected = this.findBestCorrectionForPart(firstPart);
-            const secondCorrected = this.findBestCorrectionForPart(secondPart);
-
-            if (firstCorrected && secondCorrected) {
-                const totalDistance = this.levenshteinCost(firstPart, firstCorrected) +
-                                    this.levenshteinCost(secondPart, secondCorrected) + this.insertionCost;
-                if (totalDistance < bestDistance) bestDistance = totalDistance;
-            }
-        }
-
-        return bestDistance;
-    }
-
-    /**
-     * Check if a two-word split would use any override corrections
-     */
-    splitUsesOverrideCorrection(word) {
-        const lowerWord = word.toLowerCase();
-
-        for (let i = 2; i <= lowerWord.length - 2; i++) {
-            const firstPart = lowerWord.substring(0, i);
-            const secondPart = lowerWord.substring(i);
-
-            // Check if either part would use an override correction
-            if (this.correctionOverrides[firstPart] || this.correctionOverrides[secondPart]) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Find two-word split for concatenated words
-     * Caches the distance result to avoid redundant computation when getTwoWordSplitDistance is called
-     */
-    findTwoWordSplit(word) {
-        if (word.length < 4 || this.hasWord(word)) return null;
-
-        const lowerWord = word.toLowerCase();
-        const isCapitalized = word[0] === word[0].toUpperCase();
-        let bestSplit = null;
-        let bestScore = Infinity;
-        let bestCommonScore = Infinity;
-        let isExactMatch = false; // Track if best split was an exact match (no corrections needed)
-
-        for (let i = 2; i <= lowerWord.length - 2; i++) {
-            const firstPart = lowerWord.substring(0, i);
-            const secondPart = lowerWord.substring(i);
-
-            if (this.dictionarySet.has(firstPart) && this.dictionarySet.has(secondPart)) {
-                // Perfect match - calculate commonality score for tie-breaking
-                const commonScore = this.getWordFrequencyScore(firstPart) + this.getWordFrequencyScore(secondPart);
-
-                // Exact matches have distance 0 (no correction needed)
-                // Compare against bestScore - prefer exact match over any correction
-                if (bestScore > 0 || (bestScore === 0 && commonScore < bestCommonScore)) {
-                    bestScore = 0;  // Exact match = 0 distance
-                    bestCommonScore = commonScore;
-                    isExactMatch = true; // Mark as exact match
-                    const twoWordResult = firstPart + ' ' + secondPart;
-                    bestSplit = this.preserveCapitalization(word, twoWordResult);
-                }
-            }
-
-            const firstCorrected = this.findBestCorrectionForPart(firstPart);
-            const secondCorrected = this.findBestCorrectionForPart(secondPart);
-
-            if (firstCorrected && secondCorrected) {
-                const totalDistance = this.levenshteinCost(firstPart, firstCorrected) +
-                                    this.levenshteinCost(secondPart, secondCorrected);
-
-                // Skip if no correction was actually needed (both parts are exact matches)
-                // This prevents the correction path from overwriting exact matches with distance 0
-                const needsCorrection = firstPart !== firstCorrected || secondPart !== secondCorrected;
-
-                if (needsCorrection && totalDistance <= this.maxEditDistance) {
-                    // Calculate commonality score for the corrected words
-                    const commonScore = this.getWordFrequencyScore(firstCorrected) + this.getWordFrequencyScore(secondCorrected);
-
-                    // Prefer lower distance first
-                    // If distances are equal, prefer exact matches over corrections
-                    // If both are corrections (or both exact), use commonality score as tiebreaker
-                    const shouldReplace = totalDistance < bestScore ||
-                        (totalDistance === bestScore && !isExactMatch && commonScore < bestCommonScore);
-
-                    if (shouldReplace) {
-                        bestScore = totalDistance;
-                        bestCommonScore = commonScore;
-                        isExactMatch = false; // Mark as correction (not exact match)
-                        const twoWordResult = firstCorrected + ' ' + secondCorrected;
-                        bestSplit = this.preserveCapitalization(word, twoWordResult);
-                    }
-                }
-            }
-        }
-
-        // Cache the best distance for getTwoWordSplitDistance to avoid redundant computation
-        // The cost should be: correction cost + space insertion cost
-        const distCacheKey = 'dist_' + lowerWord;
-        let cachedDistance;
-        if (bestScore === Infinity) {
-            cachedDistance = Infinity;
-        } else if (isExactMatch) {
-            // Both words were exact dictionary matches - just the cost of inserting a space
-            cachedDistance = 0.3;
-        } else {
-            // One or both words needed correction - add insertion cost for the space
-            // Space insertion should cost the same as any other character insertion
-            cachedDistance = bestScore + this.insertionCost;
-        }
-        this.correctionCache.set(distCacheKey, cachedDistance);
-
-        return bestSplit;
-    }
 
     /**
      * Preserve original capitalization in the corrected word
@@ -416,9 +329,210 @@ class AutocorrectEngine {
     }
 
     /**
+     * Reset incremental state (call on space, click, or new word)
+     */
+    resetIncrementalState() {
+        this.incrementalState = null;
+    }
+
+    /**
+     * Incremental autocorrect - maintains active candidate set between keystrokes
+     * Returns the best candidate or null if no good correction exists
+     */
+    getIncrementalCorrection(word) {
+        const lowerWord = word.toLowerCase();
+
+        // Check for exact override matches first (highest priority)
+        if (this.correctionOverrides[lowerWord]) {
+            return this.correctionOverrides[lowerWord];
+        }
+
+        // If word is in dictionary, no correction needed
+        if (this.hasWord(lowerWord)) {
+            return null;
+        }
+
+        if (!this.trieDictionary) return null;
+
+        // Check if we can do incremental update (one character added)
+        const canIncrement = this.incrementalState &&
+                            lowerWord.startsWith(this.incrementalState.word) &&
+                            lowerWord.length === this.incrementalState.word.length + 1;
+
+        if (!canIncrement) {
+            // Start fresh - initialize from root
+            this.incrementalState = {
+                word: lowerWord,
+                candidates: new Map() // Map of trieNode -> {row, depth}
+            };
+
+            // Initialize first row of DP matrix
+            const sz = lowerWord.length;
+            const initialRow = new Float32Array(sz + 1);
+            for (let i = 0; i <= sz; i++) {
+                initialRow[i] = i;
+            }
+
+            // Explore from root
+            for (const [char, node] of this.trieDictionary.root.children) {
+                this.expandNode(node, char, initialRow, lowerWord, 1);
+            }
+        } else {
+            // Incremental update - extend existing candidates
+            const newChar = lowerWord[lowerWord.length - 1];
+            const newCandidates = new Map();
+
+            // Extend each active candidate
+            for (const [node, data] of this.incrementalState.candidates) {
+                // Try to follow existing children
+                for (const [char, childNode] of node.children) {
+                    const newRow = this.computeNextRow(data.row, lowerWord, char);
+                    const minInRow = Math.min(...newRow);
+
+                    // Only keep if within edit distance threshold
+                    if (minInRow <= this.maxEditDistance) {
+                        newCandidates.set(childNode, {
+                            row: newRow,
+                            depth: data.depth + 1
+                        });
+                    }
+                }
+            }
+
+            this.incrementalState.word = lowerWord;
+            this.incrementalState.candidates = newCandidates;
+        }
+
+        // Find best candidate from active set
+        let bestCandidate = null;
+        let bestDistance = this.maxEditDistance;
+        let bestFrequency = Infinity;
+
+        for (const [node, data] of this.incrementalState.candidates) {
+            if (node.word && node.word.length > 0) {
+                const editDist = data.row[data.row.length - 1];
+                if (editDist <= bestDistance) {
+                    const freq = this.getWordFrequencyScore(node.word);
+                    if (editDist < bestDistance ||
+                        (editDist === bestDistance && freq < bestFrequency)) {
+                        bestDistance = editDist;
+                        bestFrequency = freq;
+                        bestCandidate = node.word;
+                    }
+                }
+            }
+        }
+
+        return bestCandidate;
+    }
+
+    /**
+     * Expand a trie node and compute its DP row
+     */
+    expandNode(node, char, lastRow, word, depth) {
+        const sz = word.length;
+        const currentRow = new Float32Array(sz + 1);
+        currentRow[0] = lastRow[0] + 1;
+
+        let minInRow = currentRow[0];
+
+        for (let i = 1; i <= sz; i++) {
+            const insertCost = 1.0 + currentRow[i - 1];
+            const deleteCost = 1.0 + lastRow[i];
+            let replaceCost = lastRow[i - 1];
+
+            if (word[i - 1] !== char) {
+                replaceCost = 1.0 + lastRow[i - 1];
+
+                // Check for adjacent keys
+                const adjacentKey = word[i - 1] + char;
+                if (this.trieDictionary.adjacentKeysSet.has(adjacentKey)) {
+                    replaceCost = this.adjacentKeyMultiplier + lastRow[i - 1];
+                }
+            }
+
+            currentRow[i] = Math.min(insertCost, deleteCost, replaceCost);
+            minInRow = Math.min(minInRow, currentRow[i]);
+        }
+
+        // Only keep if within threshold
+        if (minInRow <= this.maxEditDistance) {
+            this.incrementalState.candidates.set(node, {
+                row: currentRow,
+                depth: depth
+            });
+
+            // Recursively expand children
+            for (const [nextChar, childNode] of node.children) {
+                this.expandNode(childNode, nextChar, currentRow, word, depth + 1);
+            }
+        }
+    }
+
+    /**
+     * Compute next DP row when adding one character to the input
+     */
+    computeNextRow(lastRow, word, char) {
+        const sz = word.length;
+        const newRow = new Float32Array(sz + 1);
+        newRow[0] = lastRow[0] + 1;
+
+        for (let i = 1; i <= sz; i++) {
+            const insertCost = 1.0 + newRow[i - 1];
+            const deleteCost = 1.0 + lastRow[i];
+            let replaceCost = lastRow[i - 1];
+
+            if (word[i - 1] !== char) {
+                replaceCost = 1.0 + lastRow[i - 1];
+
+                // Check for adjacent keys
+                const adjacentKey = word[i - 1] + char;
+                if (this.trieDictionary.adjacentKeysSet.has(adjacentKey)) {
+                    replaceCost = this.adjacentKeyMultiplier + lastRow[i - 1];
+                }
+            }
+
+            newRow[i] = Math.min(insertCost, deleteCost, replaceCost);
+        }
+
+        return newRow;
+    }
+
+    /**
+     * Check if a word should skip autocorrect
+     * Returns true for numbers, symbols, all-caps words, etc.
+     */
+    shouldSkipAutocorrect(word) {
+        if (!word || word.length === 0) return true;
+
+        // Skip if contains numbers
+        if (/\d/.test(word)) {
+            return true;
+        }
+
+        // Skip if contains special symbols (except apostrophes which are valid in words)
+        if (/[^a-zA-Z']/.test(word)) {
+            return true;
+        }
+
+        // Skip if all caps (2+ letters) - likely an acronym
+        if (word.length >= 2 && word === word.toUpperCase()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Find closest word correction (used for actual autocorrect)
+     * Uses incremental state if available, otherwise returns original word
      */
     findClosestWord(word) {
+        // Skip autocorrect for special cases
+        if (this.shouldSkipAutocorrect(word)) {
+            return word;
+        }
+
         const lowerWord = word.toLowerCase();
 
         // Check for exact override matches first (highest priority)
@@ -430,43 +544,20 @@ class AutocorrectEngine {
             return word;
         }
 
-        // Always use our own best correction logic for more reliable results
-        const singleWordCorrection = this.findBestCorrectionForPart(lowerWord);
-
-        // Calculate two-word split once (it caches the distance for us)
-        const twoWordSplit = this.findTwoWordSplit(word);
-        const twoWordDistance = twoWordSplit ? this.getTwoWordSplitDistance(word) : Infinity;
-
-        if (!singleWordCorrection || singleWordCorrection === word.toLowerCase()) {
-            // Try two-word split if single word correction failed
-            if (twoWordSplit) {
-                return twoWordSplit;
-            }
-            return word; // No good correction found
-        }
-
-        // Check if two-word split is better than single word correction
-        const singleWordDistance = this.levenshteinCost(word.toLowerCase(), singleWordCorrection);
-
-        if (twoWordSplit) {
-            // Check if the two-word split uses any override corrections
-            const usesOverrideCorrection = this.splitUsesOverrideCorrection(word);
-
-            // Check if both words in the split are very common (top 150 words)
-            const splitWords = twoWordSplit.toLowerCase().split(' ');
-            const bothWordsVeryCommon = splitWords.length === 2 &&
-                this.getWordFrequencyScore(splitWords[0]) <= 150 &&
-                this.getWordFrequencyScore(splitWords[1]) <= 150;
-
-            if (twoWordDistance < singleWordDistance ||
-                (twoWordDistance === singleWordDistance && usesOverrideCorrection) ||
-                (bothWordsVeryCommon && twoWordDistance <= singleWordDistance + 1)) {
-                return twoWordSplit;
+        // Use incremental correction (built up during typing)
+        if (this.trieDictionary) {
+            const correction = this.getIncrementalCorrection(lowerWord);
+            if (correction && correction !== lowerWord) {
+                return this.preserveCapitalization(word, correction);
             }
         }
 
-        // Preserve original capitalization in the single word correction
-        return this.preserveCapitalization(word, singleWordCorrection);
+        // No correction found - return original word
+        // NOTE: We don't fall back to expensive full search here because:
+        // 1. If incremental state was maintained during typing, we already have the best answer
+        // 2. If not, a full search would block the UI for long/mistyped words
+        // 3. The incremental approach is the primary path now
+        return word;
     }
 
     /**

@@ -1,5 +1,5 @@
 // JavaScript implementation of TrieDictionary based on the C++ version from nimble
-// This provides efficient autocorrection with trie-based search and keyboard-aware edit distance
+// Optimized for Quest 3 with aggressive pruning and memory efficiency
 
 class TrieNode {
     constructor() {
@@ -67,31 +67,69 @@ class TrieDictionary {
         const lowercaseWord = word.toLowerCase();
         const sz = lowercaseWord.length;
 
+        // DEBUG: Check if trie has any children
+        if (this.root.children.size === 0) {
+            console.error(`❌ TrieDictionary.search("${word}"): Trie is EMPTY! No root children.`);
+            return results;
+        }
+
+        // Calculate acceptable length range for early pruning
+        // Allow maxEditDist characters difference in either direction
+        const inputLength = lowercaseWord.length;
+        const minLength = Math.max(1, inputLength - maxEditDist);
+        const maxLength = inputLength + maxEditDist;
+
+        // Pre-allocate row buffers for reuse (faster than creating new arrays)
+        const rowBuffer1 = new Float32Array(sz + 1);
+        const rowBuffer2 = new Float32Array(sz + 1);
+
         // Initialize first row of edit distance matrix
-        const currentRow = new Array(sz + 1);
         for (let i = 0; i <= sz; i++) {
-            currentRow[i] = i;
+            rowBuffer1[i] = i;
+        }
+
+        // DEBUG logging for "fantastic" searches
+        if (word.includes('fantastic')) {
+            console.log(`🔎 Searching for "${word}": minLen=${minLength}, maxLen=${maxLength}, maxDist=${maxEditDist}`);
+            console.log(`🔎 Root has ${this.root.children.size} children:`, Array.from(this.root.children.keys()).slice(0, 10));
         }
 
         // Start search from root's children
         for (const [char, node] of this.root.children) {
-            this.searchImpl(node, char, currentRow, lowercaseWord, maxEditDist, results);
+            this.searchImpl(
+                node,
+                char,
+                rowBuffer1,
+                rowBuffer2,
+                lowercaseWord,
+                maxEditDist,
+                results,
+                1, // current depth
+                minLength,
+                maxLength
+            );
         }
 
         return results;
     }
 
-    searchImpl(node, char, lastRow, word, maxEditDist, results) {
+    searchImpl(node, char, lastRow, currentRow, word, maxEditDist, results, depth, minLength, maxLength) {
         const sz = lastRow.length;
 
         if (sz === 0) {
             return;
         }
 
-        const currentRow = new Array(sz);
+        // AGGRESSIVE PRUNING: Check if we can possibly reach acceptable length
+        // If current depth already exceeds maxLength, bail immediately
+        if (depth > maxLength) {
+            return;
+        }
+
         currentRow[0] = lastRow[0] + 1;
 
         // Calculate the min cost of insertion, deletion, match or substitution
+        let minInRow = currentRow[0];
         for (let i = 1; i < sz; i++) {
             const insertCondition = 1.0 + currentRow[i - 1];
             const deleteCondition = 1.0 + lastRow[i];
@@ -107,30 +145,53 @@ class TrieDictionary {
                 }
             }
 
-            currentRow[i] = Math.min(insertCondition, deleteCondition, replaceCondition);
-        }
+            const minVal = Math.min(insertCondition, deleteCondition, replaceCondition);
+            currentRow[i] = minVal;
 
-        // If we found a complete word within edit distance, add to results
-        if (currentRow[sz - 1] <= maxEditDist && node.word.length > 0) {
-            results.push({
-                word: node.word,
-                editDistance: currentRow[sz - 1]
-            });
-        }
-
-        // Continue search if any value in current row is within maxEditDist
-        // More efficient than Math.min(...currentRow) for large arrays
-        let minInRow = currentRow[0];
-        for (let i = 1; i < currentRow.length; i++) {
-            if (currentRow[i] < minInRow) {
-                minInRow = currentRow[i];
+            // Track minimum inline to avoid second pass
+            if (minVal < minInRow) {
+                minInRow = minVal;
             }
         }
 
-        if (minInRow <= maxEditDist) {
-            for (const [nextChar, childNode] of node.children) {
-                this.searchImpl(childNode, nextChar, currentRow, word, maxEditDist, results);
+        // If we found a complete word, check length constraint AND edit distance
+        if (node.word.length > 0) {
+            const wordLength = node.word.length;
+            const editDist = currentRow[sz - 1];
+
+
+            // CRITICAL: Check length constraint before adding to results
+            if (wordLength >= minLength && wordLength <= maxLength &&
+                editDist <= maxEditDist) {
+                results.push({
+                    word: node.word,
+                    editDistance: editDist
+                });
             }
+        }
+
+        // AGGRESSIVE PRUNING: Only continue if there's hope
+        // Stop early if minimum cost in row already exceeds threshold
+        // DISABLED: Too aggressive, cuts off valid paths
+        // if (minInRow > maxEditDist) {
+        //     return;
+        // }
+
+        // Recurse to children - need fresh buffer for next row
+        for (const [nextChar, childNode] of node.children) {
+            const nextRow = new Float32Array(sz);
+            this.searchImpl(
+                childNode,
+                nextChar,
+                currentRow,  // current becomes last for next level
+                nextRow,     // fresh buffer for next level
+                word,
+                maxEditDist,
+                results,
+                depth + 1,
+                minLength,
+                maxLength
+            );
         }
     }
 
@@ -171,4 +232,11 @@ class TrieDictionary {
         // Return in format compatible with existing code [word, distance]
         return candidates.map(candidate => [candidate.word, candidate.editDistance]);
     }
+}
+
+// Export for both Node.js and browser environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = TrieDictionary;
+} else if (typeof window !== 'undefined') {
+    window.TrieDictionary = TrieDictionary;
 }
