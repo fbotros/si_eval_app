@@ -1347,7 +1347,7 @@ feedbackInput.addEventListener('input', function(e) {
     if (textLengthChange < 0) {
         // Backspace detected - reset counter
         feedbackCharsTypedSinceBackspace = 0;
-        
+
         const wasAfterDelimiter = feedbackLastCursorPosition === 0 ||
             (feedbackLastTextContent.length >= feedbackLastCursorPosition &&
                 /[\s,;.!?'"\/\-]/.test(feedbackLastTextContent[feedbackLastCursorPosition - 1]));
@@ -1363,7 +1363,7 @@ feedbackInput.addEventListener('input', function(e) {
     } else if (textLengthChange > 0) {
         // Character added - increment counter (but only for non-delimiter chars)
         const justTypedDelimiter = feedbackIsDelimiterBeforeCursor();
-        
+
         if (!justTypedDelimiter) {
             feedbackCharsTypedSinceBackspace += textLengthChange;
         }
