@@ -15,6 +15,10 @@ class AutocorrectEngine {
         this.maxEditDistance = options.maxEditDistance || 2;
         this.keyboardNeighbors = options.keyboardNeighbors || {};
 
+        // Word splitting options
+        this.enableWordSplitting = options.enableWordSplitting !== false; // Enabled by default
+        this.wordSplitCost = options.wordSplitCost || 0.3; // Cost of inserting a space
+
         // Initialize dictionaries
         this.dictionary = [];
         this.dictionarySet = new Set();
@@ -26,6 +30,21 @@ class AutocorrectEngine {
 
         // Incremental autocorrect state
         this.incrementalState = null;
+
+        // Very common words (top 100) - used for word splitting
+        this.veryCommonWords = new Set([
+            'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i',
+            'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at',
+            'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her', 'she',
+            'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 'their', 'what',
+            'so', 'up', 'out', 'if', 'about', 'who', 'get', 'which', 'go', 'me',
+            'when', 'make', 'can', 'like', 'time', 'no', 'just', 'him', 'know', 'take',
+            'people', 'into', 'year', 'your', 'good', 'some', 'could', 'them', 'see', 'other',
+            'than', 'then', 'now', 'look', 'only', 'come', 'its', 'over', 'think', 'also',
+            'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way',
+            'even', 'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us',
+            'is', 'was', 'are', 'been', 'has', 'had', 'were', 'am'
+        ]);
 
         // Common typo correction overrides - these get checked first for instant corrections
         this.correctionOverrides = options.correctionOverrides || {
@@ -82,6 +101,15 @@ class AutocorrectEngine {
         // Add base words if provided
         if (options.baseWords) {
             this.addWords(options.baseWords);
+        }
+
+        // Ensure single-letter common words are in dictionary (often filtered out)
+        const singleLetterWords = ['i', 'a'];
+        for (const word of singleLetterWords) {
+            if (!this.dictionarySet.has(word)) {
+                this.dictionary.push(word);
+                this.dictionarySet.add(word);
+            }
         }
 
         // Initialize TrieDictionary if available
@@ -310,6 +338,7 @@ class AutocorrectEngine {
 
     /**
      * Preserve original capitalization in the corrected word
+     * Handles both single words and multi-word splits
      */
     preserveCapitalization(originalWord, correctedWord) {
         if (!originalWord || !correctedWord) return correctedWord;
@@ -317,6 +346,30 @@ class AutocorrectEngine {
         // If original is all uppercase, make correction all uppercase
         if (originalWord === originalWord.toUpperCase()) {
             return correctedWord.toUpperCase();
+        }
+
+        // Check if corrected word is a multi-word split (contains space)
+        if (correctedWord.includes(' ')) {
+            const words = correctedWord.split(' ');
+            const originalLower = originalWord.toLowerCase();
+
+            // Apply original capitalization pattern to split words
+            const capitalizedWords = words.map((word, index) => {
+                // Find the position in original word where this split word starts
+                let posInOriginal = 0;
+                for (let i = 0; i < index; i++) {
+                    posInOriginal += words[i].length;
+                }
+
+                // Check if that position in original was capitalized
+                if (posInOriginal < originalWord.length &&
+                    originalWord[posInOriginal] === originalWord[posInOriginal].toUpperCase()) {
+                    return word.charAt(0).toUpperCase() + word.slice(1);
+                }
+                return word;
+            });
+
+            return capitalizedWords.join(' ');
         }
 
         // If original starts with capital, capitalize first letter of correction
@@ -524,10 +577,72 @@ class AutocorrectEngine {
     }
 
     /**
-     * Find closest word correction (used for actual autocorrect)
-     * Uses incremental state if available, otherwise returns original word
+     * Try to split a concatenated word into two words
+     * Only suggests splits where at least one word is very common
+     * Returns {firstWord, secondWord} or null
      */
-    findClosestWord(word) {
+    findTwoWordSplit(word) {
+        if (!this.enableWordSplitting || word.length < 3) {
+            return null;
+        }
+
+        const lowerWord = word.toLowerCase();
+
+        // Check if word is in dictionary AND is reasonably common
+        // If it's in dictionary but NOT common, still try to split it
+        // (e.g., "iam" might be in some dictionaries but we still want "I am")
+        if (this.hasWord(lowerWord)) {
+            const wordFreq = this.getWordFrequencyScore(lowerWord);
+            // If the word is reasonably common (top 1000), don't split it
+            if (wordFreq < 1000) {
+                return null;
+            }
+            // Otherwise, continue to try splitting even if it's in dictionary
+        }
+
+        let bestSplit = null;
+        let bestScore = Infinity;
+
+        // Try splits at each position (min 1 char per word to handle "I am")
+        for (let i = 1; i <= lowerWord.length - 1; i++) {
+            const firstPart = lowerWord.substring(0, i);
+            const secondPart = lowerWord.substring(i);
+
+            // Both parts must be in dictionary
+            if (!this.hasWord(firstPart) || !this.hasWord(secondPart)) {
+                continue;
+            }
+
+            // At least one word must be very common
+            const firstIsCommon = this.veryCommonWords.has(firstPart);
+            const secondIsCommon = this.veryCommonWords.has(secondPart);
+
+            if (!firstIsCommon && !secondIsCommon) {
+                continue;
+            }
+
+            // Score the split (lower is better)
+            // Prioritize splits where both words are common
+            const firstFreq = this.getWordFrequencyScore(firstPart);
+            const secondFreq = this.getWordFrequencyScore(secondPart);
+            const score = firstFreq + secondFreq;
+
+            // Only use this split if it's better than keeping the original word
+            // Both parts should be more common than the original
+            if (score < bestScore) {
+                bestScore = score;
+                bestSplit = { firstWord: firstPart, secondWord: secondPart };
+            }
+        }
+
+        return bestSplit;
+    }
+
+    /**
+     * Find closest word correction (used for actual autocorrect)
+     * Uses incremental state if available, tries word splitting, or returns original word
+     */
+    findClosestWord(word, options = {}) {
         // Skip autocorrect for special cases
         if (this.shouldSkipAutocorrect(word)) {
             return word;
@@ -544,19 +659,41 @@ class AutocorrectEngine {
             return word;
         }
 
-        // Use incremental correction (built up during typing)
+        // Try single-word correction (built up during typing)
+        let singleWordCorrection = null;
         if (this.trieDictionary) {
             const correction = this.getIncrementalCorrection(lowerWord);
             if (correction && correction !== lowerWord) {
-                return this.preserveCapitalization(word, correction);
+                singleWordCorrection = correction;
+            } else {
+                // Only do fallback search if explicitly requested (final correction)
+                // Don't do it for tooltip previews as it's expensive for gibberish words
+                const useFallback = options.useFallback !== false;
+
+                if (useFallback) {
+                    const fallbackCorrection = this.findBestCorrectionForPart(lowerWord);
+                    if (fallbackCorrection && fallbackCorrection !== lowerWord) {
+                        singleWordCorrection = fallbackCorrection;
+                    }
+                }
             }
         }
 
+        // Try word splitting if enabled
+        const split = this.findTwoWordSplit(word);
+
+        // Choose between single-word correction and split
+        if (split) {
+            const splitResult = split.firstWord + ' ' + split.secondWord;
+            return this.preserveCapitalization(word, splitResult);
+        }
+
+        // Use single-word correction if available
+        if (singleWordCorrection) {
+            return this.preserveCapitalization(word, singleWordCorrection);
+        }
+
         // No correction found - return original word
-        // NOTE: We don't fall back to expensive full search here because:
-        // 1. If incremental state was maintained during typing, we already have the best answer
-        // 2. If not, a full search would block the UI for long/mistyped words
-        // 3. The incremental approach is the primary path now
         return word;
     }
 
@@ -609,40 +746,6 @@ class AutocorrectEngine {
     /**
      * Get singular form of a potential plural word
      */
-    getSingularForm(word) {
-        const lowerWord = word.toLowerCase();
-
-        // Try -ies -> -y (berries -> berry)
-        if (lowerWord.endsWith('ies') && lowerWord.length > 4) {
-            const singular = lowerWord.slice(0, -3) + 'y';
-            if (this.dictionarySet.has(singular)) {
-                return singular;
-            }
-        }
-
-        // Try -es -> -e (boxes -> box, but not roses -> ros)
-        if (lowerWord.endsWith('es') && lowerWord.length > 3) {
-            const singular = lowerWord.slice(0, -2);
-            if (this.dictionarySet.has(singular)) {
-                return singular;
-            }
-            // Also try removing just -s (roses -> rose)
-            const singularS = lowerWord.slice(0, -1);
-            if (this.dictionarySet.has(singularS)) {
-                return singularS;
-            }
-        }
-
-        // Try -s -> nothing (cats -> cat)
-        if (lowerWord.endsWith('s') && lowerWord.length > 2) {
-            const singular = lowerWord.slice(0, -1);
-            if (this.dictionarySet.has(singular)) {
-                return singular;
-            }
-        }
-
-        return null;
-    }
 
     /**
      * Check if a word is in the dictionary (including plural and possessive forms)
@@ -663,17 +766,9 @@ class AutocorrectEngine {
             if (this.dictionarySet.has(withoutApostrophe)) {
                 return true; // Base word exists
             }
-
-            // Check if it's a possessive plural (dogs' -> dog)
-            const singularOfPossessive = this.getSingularForm(withoutApostrophe);
-            if (singularOfPossessive) {
-                return true;
-            }
         }
 
-        // Check if it's a valid plural form
-        const singularForm = this.getSingularForm(lowerWord);
-        return singularForm !== null;
+        return false;
     }
 
     /**

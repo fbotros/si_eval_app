@@ -170,12 +170,24 @@ class TrieDictionary {
             }
         }
 
-        // AGGRESSIVE PRUNING: Only continue if there's hope
-        // Stop early if minimum cost in row already exceeds threshold
-        // DISABLED: Too aggressive, cuts off valid paths
-        // if (minInRow > maxEditDist) {
-        //     return;
-        // }
+        // SMART PRUNING: Only continue if there's mathematical possibility of finding a match
+        // The minimum value in the row represents the best possible alignment at this point
+        // If minInRow > maxEditDist, no future path can achieve editDistance <= maxEditDist
+        // This is safe because edit distance can only increase or stay the same as we go deeper
+        if (minInRow > maxEditDist) {
+            return;
+        }
+
+        // Additional pruning: If we're too deep and still far from the input length, bail
+        // This handles cases where we've gone way past reasonable word length
+        const remainingInputChars = sz - 1; // -1 because sz includes the initial 0 column
+        const charsProcessedInCandidate = depth;
+        const minRemainingEdits = Math.abs(remainingInputChars - charsProcessedInCandidate);
+
+        // If we need more edits than allowed just to match lengths, prune
+        if (minInRow + minRemainingEdits > maxEditDist) {
+            return;
+        }
 
         // Recurse to children - need fresh buffer for next row
         for (const [nextChar, childNode] of node.children) {
