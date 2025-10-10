@@ -23,8 +23,6 @@ async function loadDictionary() {
 
     dictionaryLoadPromise = (async () => {
         try {
-            console.log('Loading dictionary from comprehensive_dictionary.txt...');
-
             // Smart path detection - determine correct path based on current location
             const currentPath = window.location.pathname;
             let dictionaryPath;

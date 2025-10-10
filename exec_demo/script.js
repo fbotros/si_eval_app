@@ -399,12 +399,12 @@ function performAutocorrectPreview() {
     const currentValue = inputArea.value;
     const cursorPos = inputArea.selectionStart;
 
-    // Check if we're editing within an existing word directly with the full text
+    // Check if we're editing within an existing word (cursor is NOT at the end of the word)
     // This avoids creating the expensive textBeforeCursor substring
     const wordInfo = getWordAtPosition(currentValue, cursorPos);
     const isWithinWord = wordInfo.word.length > 0 && cursorPos > wordInfo.start && cursorPos < wordInfo.end;
 
-    // Don't show preview if editing within an existing word
+    // Don't show preview if editing within an existing word (not at the end)
     if (isWithinWord) {
         hideAutocorrectTooltip();
         return;

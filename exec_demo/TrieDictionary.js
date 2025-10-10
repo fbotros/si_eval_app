@@ -88,11 +88,6 @@ class TrieDictionary {
             rowBuffer1[i] = i;
         }
 
-        // DEBUG logging for "fantastic" searches
-        if (word.includes('fantastic')) {
-            console.log(`🔎 Searching for "${word}": minLen=${minLength}, maxLen=${maxLength}, maxDist=${maxEditDist}`);
-            console.log(`🔎 Root has ${this.root.children.size} children:`, Array.from(this.root.children.keys()).slice(0, 10));
-        }
 
         // Start search from root's children
         for (const [char, node] of this.root.children) {
@@ -120,7 +115,7 @@ class TrieDictionary {
             return;
         }
 
-        // AGGRESSIVE PRUNING: Check if we can possibly reach acceptable length
+      // AGGRESSIVE PRUNING: Check if we can possibly reach acceptable length
         // If current depth already exceeds maxLength, bail immediately
         if (depth > maxLength) {
             return;
@@ -154,6 +149,7 @@ class TrieDictionary {
             }
         }
 
+
         // If we found a complete word, check length constraint AND edit distance
         if (node.word.length > 0) {
             const wordLength = node.word.length;
@@ -175,17 +171,6 @@ class TrieDictionary {
         // If minInRow > maxEditDist, no future path can achieve editDistance <= maxEditDist
         // This is safe because edit distance can only increase or stay the same as we go deeper
         if (minInRow > maxEditDist) {
-            return;
-        }
-
-        // Additional pruning: If we're too deep and still far from the input length, bail
-        // This handles cases where we've gone way past reasonable word length
-        const remainingInputChars = sz - 1; // -1 because sz includes the initial 0 column
-        const charsProcessedInCandidate = depth;
-        const minRemainingEdits = Math.abs(remainingInputChars - charsProcessedInCandidate);
-
-        // If we need more edits than allowed just to match lengths, prune
-        if (minInRow + minRemainingEdits > maxEditDist) {
             return;
         }
 
