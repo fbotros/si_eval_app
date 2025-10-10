@@ -22,30 +22,25 @@ function shufflePrompts() {
 }
 
 async function loadPrompts() {
-    // Load all three prompt files
+    // Load two prompt files
     const easyResponse = await fetch('./prompts.txt');
     const hardResponse = await fetch('./hard_prompts.txt');
-    const extraHardResponse = await fetch('./extra_hard_prompts.txt');
 
     const easyText = await easyResponse.text();
     const hardText = await hardResponse.text();
-    const extraHardText = await extraHardResponse.text();
 
     // Parse prompts from each file
     const easyPrompts = easyText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
     const hardPrompts = hardText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
-    const extraHardPrompts = extraHardText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
 
     // Shuffle each category using the existing shuffleArray function
     const shuffledEasy = shuffleArray(easyPrompts);
     const shuffledHard = shuffleArray(hardPrompts);
-    const shuffledExtraHard = shuffleArray(extraHardPrompts);
 
-    // Create ordered sequence: 2 easy, 2 hard, 2 extra hard
+    // Create ordered sequence: 2 easy, 2 hard
     prompts = [
         ...shuffledEasy.slice(0, 2),
-        ...shuffledHard.slice(0, 2),
-        ...shuffledExtraHard.slice(0, 2)
+        ...shuffledHard.slice(0, 2)
     ];
 }
 
@@ -164,17 +159,13 @@ function updateDifficultyIndicator() {
     // Determine difficulty based on prompt index
     // Prompts 0-1: Easy (a-z)
     // Prompts 2-3: Hard (a-z, .?!)
-    // Prompts 4-5: Extra Hard (a-z, .?!, 0-9)
 
     if (currentPromptIndex <= 1) {
         // Easy prompts
         charsetIcons.textContent = 'a-z';
-    } else if (currentPromptIndex <= 3) {
+    } else {
         // Hard prompts
         charsetIcons.textContent = 'a-z, .?!';
-    } else {
-        // Extra hard prompts
-        charsetIcons.textContent = 'a-z, .?!, 0-9';
     }
 }
 
@@ -901,7 +892,7 @@ function advanceToNextPrompt() {
     consecutiveEnterPresses = 0;
 
     // Move to the next prompt or end the test
-    if (currentPromptIndex < 5) {  // Stop after 6 prompts (index 0-5)
+    if (currentPromptIndex < 3) {  // Stop after 4 prompts (index 0-3)
         currentPromptIndex++;
         updateCurrentPrompt();
         inputArea.value = '';
@@ -1034,6 +1025,7 @@ let feedbackLastTextLength = 0;
 let feedbackLastCursorPosition = 0;
 let feedbackLastTextContent = '';
 let feedbackIsApplyingAutocorrect = false;
+let feedbackCharsTypedSinceBackspace = 0;
 
 // Create tooltip element for feedback contenteditable
 function createFeedbackTooltip() {
@@ -1221,6 +1213,13 @@ function checkFeedbackForAutocorrect() {
         }
     }
 
+    // Suppress autocorrect preview if user deleted text and hasn't typed 2+ chars yet
+    if (feedbackCharsTypedSinceBackspace < 2) {
+        feedbackCurrentAutocorrectSuggestion = null;
+        hideFeedbackAutocorrectTooltip();
+        return;
+    }
+
     if (currentWord.length < 3) {
         feedbackCurrentAutocorrectSuggestion = null;
         hideFeedbackAutocorrectTooltip();
@@ -1338,6 +1337,7 @@ feedbackInput.addEventListener('input', function(e) {
         feedbackLastTextLength = currentTextLength;
         feedbackLastCursorPosition = currentCursorPosition;
         feedbackAutocorrectEnabled = true;
+        feedbackCharsTypedSinceBackspace = 0; // Reset on autocorrect
         debouncedFeedbackAutocorrectCheck();
         return;
     }
@@ -1345,6 +1345,9 @@ feedbackInput.addEventListener('input', function(e) {
     const textLengthChange = currentTextLength - feedbackLastTextLength;
 
     if (textLengthChange < 0) {
+        // Backspace detected - reset counter
+        feedbackCharsTypedSinceBackspace = 0;
+        
         const wasAfterDelimiter = feedbackLastCursorPosition === 0 ||
             (feedbackLastTextContent.length >= feedbackLastCursorPosition &&
                 /[\s,;.!?'"\/\-]/.test(feedbackLastTextContent[feedbackLastCursorPosition - 1]));
@@ -1358,7 +1361,12 @@ feedbackInput.addEventListener('input', function(e) {
             feedbackAutocorrectEnabled = true;
         }
     } else if (textLengthChange > 0) {
+        // Character added - increment counter (but only for non-delimiter chars)
         const justTypedDelimiter = feedbackIsDelimiterBeforeCursor();
+        
+        if (!justTypedDelimiter) {
+            feedbackCharsTypedSinceBackspace += textLengthChange;
+        }
 
         if (justTypedDelimiter) {
             feedbackAutocorrectEnabled = true;
@@ -1394,7 +1402,8 @@ feedbackInput.addEventListener('keydown', function(e) {
     if (isTriggerKey) {
         const currentWord = getFeedbackCurrentWord();
 
-        if (!feedbackCurrentAutocorrectSuggestion && currentWord && currentWord.length >= 3 && feedbackAutocorrectEnabled) {
+        // Check suppression before attempting autocorrect
+        if (!feedbackCurrentAutocorrectSuggestion && currentWord && currentWord.length >= 3 && feedbackAutocorrectEnabled && feedbackCharsTypedSinceBackspace >= 2) {
             const suggestion = autocorrectEngine.findClosestWord(currentWord);
 
             if (suggestion && suggestion.toLowerCase() !== currentWord.toLowerCase()) {
@@ -1408,7 +1417,8 @@ feedbackInput.addEventListener('keydown', function(e) {
         feedbackAutocorrectEnabled = true;
     }
 
-    if (feedbackCurrentAutocorrectSuggestion && feedbackWordToReplaceWithSuggestion && isTriggerKey) {
+    // Also check suppression before applying cached suggestion
+    if (feedbackCurrentAutocorrectSuggestion && feedbackWordToReplaceWithSuggestion && isTriggerKey && feedbackCharsTypedSinceBackspace >= 2) {
         const wordToDelete = getFeedbackCurrentWord();
         const suggestionToApply = feedbackCurrentAutocorrectSuggestion;
 
