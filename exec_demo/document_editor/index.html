@@ -1488,12 +1488,37 @@
                     if (!justTypedDelimiter) {
                         // Typed a regular character - increment counter
                         charsTypedSinceLastBackspace++;
+
+                        // SAFETY CHECK: If we're typing and autocorrect is disabled,
+                        // but this is the VERY FIRST character (clicked then immediately started typing),
+                        // check if we should re-enable it (in case they clicked on a blank line)
+                        // Only check on first char - if still disabled after that, respect the decision
+                        if (!autocorrectEnabled && charsTypedSinceLastBackspace === 1) {
+                            // Look at what came BEFORE and AFTER the cursor
+                            const currentWord = getCurrentWord();
+                            const fullText = getEditorText();
+                            const cursorPos = getCursorOffset();
+                            const textBeforeCursor = getTextBeforeCursor();
+                            const textBeforeWord = textBeforeCursor.substring(0, textBeforeCursor.length - currentWord.length);
+
+                            // Also check what's AFTER the cursor
+                            const charAfterCursor = cursorPos < fullText.length ? fullText[cursorPos] : '';
+                            const hasTextAfterCursor = charAfterCursor && /[\w']/.test(charAfterCursor);
+
+                            // Only enable if BOTH:
+                            // 1. Text before word is empty OR ends with delimiter
+                            // 2. No word character after cursor (not in middle of word)
+                            const beforeIsDelimiter = textBeforeWord.length === 0 || /[\s,;.!?'"\/\-\n]$/.test(textBeforeWord);
+
+                            if (beforeIsDelimiter && !hasTextAfterCursor) {
+                                autocorrectEnabled = true;
+                            }
+                        }
                     } else {
                         // Just typed a delimiter - reset counter and re-enable autocorrect
                         charsTypedSinceLastBackspace = 0;
                         autocorrectEnabled = true;
                     }
-                    // If already enabled, keep it enabled
                 }
 
                 lastTextContent = currentTextContent;
@@ -1507,21 +1532,27 @@
             editor.addEventListener('mousedown', function (e) {
                 // After click, check if cursor landed after a delimiter
                 setTimeout(() => {
-                    const afterDelimiter = isDelimiterBeforeCursor();
                     const editorText = getEditorText();
                     const cursorPos = getCursorOffset();
-                    
+
                     // If the editor is empty or cursor is at start, enable autocorrect
                     if (editorText.length === 0 || cursorPos === 0) {
                         autocorrectEnabled = true;
                         charsTypedSinceLastBackspace = 0;
-                    } else {
-                        // Otherwise use delimiter check
-                        autocorrectEnabled = afterDelimiter;
-                        // Reset counter when clicking after delimiter
-                        if (afterDelimiter) {
-                            charsTypedSinceLastBackspace = 0;
-                        }
+                        return;
+                    }
+
+                    // Check what's before the cursor
+                    const charBeforeCursor = editorText[cursorPos - 1];
+
+                    // Enable autocorrect if after whitespace, punctuation, or newline
+                    const afterDelimiter = /[\s,;.!?'"\/\-\n]/.test(charBeforeCursor);
+
+                    autocorrectEnabled = afterDelimiter;
+
+                    // Reset counter when clicking after delimiter
+                    if (afterDelimiter) {
+                        charsTypedSinceLastBackspace = 0;
                     }
                 }, 0);
             });
