@@ -1612,4 +1612,17 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Configure input area
     configureInputArea();
     initializeTest();
+    
+    // Hide loading overlay and focus input area
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
+        // Wait for fade transition to complete before focusing
+        setTimeout(() => {
+            const inputArea = document.getElementById('input-area');
+            if (inputArea) {
+                inputArea.focus();
+            }
+        }, 300);
+    }
 });
