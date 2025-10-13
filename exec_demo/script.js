@@ -1325,6 +1325,71 @@ function replaceFeedbackCurrentWord(wordToDelete, suggestion) {
     }
 }
 
+// Helper to get text before cursor in feedback input
+function getFeedbackTextBeforeCursor() {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return '';
+
+    const range = selection.getRangeAt(0);
+    const fullEditorText = getFeedbackEditorText();
+
+    // Calculate cursor position using same logic as getFeedbackCursorOffset
+    let cursorPos = 0;
+    let foundCursor = false;
+
+    function walkNodes(node, isFirstChild) {
+        if (foundCursor) return;
+
+        if (node.nodeType === Node.TEXT_NODE) {
+            if (node === range.startContainer) {
+                cursorPos += range.startOffset;
+                foundCursor = true;
+                return;
+            } else {
+                cursorPos += node.textContent.length;
+            }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.nodeName === 'BR') {
+                cursorPos += 1;
+            } else if (node.nodeName === 'DIV' && node !== feedbackInput) {
+                if (!isFirstChild && cursorPos > 0) {
+                    cursorPos += 1;
+                }
+            }
+
+            const children = Array.from(node.childNodes);
+            for (let i = 0; i < children.length; i++) {
+                walkNodes(children[i], i === 0 && isFirstChild);
+                if (foundCursor) break;
+            }
+        }
+    }
+
+    walkNodes(feedbackInput, true);
+    return fullEditorText.substring(0, cursorPos);
+}
+
+// Helper to check if we're at the start of a sentence in feedback input
+function isFeedbackAtSentenceStart(textBeforeCursor) {
+    // Empty document or start of document
+    if (!textBeforeCursor || textBeforeCursor.length === 0) {
+        return true;
+    }
+
+    // Check for newline at end (start of new line)
+    if (textBeforeCursor.endsWith('\n')) {
+        return true;
+    }
+
+    // Check for period/question mark/exclamation + whitespace
+    // Match patterns like ". ", ".\n", "! ", etc.
+    if (/[.!?][\s\n]+$/.test(textBeforeCursor)) {
+        return true;
+    }
+
+    return false;
+}
+
 // Handle feedback input events
 feedbackInput.addEventListener('input', function(e) {
     const currentTextContent = getFeedbackEditorText();
@@ -1417,10 +1482,81 @@ feedbackInput.addEventListener('keydown', function(e) {
         feedbackAutocorrectEnabled = true;
     }
 
+    // Check for capitalization FIRST (even without autocorrect)
+    if (isTriggerKey && feedbackCharsTypedSinceBackspace >= 0) {
+        const currentWord = getFeedbackCurrentWord();
+
+        if (currentWord && currentWord.length > 0) {
+            const textBeforeCursor = getFeedbackTextBeforeCursor();
+            const textBeforeWord = textBeforeCursor.substring(0, textBeforeCursor.length - currentWord.length);
+
+            let shouldCapitalize = false;
+            let newWord = currentWord;
+
+            // Check if at sentence start
+            if (isFeedbackAtSentenceStart(textBeforeWord)) {
+                // Capitalize first letter if it's lowercase
+                if (currentWord[0] >= 'a' && currentWord[0] <= 'z') {
+                    shouldCapitalize = true;
+                    newWord = currentWord.charAt(0).toUpperCase() + currentWord.slice(1);
+                }
+            }
+
+            // Check for standalone "i" → "I"
+            if (currentWord.toLowerCase() === 'i' && currentWord.length === 1) {
+                shouldCapitalize = true;
+                newWord = 'I';
+            }
+
+            // Apply capitalization if needed (and there's no autocorrect suggestion)
+            if (shouldCapitalize && !feedbackCurrentAutocorrectSuggestion) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                feedbackIsApplyingAutocorrect = true;
+
+                setTimeout(() => {
+                    try {
+                        replaceFeedbackCurrentWord(currentWord, newWord);
+
+                        hideFeedbackAutocorrectTooltip();
+                        feedbackCurrentAutocorrectSuggestion = null;
+                        feedbackWordToReplaceWithSuggestion = null;
+
+                        if (e.key === 'Enter') {
+                            document.execCommand('insertLineBreak', false, null);
+                        } else {
+                            document.execCommand('insertText', false, e.key);
+                        }
+                    } finally {
+                        feedbackIsApplyingAutocorrect = false;
+                    }
+                }, 0);
+
+                return false;
+            }
+        }
+    }
+
     // Also check suppression before applying cached suggestion
     if (feedbackCurrentAutocorrectSuggestion && feedbackWordToReplaceWithSuggestion && isTriggerKey && feedbackCharsTypedSinceBackspace >= 2) {
         const wordToDelete = getFeedbackCurrentWord();
-        const suggestionToApply = feedbackCurrentAutocorrectSuggestion;
+        let suggestionToApply = feedbackCurrentAutocorrectSuggestion;
+
+        // Check if we need to capitalize (sentence start)
+        const textBeforeCursor = getFeedbackTextBeforeCursor();
+        // Get text before the word we're about to replace
+        const textBeforeWord = textBeforeCursor.substring(0, textBeforeCursor.length - wordToDelete.length);
+
+        if (isFeedbackAtSentenceStart(textBeforeWord)) {
+            // Capitalize first letter of suggestion
+            suggestionToApply = suggestionToApply.charAt(0).toUpperCase() + suggestionToApply.slice(1);
+        }
+
+        // Special case: standalone "i" should become "I"
+        if (wordToDelete.toLowerCase() === 'i' && wordToDelete.length === 1) {
+            suggestionToApply = 'I';
+        }
 
         e.preventDefault();
         e.stopPropagation();
