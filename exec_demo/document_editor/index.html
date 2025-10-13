@@ -321,8 +321,8 @@
         /* Debug log viewer */
         #debug-log {
             position: fixed;
-            bottom: 0;
-            right: 0;
+            bottom: 20px;
+            right: 20px;
             width: 400px;
             max-height: 300px;
             background: rgba(0, 0, 0, 0.9);
@@ -332,8 +332,8 @@
             padding: 10px;
             overflow-y: auto;
             z-index: 10000;
-            border-top: 2px solid #00ff00;
-            border-left: 2px solid #00ff00;
+            border: 2px solid #00ff00;
+            border-radius: 4px;
         }
 
         #debug-log .log-entry {
@@ -925,15 +925,20 @@
                 console.log(message);
             }
 
-            // DEBUG: Log title input events to understand Quest 3 behavior
+            // REMOVED: Auto-select behavior on title input
+            // Quest 3 browser has a bug where clicking in the editor causes spurious
+            // focus events on the title input, which would trigger select() and
+            // select all the title text. Removing this functionality to fix the issue.
+
+            // Keep debug logging for now to verify the fix
             titleInput.addEventListener('click', function (e) {
                 debugLog('🔴 TITLE CLICK detail=' + e.detail + ' active=' + (document.activeElement === this ? 'title' : 'other'), 'title-click');
-                this.select();
+                // REMOVED: this.select();
             });
 
             titleInput.addEventListener('focus', function (e) {
                 debugLog('🔵 TITLE FOCUS from=' + (e.relatedTarget ? e.relatedTarget.id : 'null'), 'title-focus');
-                this.select();
+                // REMOVED: this.select();
             });
 
             // DEBUG: Also log double-click events on the editor
