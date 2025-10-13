@@ -861,24 +861,22 @@
             titleInput.addEventListener('input', resizeTitleInput);
             titleInput.addEventListener('change', resizeTitleInput);
 
-            // Select all text when clicking on the title input
-            // Only select on single-click to avoid interference with double-click in editor
-            titleInput.addEventListener('click', function (e) {
-                // Only select if it's a single click (not part of a double-click)
-                // and the click target is actually the title input
-                if (e.detail === 1 && e.target === this) {
-                    this.select();
-                }
-            });
+            // Commenting out auto-select behavior entirely to debug Quest 3 issue
+            // titleInput.addEventListener('click', function (e) {
+            //     // Only select if it's a single click (not part of a double-click)
+            //     // and the click target is actually the title input
+            //     if (e.detail === 1 && e.target === this) {
+            //         this.select();
+            //     }
+            // });
 
-            // Also select all on focus (for keyboard navigation)
-            titleInput.addEventListener('focus', function (e) {
-                // Only select on focus if not triggered by a click event
-                // to prevent interference with natural browser text selection
-                if (!e.sourceCapabilities || e.sourceCapabilities.firesTouchEvents === false) {
-                    this.select();
-                }
-            });
+            // titleInput.addEventListener('focus', function (e) {
+            //     // Only select on focus if not triggered by a click event
+            //     // to prevent interference with natural browser text selection
+            //     if (!e.sourceCapabilities || e.sourceCapabilities.firesTouchEvents === false) {
+            //         this.select();
+            //     }
+            // });
 
             // Tooltip management functions
             function showAutocorrectTooltip(text, x, y) {
