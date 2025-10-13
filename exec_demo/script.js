@@ -388,11 +388,11 @@ function scheduleAutocorrectPreview() {
         clearTimeout(autocorrectPreviewTimer);
     }
 
-    // Schedule new preview with minimal delay to not block typing
+    // Schedule new preview with debounce to avoid showing tooltips too eagerly
     autocorrectPreviewTimer = setTimeout(() => {
         performAutocorrectPreview();
         autocorrectPreviewTimer = null;
-    }, 16); // ~1 frame at 60fps for smooth typing
+    }, 300); // 300ms debounce - only show tooltip after user pauses typing
 }
 
 function performAutocorrectPreview() {
@@ -775,6 +775,16 @@ inputArea.addEventListener('input', function() {
         const actualTypedChar = currentValue.charAt(cursorPos - 1);
         const isSpaceOrPunct = /[\s.,.!?;:"()]/.test(actualTypedChar);
 
+        // If tooltip is visible and user types another regular character, hide it AND clear the cached suggestion
+        // This ensures determinism - we don't apply stale suggestions
+        if (!isSpaceOrPunct) {
+            const isRegularChar = /[a-zA-Z0-9']/.test(actualTypedChar);
+            if (isRegularChar && autocorrectTooltip.classList.contains('show')) {
+                // Hide the tooltip AND clear the cached suggestion state to maintain determinism
+                hideAutocorrectTooltip();
+                // The hideAutocorrectTooltip function already clears lastTooltipWord and lastTooltipSuggestion
+            }
+        }
 
         // Only count non-space characters toward backspace penalty
         if (!isSpaceOrPunct) {
@@ -1435,6 +1445,18 @@ feedbackInput.addEventListener('input', function(e) {
     } else if (textLengthChange > 0) {
         // Character added - increment counter (but only for non-delimiter chars)
         const justTypedDelimiter = feedbackIsDelimiterBeforeCursor();
+
+        // If tooltip is visible and user types another regular character, hide it AND clear the cached suggestion
+        // This ensures determinism - we don't apply stale suggestions
+        if (!justTypedDelimiter) {
+            const { tooltip } = getFeedbackTooltipElements();
+            if (tooltip.classList.contains('show')) {
+                // Hide the tooltip AND clear the cached suggestion state to maintain determinism
+                hideFeedbackAutocorrectTooltip();
+                feedbackCurrentAutocorrectSuggestion = null;
+                feedbackWordToReplaceWithSuggestion = null;
+            }
+        }
 
         if (!justTypedDelimiter) {
             feedbackCharsTypedSinceBackspace += textLengthChange;
