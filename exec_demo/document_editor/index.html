@@ -1404,6 +1404,13 @@
                             cursorPos += node.textContent.length;
                         }
                     } else if (node.nodeType === Node.ELEMENT_NODE) {
+                        // Check if this is the container where cursor is
+                        if (node === range.startContainer) {
+                            // Cursor is positioned between children
+                            foundCursor = true;
+                            return;
+                        }
+
                         if (node.nodeName === 'BR') {
                             cursorPos += 1;
                         } else if (node.nodeName === 'DIV' && node !== editor) {
