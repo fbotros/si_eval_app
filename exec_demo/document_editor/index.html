@@ -295,46 +295,6 @@
             color: #4a5568;
             font-weight: 500;
         }
-
-        /* Debug log viewer */
-        #debug-log {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 400px;
-            max-height: 300px;
-            background: rgba(0, 0, 0, 0.9);
-            color: #00ff00;
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            padding: 10px;
-            overflow-y: auto;
-            z-index: 10000;
-            border: 2px solid #00ff00;
-            border-radius: 4px;
-        }
-
-        #debug-log .log-entry {
-            margin: 2px 0;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        #debug-log .log-entry.error {
-            color: #ff0000;
-        }
-
-        #debug-log .log-entry.editor {
-            color: #00ff00;
-        }
-
-        #debug-log .log-entry.title-click {
-            color: #ff6666;
-        }
-
-        #debug-log .log-entry.title-focus {
-            color: #6666ff;
-        }
     </style>
 </head>
 
@@ -396,9 +356,6 @@
 
     <!-- Autocorrect tooltip - positioned outside of contentEditable -->
     <div id="autocorrect-tooltip" class="autocorrect-tooltip"></div>
-
-    <!-- Debug log viewer -->
-    <div id="debug-log"></div>
 
     <!-- Load external scripts (already loaded in head) -->
     <script src="../AutocorrectEngine.js"></script>
@@ -866,33 +823,6 @@
                 // Set input width to text width plus padding (20px) plus a bit of buffer (10px)
                 input.style.width = (textWidth + 30) + 'px';
             }
-
-            // Helper function to add logs to the on-screen debug viewer
-            function debugLog(message, className = '') {
-                const debugDiv = document.getElementById('debug-log');
-                if (!debugDiv) return;
-
-                const entry = document.createElement('div');
-                entry.className = 'log-entry ' + className;
-                entry.textContent = new Date().toISOString().split('T')[1].split('.')[0] + ' ' + message;
-                debugDiv.appendChild(entry);
-
-                // Auto-scroll to bottom
-                debugDiv.scrollTop = debugDiv.scrollHeight;
-
-                // Keep only last 50 entries
-                while (debugDiv.children.length > 50) {
-                    debugDiv.removeChild(debugDiv.firstChild);
-                }
-
-                // Also log to console for desktop debugging
-                console.log(message);
-            }
-
-            // DEBUG: Log double-click events on the editor
-            editor.addEventListener('dblclick', function (e) {
-                debugLog('💚 EDITOR DBL-CLICK detail=' + e.detail + ' target=' + e.target.nodeName, 'editor');
-            });
 
             // Tooltip management functions
             function showAutocorrectTooltip(text, x, y) {
