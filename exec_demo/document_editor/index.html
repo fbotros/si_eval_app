@@ -145,7 +145,7 @@
         }
 
         .toolbar button:hover {
-            background: #ececec;
+            background: #e0e0e0;
         }
 
         .toolbar button.active {
@@ -861,22 +861,37 @@
             titleInput.addEventListener('input', resizeTitleInput);
             titleInput.addEventListener('change', resizeTitleInput);
 
-            // Commenting out auto-select behavior entirely to debug Quest 3 issue
-            // titleInput.addEventListener('click', function (e) {
-            //     // Only select if it's a single click (not part of a double-click)
-            //     // and the click target is actually the title input
-            //     if (e.detail === 1 && e.target === this) {
-            //         this.select();
-            //     }
-            // });
+            // DEBUG: Log title input events to understand Quest 3 behavior
+            titleInput.addEventListener('click', function (e) {
+                console.log('🔴 Title input CLICK event:', {
+                    target: e.target,
+                    currentTarget: e.currentTarget,
+                    detail: e.detail,
+                    activeElement: document.activeElement,
+                    timestamp: Date.now()
+                });
+                this.select();
+            });
 
-            // titleInput.addEventListener('focus', function (e) {
-            //     // Only select on focus if not triggered by a click event
-            //     // to prevent interference with natural browser text selection
-            //     if (!e.sourceCapabilities || e.sourceCapabilities.firesTouchEvents === false) {
-            //         this.select();
-            //     }
-            // });
+            titleInput.addEventListener('focus', function (e) {
+                console.log('🔵 Title input FOCUS event:', {
+                    relatedTarget: e.relatedTarget,
+                    activeElement: document.activeElement,
+                    timestamp: Date.now()
+                });
+                this.select();
+            });
+
+            // DEBUG: Also log double-click events on the editor
+            editor.addEventListener('dblclick', function (e) {
+                console.log('💚 Editor DOUBLE-CLICK event:', {
+                    target: e.target,
+                    currentTarget: e.currentTarget,
+                    detail: e.detail,
+                    activeElement: document.activeElement,
+                    timestamp: Date.now()
+                });
+            });
 
             // Tooltip management functions
             function showAutocorrectTooltip(text, x, y) {
