@@ -46,6 +46,29 @@
             flex-shrink: 0;
         }
 
+        .document-title {
+            font-size: 24px;
+            font-weight: 400;
+            color: #2d3748;
+            outline: none;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin: -7px -11px;
+            transition: all 0.2s ease;
+            cursor: text;
+        }
+
+        .document-title:hover {
+            border-color: rgba(0, 0, 0, 0.15);
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .document-title:focus {
+            border-color: rgba(102, 126, 234, 0.4);
+            background: rgba(255, 255, 255, 0.8);
+        }
+
 
         .main-content {
             display: flex;
@@ -335,7 +358,7 @@
                 <path d="M16 17H8" stroke="#2d3748" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                 <path d="M10 9H9H8" stroke="#2d3748" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
-            My Daily Notes
+            <span class="document-title" contenteditable="true" spellcheck="false">My Daily Notes</span>
         </h1>
         <div
             style="position: absolute; top: 10px; right: 20px; font-size: 10px; color: #999; font-family: monospace; user-select: none;">
