@@ -925,20 +925,59 @@
                 console.log(message);
             }
 
-            // REMOVED: Auto-select behavior on title input
+            // Quest 3 fix: Prevent spurious focus events on title input
             // Quest 3 browser has a bug where clicking in the editor causes spurious
-            // focus events on the title input, which would trigger select() and
-            // select all the title text. Removing this functionality to fix the issue.
-
+            // focus events on the title input. We detect this and immediately return
+            // focus to the editor to prevent disruption.
+            
+            let lastEditorInteraction = 0;
+            let savedEditorSelection = null;
+            
+            // Track when user interacts with editor and save selection
+            editor.addEventListener('mousedown', function() {
+                lastEditorInteraction = Date.now();
+            });
+            
+            editor.addEventListener('mouseup', function() {
+                // Save selection after mouse up (after double-click selection is made)
+                setTimeout(() => {
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        savedEditorSelection = selection.getRangeAt(0).cloneRange();
+                        debugLog('💾 SAVED editor selection', 'editor');
+                    }
+                }, 0);
+            });
+            
+            editor.addEventListener('keydown', function() {
+                lastEditorInteraction = Date.now();
+            });
+            
             // Keep debug logging for now to verify the fix
             titleInput.addEventListener('click', function (e) {
                 debugLog('🔴 TITLE CLICK detail=' + e.detail + ' active=' + (document.activeElement === this ? 'title' : 'other'), 'title-click');
-                // REMOVED: this.select();
             });
 
             titleInput.addEventListener('focus', function (e) {
                 debugLog('🔵 TITLE FOCUS from=' + (e.relatedTarget ? e.relatedTarget.id : 'null'), 'title-focus');
-                // REMOVED: this.select();
+                
+                // Quest 3 fix: If this focus happened very recently after an editor interaction,
+                // it's likely a spurious focus event - immediately return focus to editor
+                const timeSinceEditorInteraction = Date.now() - lastEditorInteraction;
+                if (timeSinceEditorInteraction < 100 && e.relatedTarget === null) {
+                    debugLog('⚠️ SPURIOUS FOCUS - restoring editor focus and selection', 'title-focus');
+                    e.preventDefault();
+                    
+                    // Restore the saved selection before returning focus
+                    if (savedEditorSelection) {
+                        const selection = window.getSelection();
+                        selection.removeAllRanges();
+                        selection.addRange(savedEditorSelection);
+                        debugLog('✅ RESTORED editor selection', 'editor');
+                    }
+                    
+                    editor.focus();
+                }
             });
 
             // DEBUG: Also log double-click events on the editor
