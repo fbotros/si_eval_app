@@ -529,6 +529,13 @@ function performCursorAwareAutocorrect(appendChar) {
             correctedWord = autocorrectEngine.findClosestWord(wordCore);
         }
 
+        // Check if corrected word is an "I" contraction that needs capitalization
+        const lowerCorrected = correctedWord.toLowerCase();
+        if (lowerCorrected === 'i' || lowerCorrected === "i've" || lowerCorrected === "i'm" ||
+            lowerCorrected === "i'd" || lowerCorrected === "i'll" || lowerCorrected === "i'd've") {
+            correctedWord = 'I' + correctedWord.slice(1);
+        }
+
         // If a correction was found and it's different from the original
         if (correctedWord !== wordCore && correctedWord !== lowerWord) {
             // Reconstruct with original punctuation
@@ -1502,10 +1509,25 @@ feedbackInput.addEventListener('keydown', function(e) {
                 }
             }
 
-            // Check for standalone "i" → "I"
-            if (currentWord.toLowerCase() === 'i' && currentWord.length === 1) {
+            // Check for "i" contractions and fix them
+            const lowerWord = currentWord.toLowerCase();
+            if (lowerWord === 'i') {
                 shouldCapitalize = true;
                 newWord = 'I';
+            } else if (lowerWord === "i've" || lowerWord === "i'm" || lowerWord === "i'd" ||
+                       lowerWord === "i'll" || lowerWord === "i'd've") {
+                // Has apostrophe - just capitalize
+                shouldCapitalize = true;
+                newWord = 'I' + currentWord.slice(1);
+            } else if (lowerWord === 'im') {
+                shouldCapitalize = true;
+                newWord = "I'm";
+            } else if (lowerWord === 'ive') {
+                shouldCapitalize = true;
+                newWord = "I've";
+            } else if (lowerWord === 'id') {
+                shouldCapitalize = true;
+                newWord = "I'd";
             }
 
             // Apply capitalization if needed (and there's no autocorrect suggestion)
@@ -1612,7 +1634,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Configure input area
     configureInputArea();
     initializeTest();
-    
+
     // Hide loading overlay and focus input area
     const overlay = document.getElementById('loading-overlay');
     if (overlay) {
