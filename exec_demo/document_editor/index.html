@@ -145,7 +145,7 @@
         }
 
         .toolbar button:hover {
-            background: #e0e0e0;
+            background: #ececec;
         }
 
         .toolbar button.active {
@@ -862,13 +862,22 @@
             titleInput.addEventListener('change', resizeTitleInput);
 
             // Select all text when clicking on the title input
-            titleInput.addEventListener('click', function () {
-                this.select();
+            // Only select on single-click to avoid interference with double-click in editor
+            titleInput.addEventListener('click', function (e) {
+                // Only select if it's a single click (not part of a double-click)
+                // and the click target is actually the title input
+                if (e.detail === 1 && e.target === this) {
+                    this.select();
+                }
             });
 
             // Also select all on focus (for keyboard navigation)
-            titleInput.addEventListener('focus', function () {
-                this.select();
+            titleInput.addEventListener('focus', function (e) {
+                // Only select on focus if not triggered by a click event
+                // to prevent interference with natural browser text selection
+                if (!e.sourceCapabilities || e.sourceCapabilities.firesTouchEvents === false) {
+                    this.select();
+                }
             });
 
             // Tooltip management functions
