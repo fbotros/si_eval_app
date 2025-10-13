@@ -53,10 +53,10 @@ async function initializeAutocorrect() {
         baseWords: baseDictionary,
         keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {},
         maxEditDistance: 2,
-        adjacentKeyMultiplier: 0.9,        // Much less aggressive - almost same as regular substitution
-        insertionCost: 0.5,                // Cheaper to make insertions more favorable
-        deletionCost: 1.0,                 // Keep deletions expensive
-        substitutionCost: 1.0,             // Keep substitutions at normal cost
+        adjacentKeyMultiplier: 0.9,        // Neighbor substitutions (e.g., i→u)
+        substitutionCost: 1.5,             // Non-neighbor substitutions - most costly (e.g., n→c)
+        insertionCost: 1.2,                // False negatives (missing letters) - moderately costly
+        deletionCost: 1.0,                 // False positives (extra letters)
         apostropheInsertionCost: 0.2,      // Very cheap to add missing apostrophes
         apostropheDeletionCost: 0.3        // Cheap to remove extra apostrophes
     });

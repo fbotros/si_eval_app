@@ -326,7 +326,7 @@
             <div id="document-editor" contenteditable="true" spellcheck="false" autocorrect="off" autocapitalize="off"
                 autocomplete="off" data-gramm="false" data-gramm_editor="false" data-enable-grammarly="false"
                 translate="no" data-ms-editor="false" data-lt-tmp-id="lt-0" data-lt-installed="false"
-                data-grammarly-disable="true"><div><font size="6">Monday October 20th</font></div><div><font size="4"><br></font></div><div><font size="5"><b>Weather</b></font></div><div><font size="4">Mostly snuny with a hgih of 68 dreeges</font></div><div><font size="4"><br></font></div><div><font size="4"><br></font></div><div><font size="5"><b>Commute</b></font></div><div><font size="4">to-do...</font></div></div>
+                data-grammarly-disable="true"><div><font size="6">Monday October 20th</font></div><div><font size="4"><br></font></div><div><font size="5"><b>Weather</b></font></div><div><font size="4">Mostly snuny with a hgih of 68 dreeges</font></div><div><font size="4"><br></font></div><div><font size="4"><br></font></div><div><font size="5"><b>Commute</b></font></div><div><font size="4">todo</font></div></div>
         </div>
     </div>
 
@@ -372,47 +372,24 @@
                 try {
                     const dictionary = await loadDictionary(); // Use default (hybrid_dictionary.txt)
 
-                    // Define QWERTY keyboard neighbor mappings
-                    const keyboardNeighbors = {
-                        'q': ['w', 'a'],
-                        'w': ['q', 'e', 's', 'a'],
-                        'e': ['w', 'r', 'd', 's'],
-                        'r': ['e', 't', 'f', 'd'],
-                        't': ['r', 'y', 'g', 'f'],
-                        'y': ['t', 'u', 'h', 'g'],
-                        'u': ['y', 'i', 'j', 'h'],
-                        'i': ['u', 'o', 'k', 'j'],
-                        'o': ['i', 'p', 'l', 'k'],
-                        'p': ['o', 'l'],
-                        'a': ['q', 'w', 's', 'z'],
-                        's': ['a', 'w', 'e', 'd', 'z', 'x'],
-                        'd': ['s', 'e', 'r', 'f', 'x', 'c'],
-                        'f': ['d', 'r', 't', 'g', 'c', 'v'],
-                        'g': ['f', 't', 'y', 'h', 'v', 'b'],
-                        'h': ['g', 'y', 'u', 'j', 'b', 'n'],
-                        'j': ['h', 'u', 'i', 'k', 'n', 'm'],
-                        'k': ['j', 'i', 'o', 'l', 'm'],
-                        'l': ['k', 'o', 'p'],
-                        'z': ['a', 's', 'x'],
-                        'x': ['z', 's', 'd', 'c'],
-                        'c': ['x', 'd', 'f', 'v'],
-                        'v': ['c', 'f', 'g', 'b'],
-                        'b': ['v', 'g', 'h', 'n'],
-                        'n': ['b', 'h', 'j', 'm'],
-                        'm': ['n', 'j', 'k']
-                    };
+                    // Use keyboard neighbors from keyboard-layout.js (loaded via script tag)
+                    // This ensures consistency with the main typing test
 
                     // Create autocorrect engine with dictionary words and keyboard neighbors
                     editorAutocorrectEngine = new AutocorrectEngine({
                         keyboardNeighbors: keyboardNeighbors,
-                        adjacentKeyMultiplier: 0.5,  // Make adjacent key substitutions very cheap
-                        substitutionCost: 1.0,
-                        insertionCost: 0.5,
-                        deletionCost: 1.0,
-                        apostropheInsertionCost: 0.3,  // Increased from 0.2 to make it less attractive
-                        apostropheDeletionCost: 0.4    // Increased from 0.3 to make it less attractive
+                        adjacentKeyMultiplier: 0.9,
+                        substitutionCost: 1.5,  // Non-neighbor substitutions are most costly
+                        insertionCost: 1.2,     // False negatives (missing letters)
+                        deletionCost: 1.0,      // False positives (extra letters)
+                        apostropheInsertionCost: 0.2,
+                        apostropheDeletionCost: 0.3
                     });
                     editorAutocorrectEngine.addWords(dictionary);
+
+                    // Load word frequency data for better tiebreaking
+                    await editorAutocorrectEngine.loadFrequencyData('../word_frequencies.json');
+
                     autocorrectReady = true;
                 } catch (error) {
                     console.error('❌ Failed to initialize autocorrect:', error);

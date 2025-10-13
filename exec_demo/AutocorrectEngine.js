@@ -5,9 +5,9 @@
 class AutocorrectEngine {
     constructor(options = {}) {
         this.adjacentKeyMultiplier = options.adjacentKeyMultiplier || 0.9;
-        this.insertionCost = options.insertionCost || 0.5; // Cheaper than deletion/substitution
-        this.deletionCost = options.deletionCost || 1.0;
-        this.substitutionCost = options.substitutionCost || 1.0;
+        this.insertionCost = options.insertionCost || 1.2; // False negatives (missing letters)
+        this.deletionCost = options.deletionCost || 1.0;   // False positives (extra letters)
+        this.substitutionCost = options.substitutionCost || 1.5; // Non-neighbor substitutions (wrong letters) - most costly
 
         // Character-specific costs for common punctuation
         this.apostropheInsertionCost = options.apostropheInsertionCost || 0.2; // Very cheap to add apostrophes
@@ -17,7 +17,7 @@ class AutocorrectEngine {
 
         // Word splitting options
         this.enableWordSplitting = options.enableWordSplitting !== false; // Enabled by default
-        this.wordSplitCost = options.wordSplitCost || 0.3; // Cost of inserting a space
+        this.wordSplitCost = options.wordSplitCost || 1.5; // Cost of inserting a space (should be higher than most single-char edits)
 
         // Initialize dictionaries
         this.dictionary = [];
@@ -82,21 +82,11 @@ class AutocorrectEngine {
             'dont': 'don\'t'
         };
 
-        // Word frequency list (most common words first) - shared across all methods
-        this.commonWords = [
-            'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at',
-            'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her', 'she', 'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 'their',
-            'what', 'so', 'up', 'out', 'if', 'about', 'who', 'get', 'which', 'go', 'me', 'when', 'make', 'can', 'like', 'time', 'no', 'just', 'him',
-            'know', 'take', 'people', 'into', 'year', 'your', 'good', 'some', 'could', 'them', 'see', 'other', 'than', 'then', 'now', 'look', 'only',
-            'come', 'its', 'over', 'think', 'also', 'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way', 'even', 'new', 'want',
-            'because', 'any', 'these', 'give', 'day', 'most', 'us', 'is', 'was', 'are', 'been', 'has', 'had', 'were', 'said', 'each', 'which', 'their',
-            'time', 'will', 'about', 'if', 'up', 'out', 'many', 'then', 'them', 'would', 'so', 'what', 'her', 'make', 'like', 'him', 'into', 'over',
-            'think', 'thanks', 'thank', 'really', 'great', 'good', 'right', 'still', 'should', 'after', 'being', 'now', 'made', 'before', 'here', 'through',
-            'when', 'where', 'much', 'go', 'me', 'back', 'with', 'well', 'were', 'been', 'have', 'had', 'has', 'his', 'that', 'but', 'not', 'what', 'all',
-            'any', 'can', 'our', 'out', 'day', 'get', 'use', 'man', 'new', 'now', 'way', 'may', 'say', 'each', 'which', 'she', 'how', 'its', 'our', 'out',
-            'up', 'time', 'there', 'year', 'work', 'down', 'come', 'did', 'get', 'has', 'him', 'his', 'how', 'man', 'new', 'now', 'number', 'oil', 'part',
-            'people', 'right', 'she', 'some', 'take', 'than', 'that', 'the', 'them', 'well', 'were'
-        ];
+        // Word frequency map - loaded from word_frequencies.json (generated from NLTK corpus)
+        // Lower rank = more common word (e.g., "the"=1, "of"=3, "carrot"=25663)
+        // Words not in the map get a high penalty score to indicate they're very uncommon
+        this.wordFrequencyMap = new Map();
+        this.maxFrequencyScore = 1000000; // Default penalty for words not in frequency list (very uncommon)
 
         // Add base words if provided
         if (options.baseWords) {
@@ -134,11 +124,41 @@ class AutocorrectEngine {
     }
 
     /**
+     * Load word frequency data from word_frequencies.json (generated from NLTK)
+     * Should be called asynchronously after construction
+     */
+    async loadFrequencyData(frequencyFilePath = 'word_frequencies.json') {
+        try {
+            if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+                // Browser environment
+                const response = await fetch(frequencyFilePath);
+                const frequencyData = await response.json();
+                this.wordFrequencyMap = new Map(Object.entries(frequencyData));
+            } else {
+                // Node.js environment
+                const fs = require('fs');
+                const path = require('path');
+
+                // Resolve relative path from current working directory
+                const resolvedPath = path.resolve(process.cwd(), frequencyFilePath);
+                const text = fs.readFileSync(resolvedPath, 'utf8');
+                const frequencyData = JSON.parse(text);
+                this.wordFrequencyMap = new Map(Object.entries(frequencyData));
+            }
+            console.log(`✅ Loaded ${this.wordFrequencyMap.size} word frequencies from NLTK corpus`);
+        } catch (error) {
+            console.warn(`⚠️ Failed to load frequency data from ${frequencyFilePath}:`, error.message);
+            console.warn('   Continuing with default frequency scoring');
+        }
+    }
+
+    /**
      * Get word frequency score - lower score means more common word
+     * Returns rank from frequency map, or maxFrequencyScore for unknown words
      */
     getWordFrequencyScore(word) {
-        const index = this.commonWords.indexOf(word.toLowerCase());
-        return index === -1 ? 1000 : index; // Lower index = more common = lower penalty
+        const lowerWord = word.toLowerCase();
+        return this.wordFrequencyMap.get(lowerWord) || this.maxFrequencyScore;
     }
 
     /**
@@ -206,9 +226,22 @@ class AutocorrectEngine {
 
         const matrix = Array(b.length + 1).fill().map(() => Array(a.length + 1).fill(0));
 
-        // Initialize first row and column
-        for (let i = 0; i <= b.length; i++) matrix[i][0] = i;
-        for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+        // Initialize first row (cost of deleting all input characters)
+        matrix[0][0] = 0;
+        for (let j = 1; j <= a.length; j++) {
+            const charToDelete = a[j - 1];
+            const delCost = (charToDelete === "'") ?
+                this.apostropheDeletionCost : this.deletionCost;
+            matrix[0][j] = matrix[0][j - 1] + delCost;
+        }
+
+        // Initialize first column (cost of inserting all dictionary characters)
+        for (let i = 1; i <= b.length; i++) {
+            const charToInsert = b[i - 1];
+            const insCost = (charToInsert === "'") ?
+                this.apostropheInsertionCost : this.insertionCost;
+            matrix[i][0] = matrix[i - 1][0] + insCost;
+        }
 
         for (let i = 1; i <= b.length; i++) {
             for (let j = 1; j <= a.length; j++) {
@@ -309,12 +342,24 @@ class AutocorrectEngine {
                 console.log(`✅ Length check OK: "${part}" → "${candidateWord}", cost=${cost}, maxDist=${this.maxEditDistance}`);
             }
 
-            // Prefer lower cost first, then lower frequency score (more common words) as tiebreaker
-            if (cost <= this.maxEditDistance &&
-                (cost < bestDistance || (cost === bestDistance && frequencyScore < bestFrequencyScore))) {
-                bestDistance = cost;
-                bestFrequencyScore = frequencyScore;
-                bestMatch = candidateWord;
+            // Prefer lower cost first, then lower frequency score (more common words)
+            // Then prefer similar length (closer to input), finally alphabetically earlier
+            if (cost <= this.maxEditDistance) {
+                const lengthDiff = Math.abs(candidateWord.length - part.length);
+                const bestLengthDiff = bestMatch ? Math.abs(bestMatch.length - part.length) : Infinity;
+
+                const isBetter = cost < bestDistance ||
+                               (cost === bestDistance && frequencyScore < bestFrequencyScore) ||
+                               (cost === bestDistance && frequencyScore === bestFrequencyScore &&
+                                lengthDiff < bestLengthDiff) ||
+                               (cost === bestDistance && frequencyScore === bestFrequencyScore &&
+                                lengthDiff === bestLengthDiff && candidateWord < bestMatch);
+
+                if (isBetter) {
+                    bestDistance = cost;
+                    bestFrequencyScore = frequencyScore;
+                    bestMatch = candidateWord;
+                }
             }
         }
         result = bestMatch;
@@ -420,10 +465,16 @@ class AutocorrectEngine {
             };
 
             // Initialize first row of DP matrix
+            // First row represents cost of deleting all input characters
             const sz = lowerWord.length;
             const initialRow = new Float32Array(sz + 1);
-            for (let i = 0; i <= sz; i++) {
-                initialRow[i] = i;
+            initialRow[0] = 0;
+            for (let i = 1; i <= sz; i++) {
+                // Cost to delete character at position i-1
+                const charToDelete = lowerWord[i - 1];
+                const delCost = (charToDelete === "'") ?
+                    this.apostropheDeletionCost : this.deletionCost;
+                initialRow[i] = initialRow[i - 1] + delCost;
             }
 
             // Explore from root
@@ -452,8 +503,31 @@ class AutocorrectEngine {
                 }
             }
 
-            this.incrementalState.word = lowerWord;
-            this.incrementalState.candidates = newCandidates;
+            // If we have no candidates after incremental update, restart from scratch
+            if (newCandidates.size === 0) {
+                // Reset candidates map and rebuild from root
+                this.incrementalState.candidates = new Map();
+                this.incrementalState.word = lowerWord;
+
+                const sz = lowerWord.length;
+                const initialRow = new Float32Array(sz + 1);
+                initialRow[0] = 0;
+                for (let i = 1; i <= sz; i++) {
+                    // Cost to delete character at position i-1
+                    const charToDelete = lowerWord[i - 1];
+                    const delCost = (charToDelete === "'") ?
+                        this.apostropheDeletionCost : this.deletionCost;
+                    initialRow[i] = initialRow[i - 1] + delCost;
+                }
+
+                // Explore from root
+                for (const [char, node] of this.trieDictionary.root.children) {
+                    this.expandNode(node, char, initialRow, lowerWord, 1);
+                }
+            } else {
+                this.incrementalState.word = lowerWord;
+                this.incrementalState.candidates = newCandidates;
+            }
         }
 
         // Find best candidate from active set
@@ -485,22 +559,38 @@ class AutocorrectEngine {
     expandNode(node, char, lastRow, word, depth) {
         const sz = word.length;
         const currentRow = new Float32Array(sz + 1);
-        currentRow[0] = lastRow[0] + 1;
+
+        // Cost to transform 0 chars of input into current trie depth
+        // This is the cost of inserting all the dictionary characters we've followed
+        const charInsertionCost = (char === "'") ?
+            this.apostropheInsertionCost : this.insertionCost;
+        currentRow[0] = lastRow[0] + charInsertionCost;
 
         let minInRow = currentRow[0];
 
         for (let i = 1; i <= sz; i++) {
-            const insertCost = 1.0 + currentRow[i - 1];
-            const deleteCost = 1.0 + lastRow[i];
+            // Character-specific costs for insertions and deletions
+            const charToInsert = char;        // Dict char being added
+            const charToDelete = word[i - 1]; // Input char being removed
+
+            const dictInsertCost = (charToInsert === "'") ?
+                this.apostropheInsertionCost : this.insertionCost;
+            const inputDeleteCost = (charToDelete === "'") ?
+                this.apostropheDeletionCost : this.deletionCost;
+
+            // insertCost: delete from input (move right in DP matrix)
+            // deleteCost: insert dict char (move down in DP matrix)
+            const insertCost = inputDeleteCost + currentRow[i - 1];
+            const deleteCost = dictInsertCost + lastRow[i];
             let replaceCost = lastRow[i - 1];
 
             if (word[i - 1] !== char) {
-                replaceCost = 1.0 + lastRow[i - 1];
-
-                // Check for adjacent keys
+                // Check for adjacent keys first
                 const adjacentKey = word[i - 1] + char;
                 if (this.trieDictionary.adjacentKeysSet.has(adjacentKey)) {
                     replaceCost = this.adjacentKeyMultiplier + lastRow[i - 1];
+                } else {
+                    replaceCost = this.substitutionCost + lastRow[i - 1];
                 }
             }
 
@@ -528,20 +618,35 @@ class AutocorrectEngine {
     computeNextRow(lastRow, word, char) {
         const sz = word.length;
         const newRow = new Float32Array(sz + 1);
-        newRow[0] = lastRow[0] + 1;
+
+        // Cost to transform 0 chars of input into current trie depth
+        const charInsertionCost = (char === "'") ?
+            this.apostropheInsertionCost : this.insertionCost;
+        newRow[0] = lastRow[0] + charInsertionCost;
 
         for (let i = 1; i <= sz; i++) {
-            const insertCost = 1.0 + newRow[i - 1];
-            const deleteCost = 1.0 + lastRow[i];
+            // Character-specific costs for insertions and deletions
+            const charToInsert = char;        // Dict char being added
+            const charToDelete = word[i - 1]; // Input char being removed
+
+            const dictInsertCost = (charToInsert === "'") ?
+                this.apostropheInsertionCost : this.insertionCost;
+            const inputDeleteCost = (charToDelete === "'") ?
+                this.apostropheDeletionCost : this.deletionCost;
+
+            // insertCost: delete from input (move right in DP matrix)
+            // deleteCost: insert dict char (move down in DP matrix)
+            const insertCost = inputDeleteCost + newRow[i - 1];
+            const deleteCost = dictInsertCost + lastRow[i];
             let replaceCost = lastRow[i - 1];
 
             if (word[i - 1] !== char) {
-                replaceCost = 1.0 + lastRow[i - 1];
-
-                // Check for adjacent keys
+                // Check for adjacent keys first
                 const adjacentKey = word[i - 1] + char;
                 if (this.trieDictionary.adjacentKeysSet.has(adjacentKey)) {
                     replaceCost = this.adjacentKeyMultiplier + lastRow[i - 1];
+                } else {
+                    replaceCost = this.substitutionCost + lastRow[i - 1];
                 }
             }
 
@@ -684,13 +789,28 @@ class AutocorrectEngine {
         // Try word splitting if enabled
         const split = this.findTwoWordSplit(word);
 
-        // Choose between single-word correction and split
+        // Choose between single-word correction and split by comparing costs
+        if (singleWordCorrection && split) {
+            // Both options available - compare costs
+            const singleWordCost = this.levenshteinCost(lowerWord, singleWordCorrection);
+            const splitCost = this.wordSplitCost;
+
+            // Prefer single-word correction if costs are equal or better
+            if (singleWordCost <= splitCost) {
+                return this.preserveCapitalization(word, singleWordCorrection);
+            } else {
+                const splitResult = split.firstWord + ' ' + split.secondWord;
+                return this.preserveCapitalization(word, splitResult);
+            }
+        }
+
+        // Only split available
         if (split) {
             const splitResult = split.firstWord + ' ' + split.secondWord;
             return this.preserveCapitalization(word, splitResult);
         }
 
-        // Use single-word correction if available
+        // Only single-word correction available
         if (singleWordCorrection) {
             return this.preserveCapitalization(word, singleWordCorrection);
         }
