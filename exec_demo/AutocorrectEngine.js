@@ -88,9 +88,15 @@ class AutocorrectEngine {
         this.wordFrequencyMap = new Map();
         this.maxFrequencyScore = 1000000; // Default penalty for words not in frequency list (very uncommon)
 
-        // Add base words if provided
+        // Add base words if provided (without triggering initializeTrieDictionary yet)
         if (options.baseWords) {
-            this.addWords(options.baseWords);
+            options.baseWords.forEach(word => {
+                const lowerWord = word.toLowerCase();
+                if (!this.dictionarySet.has(lowerWord)) {
+                    this.dictionary.push(lowerWord);
+                    this.dictionarySet.add(lowerWord);
+                }
+            });
         }
 
         // Ensure single-letter common words are in dictionary (often filtered out)
@@ -102,7 +108,7 @@ class AutocorrectEngine {
             }
         }
 
-        // Initialize TrieDictionary if available
+        // Initialize TrieDictionary once with all words
         this.initializeTrieDictionary();
     }
 
@@ -309,10 +315,6 @@ class AutocorrectEngine {
         if (this.trieDictionary) {
             // Get candidates from trie - this should return a small set (50-200 words)
             candidates = this.trieDictionary.search(part, this.maxEditDistance);
-            console.log(`🔍 TrieDictionary found ${candidates.length} candidates for "${part}"`);
-            if (part.includes('fantastic')) {
-                console.log('📝 Top candidates:', candidates.slice(0, 5));
-            }
         } else {
             // Brute force fallback - check all dictionary words
             candidates = this.dictionary.map(word => ({ word: word }));
@@ -329,18 +331,11 @@ class AutocorrectEngine {
             // Check length difference constraint first (cheap check)
             if (!this.isLengthDifferenceAcceptable(part, candidateWord)) {
                 rejectedByLength++;
-                if (part.includes('fantastic') && candidateWord === 'fantastic') {
-                    console.log(`❌ Length check FAILED: "${part}" (${part.length}) → "${candidateWord}" (${candidateWord.length})`);
-                }
                 continue;
             }
 
             const cost = this.levenshteinCost(part, candidateWord);
             const frequencyScore = this.getWordFrequencyScore(candidateWord);
-
-            if (part.includes('fantastic') && candidateWord === 'fantastic') {
-                console.log(`✅ Length check OK: "${part}" → "${candidateWord}", cost=${cost}, maxDist=${this.maxEditDistance}`);
-            }
 
             // Prefer lower cost first, then lower frequency score (more common words)
             // Then prefer similar length (closer to input), finally alphabetically earlier

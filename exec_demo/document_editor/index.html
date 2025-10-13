@@ -432,6 +432,7 @@
 
                     // Create autocorrect engine with dictionary words and keyboard neighbors
                     editorAutocorrectEngine = new AutocorrectEngine({
+                        baseWords: dictionary,
                         keyboardNeighbors: keyboardNeighbors,
                         adjacentKeyMultiplier: 0.9,
                         substitutionCost: 1.5,  // Non-neighbor substitutions are most costly
@@ -440,7 +441,6 @@
                         apostropheInsertionCost: 0.2,
                         apostropheDeletionCost: 0.3
                     });
-                    editorAutocorrectEngine.addWords(dictionary);
 
                     // Load word frequency data for better tiebreaking
                     await editorAutocorrectEngine.loadFrequencyData('../word_frequencies.json');
