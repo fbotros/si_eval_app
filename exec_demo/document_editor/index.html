@@ -194,7 +194,6 @@
             min-height: 1000px;
             padding: 106px 106px 106px 106px;
             outline: none;
-            font-size: 36pt;
             line-height: 1.7;
             color: #2d3748;
             background: transparent;
@@ -744,14 +743,12 @@
 
             // Also update on mouse click to catch when clicking into different text
             editor.addEventListener('click', function () {
-                console.log('Click event - clearing manual overrides');
                 // Clear manual overrides so we read from DOM
                 manuallySetFontSize = null;
                 manuallySetFontFamily = null;
 
                 // Small delay to ensure selection is finalized
                 setTimeout(() => {
-                    console.log('Calling updateToolbarState after click');
                     updateToolbarState();
                 }, 10);
             });
@@ -1542,16 +1539,26 @@
                         return;
                     }
 
-                    // Check what's before the cursor
+                    // Check what's BEFORE and AFTER the cursor
                     const charBeforeCursor = editorText[cursorPos - 1];
+                    const charAfterCursor = cursorPos < editorText.length ? editorText[cursorPos] : null;
 
-                    // Enable autocorrect if after whitespace, punctuation, or newline
-                    const afterDelimiter = /[\s,;.!?'"\/\-\n]/.test(charBeforeCursor);
+                    // Enable autocorrect if EITHER:
+                    // 1. After whitespace, punctuation, or newline (clicked after delimiter)
+                    // 2. At end of word (before cursor is letter, after cursor is delimiter/end)
+                    const beforeIsDelimiter = /[\s,;.!?'"\/\-\n]/.test(charBeforeCursor);
+                    const afterIsDelimiter = !charAfterCursor || /[\s,;.!?'"\/\-\n]/.test(charAfterCursor);
+                    const beforeIsLetter = /[a-zA-Z']/.test(charBeforeCursor);
 
-                    autocorrectEnabled = afterDelimiter;
+                    // At word boundary if:
+                    // - After delimiter, OR
+                    // - At end of word (letter before, delimiter/end after)
+                    const atWordBoundary = beforeIsDelimiter || (beforeIsLetter && afterIsDelimiter);
 
-                    // Reset counter when clicking after delimiter
-                    if (afterDelimiter) {
+                    autocorrectEnabled = atWordBoundary;
+
+                    // Reset counter when clicking at word boundary
+                    if (atWordBoundary) {
                         charsTypedSinceLastBackspace = 0;
                     }
                 }, 0);
