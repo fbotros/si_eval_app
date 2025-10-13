@@ -1507,7 +1507,22 @@
             editor.addEventListener('mousedown', function (e) {
                 // After click, check if cursor landed after a delimiter
                 setTimeout(() => {
-                    autocorrectEnabled = isDelimiterBeforeCursor();
+                    const afterDelimiter = isDelimiterBeforeCursor();
+                    const editorText = getEditorText();
+                    const cursorPos = getCursorOffset();
+                    
+                    // If the editor is empty or cursor is at start, enable autocorrect
+                    if (editorText.length === 0 || cursorPos === 0) {
+                        autocorrectEnabled = true;
+                        charsTypedSinceLastBackspace = 0;
+                    } else {
+                        // Otherwise use delimiter check
+                        autocorrectEnabled = afterDelimiter;
+                        // Reset counter when clicking after delimiter
+                        if (afterDelimiter) {
+                            charsTypedSinceLastBackspace = 0;
+                        }
+                    }
                 }, 0);
             });
 
