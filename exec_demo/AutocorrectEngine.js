@@ -4,15 +4,44 @@
  */
 class AutocorrectEngine {
     constructor(options = {}) {
-        this.adjacentKeyMultiplier = options.adjacentKeyMultiplier || 0.9;
-        this.insertionCost = options.insertionCost || 1.2; // False negatives (missing letters)
-        this.deletionCost = options.deletionCost || 1.0;   // False positives (extra letters)
-        this.substitutionCost = options.substitutionCost || 1.5; // Non-neighbor substitutions (wrong letters) - most costly
+        // Cost structure optimized for realistic typing errors
+        // These defaults are tuned based on typing research and should not need to be changed at callsites
+
+        console.log('[AutocorrectEngine] Initializing with updated cost structure (v20251014-4)');
+
+        // Neighboring key substitutions are THE MOST COMMON typing error - should be cheapest!
+        this.neighborSubstitutionCost = options.neighborSubstitutionCost ?? 0.5;
+
+        // Peripheral keys are easier to miss when typing (edge of keyboard)
+        this.peripheralInsertionCost = options.peripheralInsertionCost ?? 0.5;
+        // Center keys are harder to miss
+        this.centerInsertionCost = options.centerInsertionCost ?? 1.0;
+
+        this.deletionCost = options.deletionCost ?? 1.0;   // False positives (extra letters)
+
+        // Non-neighbor substitutions are extremely unlikely (you don't hit 'q' when you meant 'p')
+        // Set to a very high cost to effectively reject these edits
+        this.nonNeighborSubstitutionCost = options.nonNeighborSubstitutionCost ?? 999;
+
+        // Peripheral keys (edges of keyboard) - easier to miss
+        this.peripheralKeys = new Set(['q', 'a', 'z', 'w', 's', 'x', 'p', 'l', 'o', 'k', 'm']);
 
         // Character-specific costs for common punctuation
-        this.apostropheInsertionCost = options.apostropheInsertionCost || 0.2; // Very cheap to add apostrophes
-        this.apostropheDeletionCost = options.apostropheDeletionCost || 0.3;   // Cheap to remove apostrophes
-        this.maxEditDistance = options.maxEditDistance || 2;
+        this.apostropheInsertionCost = options.apostropheInsertionCost ?? 0.2; // Very cheap to add apostrophes
+        this.apostropheDeletionCost = options.apostropheDeletionCost ?? 0.3;   // Cheap to remove apostrophes
+
+        // Maximum edit distance and cost threshold
+        this.maxEditDistance = options.maxEditDistance ?? 2;
+        // Reject corrections with cost >= this threshold (prevents delete+insert combos from passing)
+        // Use length-adaptive threshold: 20% of word length (min 1.4)
+        // This means shorter words are more conservative, longer words allow more edits
+        // Minimum of 1.4 allows one neighbor substitution (1.35) but blocks delete+insert (1.5)
+        this.useLengthAdaptiveThreshold = options.useLengthAdaptiveThreshold !== false; // Enabled by default
+        this.lengthAdaptiveThresholdPercent = options.lengthAdaptiveThresholdPercent ?? 0.2; // 20% by default
+        this.minCostThreshold = options.minCostThreshold ?? 1.4; // Minimum threshold (allows neighbor substitutions)
+        // Legacy fixed threshold (used only if useLengthAdaptiveThreshold is false)
+        this.maxCostThreshold = options.maxCostThreshold ?? 1.4;
+
         this.keyboardNeighbors = options.keyboardNeighbors || {};
 
         // Word splitting options
@@ -244,8 +273,14 @@ class AutocorrectEngine {
         // Initialize first column (cost of inserting all dictionary characters)
         for (let i = 1; i <= b.length; i++) {
             const charToInsert = b[i - 1];
-            const insCost = (charToInsert === "'") ?
-                this.apostropheInsertionCost : this.insertionCost;
+            let insCost;
+            if (charToInsert === "'") {
+                insCost = this.apostropheInsertionCost;
+            } else if (this.peripheralKeys.has(charToInsert)) {
+                insCost = this.peripheralInsertionCost;
+            } else {
+                insCost = this.centerInsertionCost;
+            }
             matrix[i][0] = matrix[i - 1][0] + insCost;
         }
 
@@ -254,22 +289,30 @@ class AutocorrectEngine {
                 if (b[i - 1] === a[j - 1]) {
                     matrix[i][j] = matrix[i - 1][j - 1]; // no operation needed
                 } else {
+                    // Substitution cost - neighboring keys are CHEAP, non-neighbors are rejected
                     const substitutionCost = this.areNeighboringKeys(a[j - 1], b[i - 1]) ?
-                        this.adjacentKeyMultiplier : this.substitutionCost;
+                        this.neighborSubstitutionCost : this.nonNeighborSubstitutionCost;
 
                     // Character-specific insertion/deletion costs
                     const charToInsert = b[i - 1];
                     const charToDelete = a[j - 1];
 
-                    const insertionCost = (charToInsert === "'") ?
-                        this.apostropheInsertionCost : this.insertionCost;
+                    let insertionCost;
+                    if (charToInsert === "'") {
+                        insertionCost = this.apostropheInsertionCost;
+                    } else if (this.peripheralKeys.has(charToInsert)) {
+                        insertionCost = this.peripheralInsertionCost;
+                    } else {
+                        insertionCost = this.centerInsertionCost;
+                    }
+
                     const deletionCost = (charToDelete === "'") ?
                         this.apostropheDeletionCost : this.deletionCost;
 
                     matrix[i][j] = Math.min(
                         matrix[i - 1][j - 1] + substitutionCost, // substitution
-                        matrix[i - 1][j] + insertionCost,        // insertion (character-specific) - Fixed
-                        matrix[i][j - 1] + deletionCost          // deletion (character-specific) - Fixed
+                        matrix[i - 1][j] + insertionCost,        // insertion (character-specific)
+                        matrix[i][j - 1] + deletionCost          // deletion (character-specific)
                     );
 
                     // Check for transposition (Damerau-Levenshtein)
@@ -297,6 +340,37 @@ class AutocorrectEngine {
         }
 
         if (this.hasWord(part)) return part;
+
+        // Handle possessives EARLY: strip 's or ' suffix, correct base word, then re-apply
+        let possessiveSuffix = '';
+        let baseWord = part;
+
+        if (part.endsWith("'s")) {
+            possessiveSuffix = "'s";
+            baseWord = part.slice(0, -2);
+        } else if (part.endsWith("'")) {
+            possessiveSuffix = "'";
+            baseWord = part.slice(0, -1);
+        }
+
+        // If we extracted a possessive suffix
+        if (possessiveSuffix && baseWord.length > 0) {
+            // Check if base word exists (no correction needed)
+            if (this.hasWord(baseWord)) {
+                return part; // Base word is correct, keep original with possessive
+            }
+
+            // Recursively correct the base word WITHOUT the possessive
+            const correctedBase = this.findBestCorrectionForPart(baseWord);
+
+            // If we got a valid correction for the base word, add possessive back
+            if (correctedBase && correctedBase !== baseWord) {
+                return correctedBase + possessiveSuffix;
+            }
+
+            // No correction found for base word, return original
+            return part;
+        }
 
         // For very short words, be more conservative about corrections
         if (part.length < 2) return null;
@@ -337,9 +411,14 @@ class AutocorrectEngine {
             const cost = this.levenshteinCost(part, candidateWord);
             const frequencyScore = this.getWordFrequencyScore(candidateWord);
 
+            // Calculate length-adaptive threshold: 20% of word length (min 1.4)
+            const costThreshold = this.useLengthAdaptiveThreshold
+                ? Math.max(this.minCostThreshold, part.length * this.lengthAdaptiveThresholdPercent)
+                : this.maxCostThreshold;
+
             // Prefer lower cost first, then lower frequency score (more common words)
             // Then prefer similar length (closer to input), finally alphabetically earlier
-            if (cost <= this.maxEditDistance) {
+            if (cost <= this.maxEditDistance && cost < costThreshold) {
                 const lengthDiff = Math.abs(candidateWord.length - part.length);
                 const bestLengthDiff = bestMatch ? Math.abs(bestMatch.length - part.length) : Infinity;
 
@@ -526,6 +605,11 @@ class AutocorrectEngine {
         }
 
         // Find best candidate from active set
+        // Calculate length-adaptive threshold for current input word
+        const costThreshold = this.useLengthAdaptiveThreshold
+            ? Math.max(this.minCostThreshold, this.incrementalState.word.length * this.lengthAdaptiveThresholdPercent)
+            : this.maxCostThreshold;
+
         let bestCandidate = null;
         let bestDistance = this.maxEditDistance;
         let bestFrequency = Infinity;
@@ -533,7 +617,9 @@ class AutocorrectEngine {
         for (const [node, data] of this.incrementalState.candidates) {
             if (node.word && node.word.length > 0) {
                 const editDist = data.row[data.row.length - 1];
-                if (editDist <= bestDistance) {
+
+                // Apply both maxEditDistance and cost threshold checks
+                if (editDist <= this.maxEditDistance && editDist < costThreshold) {
                     const freq = this.getWordFrequencyScore(node.word);
                     if (editDist < bestDistance ||
                         (editDist === bestDistance && freq < bestFrequency)) {
@@ -557,8 +643,14 @@ class AutocorrectEngine {
 
         // Cost to transform 0 chars of input into current trie depth
         // This is the cost of inserting all the dictionary characters we've followed
-        const charInsertionCost = (char === "'") ?
-            this.apostropheInsertionCost : this.insertionCost;
+        let charInsertionCost;
+        if (char === "'") {
+            charInsertionCost = this.apostropheInsertionCost;
+        } else if (this.peripheralKeys.has(char)) {
+            charInsertionCost = this.peripheralInsertionCost;
+        } else {
+            charInsertionCost = this.centerInsertionCost;
+        }
         currentRow[0] = lastRow[0] + charInsertionCost;
 
         let minInRow = currentRow[0];
@@ -568,8 +660,14 @@ class AutocorrectEngine {
             const charToInsert = char;        // Dict char being added
             const charToDelete = word[i - 1]; // Input char being removed
 
-            const dictInsertCost = (charToInsert === "'") ?
-                this.apostropheInsertionCost : this.insertionCost;
+            let dictInsertCost;
+            if (charToInsert === "'") {
+                dictInsertCost = this.apostropheInsertionCost;
+            } else if (this.peripheralKeys.has(charToInsert)) {
+                dictInsertCost = this.peripheralInsertionCost;
+            } else {
+                dictInsertCost = this.centerInsertionCost;
+            }
             const inputDeleteCost = (charToDelete === "'") ?
                 this.apostropheDeletionCost : this.deletionCost;
 
@@ -583,9 +681,10 @@ class AutocorrectEngine {
                 // Check for adjacent keys first
                 const adjacentKey = word[i - 1] + char;
                 if (this.trieDictionary.adjacentKeysSet.has(adjacentKey)) {
-                    replaceCost = this.adjacentKeyMultiplier + lastRow[i - 1];
+                    replaceCost = this.neighborSubstitutionCost + lastRow[i - 1];
                 } else {
-                    replaceCost = this.substitutionCost + lastRow[i - 1];
+                    // Non-neighbor substitution - reject with very high cost
+                    replaceCost = this.nonNeighborSubstitutionCost + lastRow[i - 1];
                 }
             }
 
@@ -615,8 +714,14 @@ class AutocorrectEngine {
         const newRow = new Float32Array(sz + 1);
 
         // Cost to transform 0 chars of input into current trie depth
-        const charInsertionCost = (char === "'") ?
-            this.apostropheInsertionCost : this.insertionCost;
+        let charInsertionCost;
+        if (char === "'") {
+            charInsertionCost = this.apostropheInsertionCost;
+        } else if (this.peripheralKeys.has(char)) {
+            charInsertionCost = this.peripheralInsertionCost;
+        } else {
+            charInsertionCost = this.centerInsertionCost;
+        }
         newRow[0] = lastRow[0] + charInsertionCost;
 
         for (let i = 1; i <= sz; i++) {
@@ -624,8 +729,14 @@ class AutocorrectEngine {
             const charToInsert = char;        // Dict char being added
             const charToDelete = word[i - 1]; // Input char being removed
 
-            const dictInsertCost = (charToInsert === "'") ?
-                this.apostropheInsertionCost : this.insertionCost;
+            let dictInsertCost;
+            if (charToInsert === "'") {
+                dictInsertCost = this.apostropheInsertionCost;
+            } else if (this.peripheralKeys.has(charToInsert)) {
+                dictInsertCost = this.peripheralInsertionCost;
+            } else {
+                dictInsertCost = this.centerInsertionCost;
+            }
             const inputDeleteCost = (charToDelete === "'") ?
                 this.apostropheDeletionCost : this.deletionCost;
 
@@ -639,9 +750,10 @@ class AutocorrectEngine {
                 // Check for adjacent keys first
                 const adjacentKey = word[i - 1] + char;
                 if (this.trieDictionary.adjacentKeysSet.has(adjacentKey)) {
-                    replaceCost = this.adjacentKeyMultiplier + lastRow[i - 1];
+                    replaceCost = (this.substitutionCost * this.adjacentKeyMultiplier) + lastRow[i - 1];
                 } else {
-                    replaceCost = this.substitutionCost + lastRow[i - 1];
+                    // Non-neighbor substitution - reject with very high cost
+                    replaceCost = this.nonNeighborSubstitutionCost + lastRow[i - 1];
                 }
             }
 
@@ -653,7 +765,7 @@ class AutocorrectEngine {
 
     /**
      * Check if a word should skip autocorrect
-     * Returns true for numbers, symbols, all-caps words, etc.
+     * Returns true for numbers, symbols, all-caps words, mixed-case words, etc.
      */
     shouldSkipAutocorrect(word) {
         if (!word || word.length === 0) return true;
@@ -668,10 +780,17 @@ class AutocorrectEngine {
             return true;
         }
 
-        // Skip if all caps (2+ letters) - likely an acronym
-        // Check if all alphabetic characters are uppercase
         const alphaChars = word.replace(/[^a-zA-Z]/g, '');
+
+        // Skip if all caps (2+ letters) - likely an acronym
         if (alphaChars.length >= 2 && alphaChars === alphaChars.toUpperCase()) {
+            return true;
+        }
+
+        // Skip if multiple capitals (camelCase, PascalCase, or mixed case like LinkedIn, AStar)
+        // Count uppercase letters - if 2+, skip (handles AStar, LinkedIn, iPhone, etc.)
+        const uppercaseCount = (alphaChars.match(/[A-Z]/g) || []).length;
+        if (uppercaseCount >= 2) {
             return true;
         }
 

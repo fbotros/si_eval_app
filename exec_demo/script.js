@@ -51,42 +51,12 @@ async function initializeAutocorrect() {
     // Initialize AutocorrectEngine with loaded dictionary and keyboard layout
     autocorrectEngine = new AutocorrectEngine({
         baseWords: baseDictionary,
-        keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {},
-        maxEditDistance: 2,
-        adjacentKeyMultiplier: 0.9,        // Neighbor substitutions (e.g., i→u)
-        substitutionCost: 1.5,             // Non-neighbor substitutions - most costly (e.g., n→c)
-        insertionCost: 1.2,                // False negatives (missing letters) - moderately costly
-        deletionCost: 1.0,                 // False positives (extra letters)
-        apostropheInsertionCost: 0.2,      // Very cheap to add missing apostrophes
-        apostropheDeletionCost: 0.3        // Cheap to remove extra apostrophes
+        keyboardNeighbors: typeof keyboardNeighbors !== 'undefined' ? keyboardNeighbors : {}
+        // Using default cost parameters from AutocorrectEngine
     });
 
-    // Add words from prompts
-    const allWords = [];
-    prompts.forEach(prompt => {
-        autocorrectEngine.extractWords(prompt).forEach(word => {
-            allWords.push(word);
-        });
-    });
-
-    // Load additional words from comprehensive_dictionary.txt
-    try {
-        const response = await fetch('./comprehensive_dictionary.txt');
-        if (response.ok) {
-            const text = await response.text();
-            const dictionaryWords = text.split('\n')
-                .map(word => word.trim().toLowerCase())
-                .filter(word => word.length > 0);
-            allWords.push(...dictionaryWords);
-        }
-    } catch (error) {
-        console.log('Could not load comprehensive dictionary:', error);
-    }
-
-    // Add all words to the autocorrect engine
-    if (allWords.length > 0) {
-        autocorrectEngine.addWords(allWords);
-    }
+    // Load word frequency data (CRITICAL for correct word selection!)
+    await autocorrectEngine.loadFrequencyData('./word_frequencies.json');
 }
 
 let currentPromptIndex = 0;
@@ -98,6 +68,8 @@ let promptTimingStarted = false;
 
 // Autocorrect tracking variables
 let keyPressCount = 0;
+let tooltipDebounceTimer = null;
+const TOOLTIP_DEBOUNCE_MS = 50; // Debounce time for tooltip updates
 let correctedErrorCount = 0;
 let previousInputValue = '';
 let lastWordCorrected = false;
@@ -195,8 +167,9 @@ function getWordAtPosition(text, position) {
         return { word: '', start: position, end: position, beforeCursor: '', afterCursor: '' };
     }
 
-    // Define word boundaries (letters, apostrophes, and hyphens are part of words)
-    const wordChar = /[a-zA-Z'\-]/;
+    // Define word boundaries (letters, apostrophes, hyphens, and special chars like @#$_ are part of words)
+    // This prevents autocorrect on emails, usernames, hashtags, etc.
+    const wordChar = /[a-zA-Z'\-@#$_&+=]/;
 
     // Find start of word (scan backwards from cursor)
     let start = position;
@@ -226,7 +199,7 @@ function isAtWordBoundary(text, position) {
 
     const charBefore = text[position - 1];
     const charAfter = text[position];
-    const wordChar = /[a-zA-Z'\-]/;
+    const wordChar = /[a-zA-Z'\-@#$_&+=]/;
 
     // At boundary if either side is not a word character
     return !wordChar.test(charBefore) || !wordChar.test(charAfter);
@@ -392,7 +365,7 @@ function scheduleAutocorrectPreview() {
     autocorrectPreviewTimer = setTimeout(() => {
         performAutocorrectPreview();
         autocorrectPreviewTimer = null;
-    }, 300); // 300ms debounce - only show tooltip after user pauses typing
+    }, TOOLTIP_DEBOUNCE_MS); // Show tooltip after user pauses typing
 }
 
 function performAutocorrectPreview() {
@@ -509,6 +482,12 @@ function performCursorAwareAutocorrect(appendChar) {
             return false; // No word or too short to correct
         }
 
+        // Skip autocorrect if word contains special characters (@, #, $, _, &, +, =)
+        // These indicate emails, usernames, hashtags, variables, etc. that shouldn't be corrected
+        if (/[@#$_&+=]/.test(wordInfo.word)) {
+            return false; // Don't autocorrect words with special characters
+        }
+
         // Extract word core - keep original capitalization for the autocorrect engine
         const wordPattern = /^([^a-zA-Z]*)([a-zA-Z']+)([^a-zA-Z]*)$/;
         const match = wordInfo.word.match(wordPattern);
@@ -519,14 +498,38 @@ function performCursorAwareAutocorrect(appendChar) {
         const lowerWord = wordCore.toLowerCase();
 
         let correctedWord;
+        let isPossessive = false;
+        let baseWord = wordCore;
+        let possessiveSuffix = '';
+
+        // Check for possessive forms (word's or words')
+        if (lowerWord.endsWith("'s")) {
+            baseWord = wordCore.slice(0, -2); // Remove 's
+            possessiveSuffix = "'s";
+            isPossessive = true;
+        } else if (lowerWord.endsWith("s'")) {
+            baseWord = wordCore.slice(0, -2); // Remove s'
+            possessiveSuffix = "s'";
+            isPossessive = true;
+        }
 
         // Use cached suggestion if available and matches current word
         if (lastTooltipWord === lowerWord && lastTooltipSuggestion) {
             correctedWord = lastTooltipSuggestion;
         } else {
+            // For possessives, check the base word (e.g., "markk" in "markk's")
+            const wordToCheck = isPossessive ? baseWord : wordCore;
+
             // Pass the original word with capitalization to the autocorrect engine
-            // The engine handles capitalization preservation internally
-            correctedWord = autocorrectEngine.findClosestWord(wordCore);
+            // Use useFallback: true for trigger keys to get full Damerau-Levenshtein support (transpositions)
+            const correctedBase = autocorrectEngine.findClosestWord(wordToCheck, { useFallback: true });
+
+            // If possessive, reconstruct with possessive suffix
+            if (isPossessive) {
+                correctedWord = correctedBase + possessiveSuffix;
+            } else {
+                correctedWord = correctedBase;
+            }
         }
 
         // Check if corrected word is an "I" contraction that needs capitalization
@@ -773,6 +776,8 @@ inputArea.addEventListener('input', function() {
 
         // Get the character that was actually just typed (at cursor position - 1)
         const actualTypedChar = currentValue.charAt(cursorPos - 1);
+        // Only obvious punctuation triggers autocorrect - NOT @#$_&+= (for emails, usernames, etc.)
+        // Apostrophe is NOT a trigger - it's part of words (contractions, possessives)
         const isSpaceOrPunct = /[\s.,.!?;:"()]/.test(actualTypedChar);
 
         // If tooltip is visible and user types another regular character, hide it AND clear the cached suggestion
@@ -801,7 +806,32 @@ inputArea.addEventListener('input', function() {
 
         // Handle space/punctuation for autocorrect
         if (isSpaceOrPunct) {
-            const correctionMade = triggerAutocorrect(actualTypedChar);
+            // Special case: if apostrophe was typed, check if we're forming a contraction
+            // Don't trigger autocorrect if current word + 't (or other suffixes) forms a valid word
+            let shouldTriggerAutocorrect = true;
+
+            if (actualTypedChar === "'") {
+                const currentWord = getCurrentIncompleteWord();
+                const lowerWord = currentWord.toLowerCase();
+
+                // Common contraction patterns: word + 't, word + 's, word + 'd, word + 'll, word + 're, word + 've
+                const contractionSuffixes = ['t', 's', 'd', 'll', 're', 've', 'm'];
+
+                // Check if any contraction suffix would form a valid dictionary word
+                for (const suffix of contractionSuffixes) {
+                    const potentialContraction = lowerWord + "'" + suffix;
+                    if (autocorrectEngine && autocorrectEngine.dictionarySet &&
+                        autocorrectEngine.dictionarySet.has(potentialContraction)) {
+                        shouldTriggerAutocorrect = false;
+                        break;
+                    }
+                }
+            }
+
+            if (shouldTriggerAutocorrect) {
+                const correctionMade = triggerAutocorrect(actualTypedChar);
+            }
+
             // Always check for auto-advance after punctuation (not just after autocorrect)
             setTimeout(() => checkAutoAdvance(), 0);
         }
@@ -822,6 +852,28 @@ inputArea.addEventListener('input', function() {
 
         // Reset counter on backspace (suppresses autocorrect until 2+ new chars typed)
         resetBackspaceCounter('backspace detected');
+
+        // Check if backspace moved cursor from whitespace/delimiter into a word
+        // If so, disable autocorrect until user types a delimiter
+        const currentCursorPos = inputArea.selectionStart;
+        const charBeforeCursor = currentCursorPos > 0 ? currentValue[currentCursorPos - 1] : null;
+        const charAfterCursor = currentCursorPos < currentValue.length ? currentValue[currentCursorPos] : null;
+
+        // Check previous state (before backspace)
+        const prevCursorPos = currentCursorPos; // Cursor is at same position after backspace
+        const prevCharBeforeCursor = prevCursorPos > 0 ? previousInputValue[prevCursorPos - 1] : null;
+
+        const isDelimiter = (char) => char === null || /[\s,;.!?'"\/\-\n]/.test(char);
+        const isWordChar = (char) => char !== null && /[a-zA-Z'@#$_&+=]/.test(char);
+
+        // If we were after a delimiter and now we're after a word character, we backspaced into a word
+        const wasAfterDelimiter = isDelimiter(prevCharBeforeCursor);
+        const nowAfterWordChar = isWordChar(charBeforeCursor);
+
+        if (wasAfterDelimiter && nowAfterWordChar) {
+            // Backspaced from whitespace into a word - disable autocorrect
+            suppressAutocorrect = true;
+        }
 
         // Always hide tooltip after backspace (non-blocking)
         hideAutocorrectTooltip();
@@ -1024,15 +1076,8 @@ restartButtonFinal.addEventListener('click', async function() {
     restartTest();
 });
 
-// Close popup when clicking outside of it and restart test
-popupOverlay.addEventListener('click', async function(e) {
-    if (e.target === popupOverlay) {
-        hideResultsPopup();
-        await loadPrompts();
-        await initializeAutocorrect();
-        restartTest();
-    }
-});
+// Note: Clicking outside the modal does nothing (intentionally)
+// Users must use buttons within the modal to dismiss it
 
 // Feedback contenteditable autocorrect functionality (same logic as document editor)
 let feedbackAutocorrectEnabled = true;
@@ -1129,7 +1174,8 @@ function getFeedbackCurrentWord() {
         const cursorPos = getFeedbackCursorOffset();
 
         const textBeforeCursor = fullEditorText.substring(0, cursorPos);
-        const wordMatch = textBeforeCursor.match(/[\w']+$/);
+        // Include special characters @#$_&+= as part of words (for emails, usernames, etc.)
+        const wordMatch = textBeforeCursor.match(/[\w'@#$_&+=]+$/);
         const currentWord = wordMatch ? wordMatch[0] : '';
 
         return currentWord;
@@ -1243,10 +1289,40 @@ function checkFeedbackForAutocorrect() {
         return;
     }
 
-    const isCapitalized = currentWord[0] === currentWord[0].toUpperCase() && currentWord.length > 1;
-    const wordForLookup = isCapitalized ? currentWord.toLowerCase() : currentWord;
+    // Skip autocorrect if word contains special characters (@, #, $, _, &, +, =)
+    // These indicate emails, usernames, hashtags, variables, etc. that shouldn't be corrected
+    if (/[@#$_&+=]/.test(currentWord)) {
+        feedbackCurrentAutocorrectSuggestion = null;
+        hideFeedbackAutocorrectTooltip();
+        return;
+    }
 
-    const suggestion = autocorrectEngine.findClosestWord(wordForLookup);
+    // Check for possessive forms (word's or words') and extract base word
+    let isPossessive = false;
+    let baseWord = currentWord;
+    let possessiveSuffix = '';
+    const lowerCurrentWord = currentWord.toLowerCase();
+
+    if (lowerCurrentWord.endsWith("'s")) {
+        baseWord = currentWord.slice(0, -2); // Remove 's
+        possessiveSuffix = "'s";
+        isPossessive = true;
+    } else if (lowerCurrentWord.endsWith("s'")) {
+        baseWord = currentWord.slice(0, -2); // Remove s'
+        possessiveSuffix = "s'";
+        isPossessive = true;
+    }
+
+    // For possessives, check the base word (e.g., "markk" in "markk's")
+    const wordToCheck = isPossessive ? baseWord : currentWord;
+
+    const isCapitalized = wordToCheck[0] === wordToCheck[0].toUpperCase() && wordToCheck.length > 1;
+    const wordForLookup = isCapitalized ? wordToCheck.toLowerCase() : wordToCheck;
+
+    const correctedBase = autocorrectEngine.findClosestWord(wordForLookup);
+
+    // If possessive, reconstruct with possessive suffix
+    const suggestion = isPossessive ? correctedBase + possessiveSuffix : correctedBase;
 
     if (suggestion && suggestion !== wordForLookup && suggestion !== currentWord.toLowerCase()) {
         let finalSuggestion = suggestion;
@@ -1271,7 +1347,7 @@ function checkFeedbackForAutocorrect() {
 let feedbackAutocorrectTimeout;
 function debouncedFeedbackAutocorrectCheck() {
     clearTimeout(feedbackAutocorrectTimeout);
-    feedbackAutocorrectTimeout = setTimeout(checkFeedbackForAutocorrect, 200);
+    feedbackAutocorrectTimeout = setTimeout(checkFeedbackForAutocorrect, TOOLTIP_DEBOUNCE_MS);
 }
 
 function replaceFeedbackCurrentWord(wordToDelete, suggestion) {
@@ -1498,7 +1574,29 @@ feedbackInput.addEventListener('keydown', function(e) {
 
         // Check suppression before attempting autocorrect
         if (!feedbackCurrentAutocorrectSuggestion && currentWord && currentWord.length >= 3 && feedbackAutocorrectEnabled && feedbackCharsTypedSinceBackspace >= 2) {
-            const suggestion = autocorrectEngine.findClosestWord(currentWord);
+            // Check for possessive forms (word's or words')
+            let isPossessive = false;
+            let baseWord = currentWord;
+            let possessiveSuffix = '';
+            const lowerCurrentWord = currentWord.toLowerCase();
+
+            if (lowerCurrentWord.endsWith("'s")) {
+                baseWord = currentWord.slice(0, -2); // Remove 's
+                possessiveSuffix = "'s";
+                isPossessive = true;
+            } else if (lowerCurrentWord.endsWith("s'")) {
+                baseWord = currentWord.slice(0, -2); // Remove s'
+                possessiveSuffix = "s'";
+                isPossessive = true;
+            }
+
+            // For possessives, check the base word (e.g., "markk" in "markk's")
+            const wordToCheck = isPossessive ? baseWord : currentWord;
+
+            const correctedBase = autocorrectEngine.findClosestWord(wordToCheck, { useFallback: true });
+
+            // If possessive, reconstruct with possessive suffix
+            const suggestion = isPossessive ? correctedBase + possessiveSuffix : correctedBase;
 
             if (suggestion && suggestion.toLowerCase() !== currentWord.toLowerCase()) {
                 feedbackCurrentAutocorrectSuggestion = suggestion;
@@ -1645,6 +1743,50 @@ function configureInputArea() {
     inputArea.setAttribute('spellcheck', 'false');
     inputArea.setAttribute('autocorrect', 'off');
     inputArea.setAttribute('autocomplete', 'off');
+
+    // Handle clicks to check word boundary state
+    // Autocorrect is DISABLED when clicking in the middle of a word
+    // and RE-ENABLED when typing a trigger character (whitespace/punctuation)
+    inputArea.addEventListener('click', function() {
+        // After click, check if cursor is in a safe position for autocorrect
+        setTimeout(() => {
+            const text = inputArea.value;
+            const cursorPos = inputArea.selectionStart;
+
+            // ALWAYS enable if empty or at start
+            if (text.length === 0 || cursorPos === 0) {
+                suppressAutocorrect = false;
+                resetBackspaceCounter('click at start/empty');
+                return;
+            }
+
+            // Check what's BEFORE and AFTER the cursor
+            const charBeforeCursor = cursorPos > 0 ? text[cursorPos - 1] : null;
+            const charAfterCursor = cursorPos < text.length ? text[cursorPos] : null;
+
+            // Delimiter pattern (whitespace, obvious punctuation, newlines)
+            // NOT @#$_&+= which are part of emails/usernames
+            const isDelimiter = (char) => char === null || /[\s,;.!?'"\/\-\n]/.test(char);
+
+            const beforeIsDelimiter = isDelimiter(charBeforeCursor);
+            const afterIsDelimiter = isDelimiter(charAfterCursor);
+
+            // ENABLE autocorrect ONLY if:
+            // 1. Whitespace/delimiter on BOTH sides (cursor between words)
+            // 2. Whitespace/delimiter on one side and nothing on the other (start/end of doc)
+            //
+            // DISABLE autocorrect if:
+            // - Letter/word character on at least one side (in the middle of a word)
+            const inWhitespaceOrBoundary = beforeIsDelimiter && afterIsDelimiter;
+
+            suppressAutocorrect = !inWhitespaceOrBoundary;
+
+            // Reset counter when at safe boundary
+            if (inWhitespaceOrBoundary) {
+                resetBackspaceCounter('click at boundary');
+            }
+        }, 0);
+    });
 }
 
 // Initialize the test on page load

@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="../dictionary-loader.js"></script>
     <script src="../keyboard-layout.js"></script>
-    <script src="../TrieDictionary.js"></script>
+    <script src="../TrieDictionary.js?v=20251014"></script>
     <style>
         * {
             margin: 0;
@@ -358,7 +358,7 @@
     <div id="autocorrect-tooltip" class="autocorrect-tooltip"></div>
 
     <!-- Load external scripts (already loaded in head) -->
-    <script src="../AutocorrectEngine.js"></script>
+    <script src="../AutocorrectEngine.js?v=20251014-2"></script>
     <script>
 
         // Wait for DOM to be ready
@@ -398,15 +398,10 @@
                     // This ensures consistency with the main typing test
 
                     // Create autocorrect engine with dictionary words and keyboard neighbors
+                    // Cost parameters are tuned internally and don't need to be specified
                     editorAutocorrectEngine = new AutocorrectEngine({
                         baseWords: dictionary,
-                        keyboardNeighbors: keyboardNeighbors,
-                        adjacentKeyMultiplier: 0.9,
-                        substitutionCost: 1.5,  // Non-neighbor substitutions are most costly
-                        insertionCost: 1.2,     // False negatives (missing letters)
-                        deletionCost: 1.0,      // False positives (extra letters)
-                        apostropheInsertionCost: 0.2,
-                        apostropheDeletionCost: 0.3
+                        keyboardNeighbors: keyboardNeighbors
                     });
 
                     // Load word frequency data for better tiebreaking
@@ -947,7 +942,8 @@
                     const textBeforeCursor = fullEditorText.substring(0, cursorPos);
 
                     // Extract word at end - stops at ANY whitespace including \n
-                    const wordMatch = textBeforeCursor.match(/[\w']+$/);
+                    // Include special characters @#$_&+= as part of words (for emails, usernames, etc.)
+                    const wordMatch = textBeforeCursor.match(/[\w'@#$_&+=]+$/);
                     const currentWord = wordMatch ? wordMatch[0] : '';
 
                     return currentWord;
@@ -1155,8 +1151,8 @@
                     // Check character before cursor
                     const charBeforeCursor = fullText[cursorPos - 1];
 
-                    // Whitespace or punctuation = delimiter
-                    return /[\s,;.!?'"\/\-]/.test(charBeforeCursor);
+                    // Whitespace or punctuation = delimiter (NOT apostrophe - it's part of words)
+                    return /[\s,;.!?"\/\-]/.test(charBeforeCursor);
                 } catch (error) {
                     return true; // Default to safe state
                 }
@@ -1200,19 +1196,39 @@
                     }
                 }
 
-                // Check if possessive form is valid (base word exists in dictionary)
-                if (currentWord.endsWith("'s")) {
-                    const baseWord = currentWord.slice(0, -2); // Remove 's
-                    if (editorAutocorrectEngine.dictionarySet && editorAutocorrectEngine.dictionarySet.has(baseWord.toLowerCase())) {
-                        currentAutocorrectSuggestion = null;
-                        hideAutocorrectTooltip();
-                        return;
-                    }
+                // Skip autocorrect if word contains special characters (@, #, $, _, &, +, =)
+                // These indicate emails, usernames, hashtags, variables, etc. that shouldn't be corrected
+                if (/[@#$_&+=]/.test(currentWord)) {
+                    currentAutocorrectSuggestion = null;
+                    hideAutocorrectTooltip();
+                    return;
                 }
+
+                // Check for possessive forms (word's or words') and extract base word
+                let isPossessive = false;
+                let baseWord = currentWord;
+                let possessiveSuffix = '';
+                const lowerCurrentWord = currentWord.toLowerCase();
+
+                if (lowerCurrentWord.endsWith("'s")) {
+                    baseWord = currentWord.slice(0, -2); // Remove 's
+                    possessiveSuffix = "'s";
+                    isPossessive = true;
+                } else if (lowerCurrentWord.endsWith("s'")) {
+                    baseWord = currentWord.slice(0, -2); // Remove s'
+                    possessiveSuffix = "s'";
+                    isPossessive = true;
+                }
+
+                // For possessives, check the base word (e.g., "markk" in "markk's")
+                const wordToCheck = isPossessive ? baseWord : currentWord;
 
                 // Pass the original word with capitalization preserved
                 // AutocorrectEngine will handle skipping, lowercase conversion, and capitalization preservation internally
-                const suggestion = editorAutocorrectEngine.findClosestWord(currentWord, { useFallback: false });
+                const correctedBase = editorAutocorrectEngine.findClosestWord(wordToCheck, { useFallback: false });
+
+                // If possessive, reconstruct with possessive suffix
+                const suggestion = isPossessive ? correctedBase + possessiveSuffix : correctedBase;
 
                 // Show tooltip if suggestion is different from original input
                 if (suggestion && suggestion !== currentWord && suggestion.toLowerCase() !== currentWord.toLowerCase()) {
@@ -1235,7 +1251,7 @@
             let autocorrectTimeout;
             function debouncedAutocorrectCheck() {
                 clearTimeout(autocorrectTimeout);
-                autocorrectTimeout = setTimeout(checkForAutocorrect, 200);
+                autocorrectTimeout = setTimeout(checkForAutocorrect, 50);
             }
 
             // Track last typed key to detect space/punctuation
@@ -1390,6 +1406,28 @@
                     }
                 }
 
+                // Handle backspace: check if we backspaced from whitespace into a word
+                if (e.inputType === 'deleteContentBackward') {
+                    const editorText = getEditorText();
+                    const cursorPos = getCursorOffset();
+
+                    if (cursorPos > 0) {
+                        const charBeforeCursor = editorText[cursorPos - 1];
+                        const isWordChar = (char) => char !== null && /[a-zA-Z']/.test(char);
+
+                        // Disable autocorrect if we're now positioned after a word character
+                        // This means we backspaced into or within a word
+                        const nowAfterWordChar = isWordChar(charBeforeCursor);
+
+                        if (nowAfterWordChar) {
+                            autocorrectEnabled = false;
+                        }
+                    }
+
+                    // Reset the character counter
+                    charsTypedSinceLastBackspace = 0;
+                }
+
                 // Clean up empty formatted elements after deletion
                 if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') {
                     const selection = window.getSelection();
@@ -1493,6 +1531,8 @@
                     currentAutocorrectSuggestion = null;
                     wordToReplaceWithSuggestion = null;
 
+                    console.log('[MUTATIONOBSERVER] Backspace detected, autocorrectEnabled before check:', autocorrectEnabled);
+
                     // Check if we crossed over a delimiter using the OLD text and OLD cursor position
                     const wasAfterDelimiter = lastCursorPosition === 0 ||
                         (lastTextContent.length >= lastCursorPosition &&
@@ -1502,11 +1542,6 @@
                     if (wasAfterDelimiter && !isAfterDelimiter) {
                         // We backspaced across a delimiter into an existing word
                         autocorrectEnabled = false;
-                    } else if (!wasAfterDelimiter && !isAfterDelimiter) {
-                        // We're still in the same word, keep current state
-                    } else {
-                        // Still after delimiter, keep enabled
-                        autocorrectEnabled = true;
                     }
                 } else if (textLengthChange > 0) {
                     // User is typing forward
@@ -1516,32 +1551,6 @@
                     if (!justTypedDelimiter) {
                         // Typed a regular character - increment counter
                         charsTypedSinceLastBackspace++;
-
-                        // SAFETY CHECK: If we're typing and autocorrect is disabled,
-                        // but this is the VERY FIRST character (clicked then immediately started typing),
-                        // check if we should re-enable it (in case they clicked on a blank line)
-                        // Only check on first char - if still disabled after that, respect the decision
-                        if (!autocorrectEnabled && charsTypedSinceLastBackspace === 1) {
-                            // Look at what came BEFORE and AFTER the cursor
-                            const currentWord = getCurrentWord();
-                            const fullText = getEditorText();
-                            const cursorPos = getCursorOffset();
-                            const textBeforeCursor = getTextBeforeCursor();
-                            const textBeforeWord = textBeforeCursor.substring(0, textBeforeCursor.length - currentWord.length);
-
-                            // Also check what's AFTER the cursor
-                            const charAfterCursor = cursorPos < fullText.length ? fullText[cursorPos] : '';
-                            const hasTextAfterCursor = charAfterCursor && /[\w']/.test(charAfterCursor);
-
-                            // Only enable if BOTH:
-                            // 1. Text before word is empty OR ends with delimiter
-                            // 2. No word character after cursor (not in middle of word)
-                            const beforeIsDelimiter = textBeforeWord.length === 0 || /[\s,;.!?'"\/\-\n]$/.test(textBeforeWord);
-
-                            if (beforeIsDelimiter && !hasTextAfterCursor) {
-                                autocorrectEnabled = true;
-                            }
-                        }
                     } else {
                         // Just typed a delimiter - reset counter and re-enable autocorrect
                         charsTypedSinceLastBackspace = 0;
@@ -1557,13 +1566,15 @@
             });
 
             // Handle mouse clicks to check word boundary state
+            // Autocorrect is DISABLED when clicking in the middle of a word
+            // and RE-ENABLED when typing a trigger character (whitespace/punctuation)
             editor.addEventListener('mousedown', function (e) {
-                // After click, check if cursor landed after a delimiter
+            // After click, check if cursor is in a safe position for autocorrect
                 setTimeout(() => {
                     const editorText = getEditorText();
                     const cursorPos = getCursorOffset();
 
-                    // If the editor is empty or cursor is at start, enable autocorrect
+                    // ALWAYS enable if editor is empty or cursor is at start
                     if (editorText.length === 0 || cursorPos === 0) {
                         autocorrectEnabled = true;
                         charsTypedSinceLastBackspace = 0;
@@ -1571,25 +1582,35 @@
                     }
 
                     // Check what's BEFORE and AFTER the cursor
-                    const charBeforeCursor = editorText[cursorPos - 1];
+                    const charBeforeCursor = cursorPos > 0 ? editorText[cursorPos - 1] : null;
                     const charAfterCursor = cursorPos < editorText.length ? editorText[cursorPos] : null;
 
-                    // Enable autocorrect if EITHER:
-                    // 1. After whitespace, punctuation, or newline (clicked after delimiter)
-                    // 2. At end of word (before cursor is letter, after cursor is delimiter/end)
-                    const beforeIsDelimiter = /[\s,;.!?'"\/\-\n]/.test(charBeforeCursor);
-                    const afterIsDelimiter = !charAfterCursor || /[\s,;.!?'"\/\-\n]/.test(charAfterCursor);
-                    const beforeIsLetter = /[a-zA-Z']/.test(charBeforeCursor);
+                    // Delimiter pattern (whitespace, punctuation, newlines)
+                    const isDelimiter = (char) => char === null || /[\s,;.!?'"\/\-\n]/.test(char);
+                    const isWordChar = (char) => char !== null && /[a-zA-Z']/.test(char);
 
-                    // At word boundary if:
-                    // - After delimiter, OR
-                    // - At end of word (letter before, delimiter/end after)
-                    const atWordBoundary = beforeIsDelimiter || (beforeIsLetter && afterIsDelimiter);
+                    const beforeIsDelimiter = isDelimiter(charBeforeCursor);
+                    const afterIsDelimiter = isDelimiter(charAfterCursor);
+                    const beforeIsWordChar = isWordChar(charBeforeCursor);
+                    const afterIsWordChar = isWordChar(charAfterCursor);
 
-                    autocorrectEnabled = atWordBoundary;
+                    // ENABLE autocorrect if:
+                    // 1. Whitespace/delimiter on BOTH sides (cursor between words)
+                    // 2. At END of document (after is null) - user is starting new content
+                    //
+                    // DISABLE autocorrect if:
+                    // - Word character on both sides (middle of a word)
+                    // - Word character before AND after (middle of a word)
 
-                    // Reset counter when clicking at word boundary
-                    if (atWordBoundary) {
+                    const atEndOfDocument = charAfterCursor === null;
+                    const inWhitespace = beforeIsDelimiter && afterIsDelimiter;
+                    const inMiddleOfWord = beforeIsWordChar && afterIsWordChar;
+
+                    // Enable if: in whitespace OR at end of document (unless clearly in middle of word)
+                    autocorrectEnabled = (inWhitespace || atEndOfDocument) && !inMiddleOfWord;
+
+                    // Reset counter when at safe boundary
+                    if (autocorrectEnabled) {
                         charsTypedSinceLastBackspace = 0;
                     }
                 }, 0);
@@ -1608,6 +1629,7 @@
                 }
 
                 // Check if this is a trigger key (space, Enter, or punctuation)
+                // Apostrophe is NOT a trigger - it's part of words (contractions, possessives)
                 const isEnter = e.key === 'Enter';
                 const isSpace = e.key === ' ';
                 const isPunctuation = [',', '.', ';', '/', '"', '?', '!'].includes(e.key);
@@ -1631,10 +1653,31 @@
                         }
 
                         if (shouldCheck) {
-                            // Use findClosestWord but WITHOUT fallback - only use incremental state
-                            // This is fast and deterministic. If incremental didn't find anything while typing,
-                            // we shouldn't waste time on an expensive fallback search for gibberish words.
-                            const suggestion = editorAutocorrectEngine.findClosestWord(currentWord, { useFallback: false });
+                            // Check for possessive forms (word's or words')
+                            let isPossessive = false;
+                            let baseWord = currentWord;
+                            let possessiveSuffix = '';
+                            const lowerCurrentWord = currentWord.toLowerCase();
+
+                            if (lowerCurrentWord.endsWith("'s")) {
+                                baseWord = currentWord.slice(0, -2); // Remove 's
+                                possessiveSuffix = "'s";
+                                isPossessive = true;
+                            } else if (lowerCurrentWord.endsWith("s'")) {
+                                baseWord = currentWord.slice(0, -2); // Remove s'
+                                possessiveSuffix = "s'";
+                                isPossessive = true;
+                            }
+
+                            // For possessives, check the base word (e.g., "markk" in "markk's")
+                            const wordToCheck = isPossessive ? baseWord : currentWord;
+
+                            // Use findClosestWord WITH fallback for final correction on trigger keys
+                            // This ensures transpositions and other complex edits are handled properly
+                            const correctedBase = editorAutocorrectEngine.findClosestWord(wordToCheck, { useFallback: true });
+
+                            // If possessive, reconstruct with possessive suffix
+                            const suggestion = isPossessive ? correctedBase + possessiveSuffix : correctedBase;
 
                             // Only set as suggestion if it's different from the current word
                             if (suggestion && suggestion.toLowerCase() !== currentWord.toLowerCase()) {
