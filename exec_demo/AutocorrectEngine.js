@@ -33,14 +33,14 @@ class AutocorrectEngine {
         // Maximum edit distance and cost threshold
         this.maxEditDistance = options.maxEditDistance ?? 2;
         // Reject corrections with cost >= this threshold (prevents delete+insert combos from passing)
-        // Use length-adaptive threshold: 20% of word length (min 1.4)
+        // Use length-adaptive threshold: 20% of word length (min 0.9)
         // This means shorter words are more conservative, longer words allow more edits
-        // Minimum of 1.4 allows one neighbor substitution (1.35) but blocks delete+insert (1.5)
+        // Minimum of 0.9 allows peripheral insertions (0.5) and neighbor substitutions (0.5) but blocks center insertions (1.0)
         this.useLengthAdaptiveThreshold = options.useLengthAdaptiveThreshold !== false; // Enabled by default
         this.lengthAdaptiveThresholdPercent = options.lengthAdaptiveThresholdPercent ?? 0.2; // 20% by default
-        this.minCostThreshold = options.minCostThreshold ?? 1.4; // Minimum threshold (allows neighbor substitutions)
+        this.minCostThreshold = options.minCostThreshold ?? 0.9; // Minimum threshold (blocks center key insertions)
         // Legacy fixed threshold (used only if useLengthAdaptiveThreshold is false)
-        this.maxCostThreshold = options.maxCostThreshold ?? 1.4;
+        this.maxCostThreshold = options.maxCostThreshold ?? 0.9;
 
         this.keyboardNeighbors = options.keyboardNeighbors || {};
 
