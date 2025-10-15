@@ -1811,8 +1811,14 @@
                             // If possessive, reconstruct with possessive suffix
                             const suggestion = isPossessive ? correctedBase + possessiveSuffix : correctedBase;
 
-                            // Only set as suggestion if it's different from the current word
-                            if (suggestion && suggestion.toLowerCase() !== currentWord.toLowerCase()) {
+                            // Filter: Don't change "-er" words to "-ed" words
+                            const lowerWordToCheck = wordToCheck.toLowerCase();
+                            const lowerSuggestionCheck = suggestion ? suggestion.toLowerCase() : '';
+                            const isErToEdCorrection = lowerWordToCheck.endsWith('er') && lowerSuggestionCheck.endsWith('ed') && 
+                                                      lowerWordToCheck.slice(0, -2) === lowerSuggestionCheck.slice(0, -2);
+
+                            // Only set as suggestion if it's different from the current word AND not an er→ed correction
+                            if (suggestion && suggestion.toLowerCase() !== currentWord.toLowerCase() && !isErToEdCorrection) {
                                 currentAutocorrectSuggestion = suggestion;
                                 wordToReplaceWithSuggestion = currentWord;
                             }
