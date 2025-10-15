@@ -103554,6 +103554,7 @@ toadyisming
 toadyisms
 toast
 toasted
+toaster
 toasting
 toasts
 tobacco
@@ -115645,3 +115646,10 @@ aint
 ain't
 tummy
 yummy
+alright
+calibrate
+calibrated
+recalibrate
+recalibrated
+waffles
+waffle
