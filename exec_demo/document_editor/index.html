@@ -1232,8 +1232,15 @@
                 // If possessive, reconstruct with possessive suffix
                 const suggestion = isPossessive ? correctedBase + possessiveSuffix : correctedBase;
 
+                // Filter: Don't change "-er" words to "-ed" words
+                // This prevents unknown "-er" words (like "coaster") from being "corrected" to "-ed" words (like "coasted")
+                const lowerWord = wordToCheck.toLowerCase();
+                const lowerSuggestion = suggestion ? suggestion.toLowerCase() : '';
+                const isErToEdCorrection = lowerWord.endsWith('er') && lowerSuggestion.endsWith('ed') && 
+                                          lowerWord.slice(0, -2) === lowerSuggestion.slice(0, -2);
+
                 // Show tooltip if suggestion is different from original input
-                if (suggestion && suggestion !== currentWord && suggestion.toLowerCase() !== currentWord.toLowerCase()) {
+                if (suggestion && suggestion !== currentWord && suggestion.toLowerCase() !== currentWord.toLowerCase() && !isErToEdCorrection) {
                     let finalSuggestion = suggestion;
                     currentAutocorrectSuggestion = finalSuggestion;
                     wordToReplaceWithSuggestion = currentWord;
