@@ -1135,6 +1135,8 @@
             let lastCursorPosition = 0;
             let lastTextContent = ''; // Track the actual text content
             let charsTypedSinceLastBackspace = 0; // Track characters typed since last backspace
+            let isEditingExistingWord = false; // Track if we're editing an existing word (backspaced into it or clicked into it)
+            let justSelectedAtWordBoundaries = false; // Track if we just selected a word at boundaries (to bypass backspace detection)
 
             // Track pending font size for Quest 3 compatibility
             let pendingFontSize = '11'; // Default
@@ -1531,30 +1533,58 @@
                     currentAutocorrectSuggestion = null;
                     wordToReplaceWithSuggestion = null;
 
-                    console.log('[MUTATIONOBSERVER] Backspace detected, autocorrectEnabled before check:', autocorrectEnabled);
+                    // If we just selected at word boundaries, this is replacing the selection, not a problematic backspace
+                    if (justSelectedAtWordBoundaries) {
+                        justSelectedAtWordBoundaries = false; // Clear the flag
+                        // Don't change autocorrectEnabled or isEditingExistingWord - keep them as set by mousedown
+                    } else {
+                        // Real backspace operation
+                        // Check if we crossed over a delimiter using the OLD text and OLD cursor position
+                        const wasAfterDelimiter = lastCursorPosition === 0 ||
+                            (lastTextContent.length >= lastCursorPosition &&
+                                /[\s,;.!?'"\/\-]/.test(lastTextContent[lastCursorPosition - 1]));
+                        const isAfterDelimiter = isDelimiterBeforeCursor();
 
-                    // Check if we crossed over a delimiter using the OLD text and OLD cursor position
-                    const wasAfterDelimiter = lastCursorPosition === 0 ||
-                        (lastTextContent.length >= lastCursorPosition &&
-                            /[\s,;.!?'"\/\-]/.test(lastTextContent[lastCursorPosition - 1]));
-                    const isAfterDelimiter = isDelimiterBeforeCursor();
-
-                    if (wasAfterDelimiter && !isAfterDelimiter) {
-                        // We backspaced across a delimiter into an existing word
-                        autocorrectEnabled = false;
+                        if (wasAfterDelimiter && !isAfterDelimiter) {
+                            // We backspaced across a delimiter into an existing word
+                            // This is the "click into existing word" scenario - stay disabled until delimiter
+                            autocorrectEnabled = false;
+                            isEditingExistingWord = true;
+                        } else if (!isEditingExistingWord) {
+                            // Normal backspace while typing - temporarily disable, will re-enable after 2 chars
+                            // BUT: if already in editing mode, stay in editing mode (don't reset the flag)
+                            // Don't explicitly disable here - let the counter mechanism handle it
+                        }
                     }
                 } else if (textLengthChange > 0) {
                     // User is typing forward
-                    // Increment counter for non-delimiter characters
                     const justTypedDelimiter = isDelimiterBeforeCursor();
 
                     if (!justTypedDelimiter) {
                         // Typed a regular character - increment counter
                         charsTypedSinceLastBackspace++;
+
+                        // IMPORTANT: Re-enable autocorrect after 2 characters (backspace recovery)
+                        // This only applies if we're not in "editing existing word" mode
+                        // Check: are we at the end of the word or at a word boundary?
+                        const cursorPos = getCursorOffset();
+                        const editorText = getEditorText();
+                        const charAfterCursor = cursorPos < editorText.length ? editorText[cursorPos] : null;
+                        const isWordChar = (char) => char !== null && /[a-zA-Z']/.test(char);
+                        const afterIsWordChar = isWordChar(charAfterCursor);
+
+                        // If there's NO word character after cursor, we're at the end of a word (typing mode)
+                        // AND we're not in "editing existing word" mode
+                        // In this case, re-enable autocorrect after 2 chars
+                        if (!afterIsWordChar && !isEditingExistingWord && charsTypedSinceLastBackspace >= 2) {
+                            autocorrectEnabled = true;
+                            isEditingExistingWord = false; // Clear flag
+                        }
                     } else {
                         // Just typed a delimiter - reset counter and re-enable autocorrect
                         charsTypedSinceLastBackspace = 0;
                         autocorrectEnabled = true;
+                        isEditingExistingWord = false; // Exit editing mode when delimiter is typed
                     }
                 }
 
@@ -1571,7 +1601,102 @@
             editor.addEventListener('mousedown', function (e) {
             // After click, check if cursor is in a safe position for autocorrect
                 setTimeout(() => {
+                    const selection = window.getSelection();
                     const editorText = getEditorText();
+
+                    // Check if there's an active text selection
+                    if (selection && selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        const selectedText = range.toString();
+
+                        // If a whole word is selected (non-empty selection), check if it's at word boundaries
+                        if (selectedText.length > 0) {
+                            // Calculate selection start position
+                            let selectionStart = 0;
+                            let foundStart = false;
+
+                            function walkToStart(node, isFirstChild) {
+                                if (foundStart) return;
+
+                                if (node.nodeType === Node.TEXT_NODE) {
+                                    if (node === range.startContainer) {
+                                        selectionStart += range.startOffset;
+                                        foundStart = true;
+                                        return;
+                                    } else {
+                                        selectionStart += node.textContent.length;
+                                    }
+                                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                    if (node.nodeName === 'BR') {
+                                        selectionStart += 1;
+                                    } else if (node.nodeName === 'DIV' && node !== editor) {
+                                        if (!isFirstChild && selectionStart > 0) {
+                                            selectionStart += 1;
+                                        }
+                                    }
+                                    const children = Array.from(node.childNodes);
+                                    for (let i = 0; i < children.length; i++) {
+                                        walkToStart(children[i], i === 0 && isFirstChild);
+                                        if (foundStart) break;
+                                    }
+                                }
+                            }
+
+                            walkToStart(editor, true);
+
+                            // Calculate selection end position
+                            let selectionEnd = 0;
+                            let foundEnd = false;
+
+                            function walkToEnd(node, isFirstChild) {
+                                if (foundEnd) return;
+
+                                if (node.nodeType === Node.TEXT_NODE) {
+                                    if (node === range.endContainer) {
+                                        selectionEnd += range.endOffset;
+                                        foundEnd = true;
+                                        return;
+                                    } else {
+                                        selectionEnd += node.textContent.length;
+                                    }
+                                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                    if (node.nodeName === 'BR') {
+                                        selectionEnd += 1;
+                                    } else if (node.nodeName === 'DIV' && node !== editor) {
+                                        if (!isFirstChild && selectionEnd > 0) {
+                                            selectionEnd += 1;
+                                        }
+                                    }
+                                    const children = Array.from(node.childNodes);
+                                    for (let i = 0; i < children.length; i++) {
+                                        walkToEnd(children[i], i === 0 && isFirstChild);
+                                        if (foundEnd) break;
+                                    }
+                                }
+                            }
+
+                            walkToEnd(editor, true);
+
+                            // Check boundaries: is selection preceded/followed by delimiters or doc edges?
+                            const charBeforeSelection = selectionStart > 0 ? editorText[selectionStart - 1] : null;
+                            const charAfterSelection = selectionEnd < editorText.length ? editorText[selectionEnd] : null;
+
+                            const isDelimiter = (char) => char === null || /[\s,;.!?'"\/\-\n]/.test(char);
+                            const beforeIsDelimiter = isDelimiter(charBeforeSelection);
+                            const afterIsDelimiter = isDelimiter(charAfterSelection);
+
+                            // If selection is bounded by delimiters (or doc edges), enable autocorrect
+                            if (beforeIsDelimiter && afterIsDelimiter) {
+                                autocorrectEnabled = true;
+                                charsTypedSinceLastBackspace = 2; // Set to 2 to bypass the suppression check
+                                isEditingExistingWord = false; // Clear editing mode flag
+                                justSelectedAtWordBoundaries = true; // Set flag so input handler knows to ignore next "backspace"
+                                return;
+                            }
+                        }
+                    }
+
+                    // No selection or selection not at word boundaries - use cursor position logic
                     const cursorPos = getCursorOffset();
 
                     // ALWAYS enable if editor is empty or cursor is at start
