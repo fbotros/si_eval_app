@@ -1236,7 +1236,7 @@
                 // This prevents unknown "-er" words (like "coaster") from being "corrected" to "-ed" words (like "coasted")
                 const lowerWord = wordToCheck.toLowerCase();
                 const lowerSuggestion = suggestion ? suggestion.toLowerCase() : '';
-                const isErToEdCorrection = lowerWord.endsWith('er') && lowerSuggestion.endsWith('ed') && 
+                const isErToEdCorrection = lowerWord.endsWith('er') && lowerSuggestion.endsWith('ed') &&
                                           lowerWord.slice(0, -2) === lowerSuggestion.slice(0, -2);
 
                 // Show tooltip if suggestion is different from original input
@@ -1389,6 +1389,13 @@
                 // Check for period/question mark/exclamation + whitespace
                 // Match patterns like ". ", ".\n", "! ", etc.
                 if (/[.!?][\s\n]+$/.test(textBeforeCursor)) {
+                    return true;
+                }
+
+                // Check for hyphen + space (for bullet lists like " - hello" or "- hello")
+                // This capitalizes after "- " at start of line or after newline
+                // Match: (start OR newline) + optional spaces + hyphen + one or more spaces
+                if (/(^|\n)\s*-\s+$/.test(textBeforeCursor)) {
                     return true;
                 }
 
@@ -1772,7 +1779,8 @@
                     // Get the current word BEFORE the space/punctuation is added
                     const currentWord = getCurrentWord();
 
-                    // If there's no current suggestion but there's a current word, check incremental state
+                    // If there's no current suggestion but there's a current word, use the incremental result
+                    // The incremental state has been built up during typing - no need for expensive fallback search!
                     // BUT only if autocorrect is enabled AND we're not in backspace suppression mode
                     if (!currentAutocorrectSuggestion && currentWord && autocorrectEnabled && charsTypedSinceLastBackspace >= 2) {
                         // Check minimum length, but allow short words with overrides
@@ -1804,17 +1812,30 @@
                             // For possessives, check the base word (e.g., "markk" in "markk's")
                             const wordToCheck = isPossessive ? baseWord : currentWord;
 
-                            // Use findClosestWord WITH fallback for final correction on trigger keys
-                            // This ensures transpositions and other complex edits are handled properly
-                            const correctedBase = editorAutocorrectEngine.findClosestWord(wordToCheck, { useFallback: true });
+                            // Use incremental result (no fallback) - the state has been built during typing
+                            // This is much faster and uses the same algorithm as the tooltip
+                            const correctedBase = editorAutocorrectEngine.getIncrementalCorrection(wordToCheck.toLowerCase());
+
+                            // If correctedBase is null, the word is valid - use original word as base
+                            let baseToUse = correctedBase || wordToCheck;
 
                             // If possessive, reconstruct with possessive suffix
-                            const suggestion = isPossessive ? correctedBase + possessiveSuffix : correctedBase;
+                            let suggestion = isPossessive ? baseToUse + possessiveSuffix : baseToUse;
+
+                            // Check if we need to capitalize based on sentence start
+                            const textBeforeCursor = getTextBeforeCursor();
+                            // Remove the current word to see what's before it
+                            const textBeforeWord = textBeforeCursor.substring(0, textBeforeCursor.length - currentWord.length);
+
+                            if (isAtSentenceStart(textBeforeWord)) {
+                                // Capitalize first letter
+                                suggestion = suggestion.charAt(0).toUpperCase() + suggestion.slice(1);
+                            }
 
                             // Filter: Don't change "-er" words to "-ed" words
                             const lowerWordToCheck = wordToCheck.toLowerCase();
                             const lowerSuggestionCheck = suggestion ? suggestion.toLowerCase() : '';
-                            const isErToEdCorrection = lowerWordToCheck.endsWith('er') && lowerSuggestionCheck.endsWith('ed') && 
+                            const isErToEdCorrection = lowerWordToCheck.endsWith('er') && lowerSuggestionCheck.endsWith('ed') &&
                                                       lowerWordToCheck.slice(0, -2) === lowerSuggestionCheck.slice(0, -2);
 
                             // Only set as suggestion if it's different from the current word AND not an er→ed correction
@@ -1976,12 +1997,45 @@
                 }
             });
 
-            // Hide tooltip when clicking elsewhere
-            document.addEventListener('click', function (e) {
-                if (e.target !== editor) {
+            // Apply autocorrect when clicking anywhere (before the click action)
+            document.addEventListener('mousedown', function (e) {
+                // If there's a pending autocorrect suggestion, apply it before allowing the click
+                // This works for ANY click - toolbar buttons, different text positions, etc.
+                if (currentAutocorrectSuggestion && wordToReplaceWithSuggestion) {
+                    // Get the current word to replace
+                    const wordToDelete = getCurrentWord();
+                    let suggestionToApply = currentAutocorrectSuggestion;
+
+                    // Check if suggestion is an "I" contraction that needs capitalization
+                    const lowerSuggestion = suggestionToApply.toLowerCase();
+                    if (lowerSuggestion === 'i' || lowerSuggestion === "i've" || lowerSuggestion === "i'm" ||
+                        lowerSuggestion === "i'd" || lowerSuggestion === "i'll" || lowerSuggestion === "i'd've") {
+                        suggestionToApply = 'I' + suggestionToApply.slice(1);
+                    }
+
+                    // Check if we need to capitalize (sentence start)
+                    const textBeforeCursor = getTextBeforeCursor();
+                    const textBeforeWord = textBeforeCursor.substring(0, textBeforeCursor.length - wordToDelete.length);
+
+                    if (isAtSentenceStart(textBeforeWord)) {
+                        // Capitalize first letter of suggestion (but don't double-capitalize I contractions)
+                        if (!lowerSuggestion.startsWith('i')) {
+                            suggestionToApply = suggestionToApply.charAt(0).toUpperCase() + suggestionToApply.slice(1);
+                        }
+                    }
+
+                    // Apply the autocorrect
+                    if (wordToDelete) {
+                        replaceCurrentWord(wordToDelete, suggestionToApply);
+                        justAppliedAutocorrect = true;
+                    }
+
+                    // Hide tooltip and clear suggestion
                     hideAutocorrectTooltip();
+                    currentAutocorrectSuggestion = null;
+                    wordToReplaceWithSuggestion = null;
                 }
-            });
+            }, true); // Use capture phase to run before other handlers
 
             // Save selection when editor loses focus (Quest 3 fix)
             let savedSelection = null;

@@ -10,10 +10,14 @@ class AutocorrectEngine {
         console.log('[AutocorrectEngine] Initializing with updated cost structure (v20251014-4)');
 
         // Neighboring key substitutions are THE MOST COMMON typing error - should be cheapest!
-        this.neighborSubstitutionCost = options.neighborSubstitutionCost ?? 0.5;
+        // But we differentiate based on keyboard position
+        // At least one edge key involved (like i/o, t/g) = cheaper (edge keys easier to mistype)
+        // Both middle keys (like e/r) = more expensive (both are in home row, less likely to mistype)
+        this.neighborSubstitutionCostEdge = options.neighborSubstitutionCostEdge ?? 0.5;      // At least one edge key
+        this.neighborSubstitutionCostMiddle = options.neighborSubstitutionCostMiddle ?? 0.65; // Both middle keys
 
-        // Peripheral keys are easier to miss when typing (edge of keyboard)
-        this.peripheralInsertionCost = options.peripheralInsertionCost ?? 0.5;
+        // Edge keys are easier to miss when typing (periphery of keyboard)
+        this.edgeInsertionCost = options.edgeInsertionCost ?? 0.5;
         // Center keys are harder to miss
         this.centerInsertionCost = options.centerInsertionCost ?? 1.0;
 
@@ -23,11 +27,14 @@ class AutocorrectEngine {
         // Set to a very high cost to effectively reject these edits
         this.nonNeighborSubstitutionCost = options.nonNeighborSubstitutionCost ?? 999;
 
-        // Peripheral keys (edges of keyboard) - easier to miss
-        this.peripheralKeys = new Set(['q', 'a', 'z', 'w', 's', 'x', 'p', 'l', 'o', 'k', 'm']);
+        // Edge keys (outer edges of keyboard) - easier to mistype
+        this.edgeKeys = new Set(['q', 'a', 'z', 'w', 's', 'x', 'p', 'o', 'l', 'm', 'k']);
+
+        // Middle keys (center of keyboard, not on edges) - harder to mistype
+        this.middleKeys = new Set(['e', 'r', 't', 'y', 'u', 'i', 'd', 'f', 'g', 'h', 'j', 'c', 'v', 'b', 'n']);
 
         // Character-specific costs for common punctuation
-        this.apostropheInsertionCost = options.apostropheInsertionCost ?? 0.2; // Very cheap to add apostrophes
+        this.apostropheInsertionCost = options.apostropheInsertionCost ?? 0.15; // Very cheap to add apostrophes (cheaper than edge substitutions)
         this.apostropheDeletionCost = options.apostropheDeletionCost ?? 0.3;   // Cheap to remove apostrophes
 
         // Maximum edit distance and cost threshold
@@ -276,8 +283,8 @@ class AutocorrectEngine {
             let insCost;
             if (charToInsert === "'") {
                 insCost = this.apostropheInsertionCost;
-            } else if (this.peripheralKeys.has(charToInsert)) {
-                insCost = this.peripheralInsertionCost;
+            } else if (this.edgeKeys.has(charToInsert)) {
+                insCost = this.edgeInsertionCost;
             } else {
                 insCost = this.centerInsertionCost;
             }
@@ -290,8 +297,21 @@ class AutocorrectEngine {
                     matrix[i][j] = matrix[i - 1][j - 1]; // no operation needed
                 } else {
                     // Substitution cost - neighboring keys are CHEAP, non-neighbors are rejected
-                    const substitutionCost = this.areNeighboringKeys(a[j - 1], b[i - 1]) ?
-                        this.neighborSubstitutionCost : this.nonNeighborSubstitutionCost;
+                    // Use position-aware costs: cheaper when at least one edge key involved
+                    let substitutionCost;
+                    if (this.areNeighboringKeys(a[j - 1], b[i - 1])) {
+                        const char1 = a[j - 1].toLowerCase();
+                        const char2 = b[i - 1].toLowerCase();
+                        // Cheaper if at least one key is an edge key
+                        // More expensive only if both are middle keys
+                        const hasEdgeKey = this.edgeKeys.has(char1) || this.edgeKeys.has(char2);
+
+                        substitutionCost = hasEdgeKey ?
+                            this.neighborSubstitutionCostEdge :
+                            this.neighborSubstitutionCostMiddle;
+                    } else {
+                        substitutionCost = this.nonNeighborSubstitutionCost;
+                    }
 
                     // Character-specific insertion/deletion costs
                     const charToInsert = b[i - 1];
@@ -300,8 +320,8 @@ class AutocorrectEngine {
                     let insertionCost;
                     if (charToInsert === "'") {
                         insertionCost = this.apostropheInsertionCost;
-                    } else if (this.peripheralKeys.has(charToInsert)) {
-                        insertionCost = this.peripheralInsertionCost;
+                    } else if (this.edgeKeys.has(charToInsert)) {
+                        insertionCost = this.edgeInsertionCost;
                     } else {
                         insertionCost = this.centerInsertionCost;
                     }
@@ -646,8 +666,8 @@ class AutocorrectEngine {
         let charInsertionCost;
         if (char === "'") {
             charInsertionCost = this.apostropheInsertionCost;
-        } else if (this.peripheralKeys.has(char)) {
-            charInsertionCost = this.peripheralInsertionCost;
+        } else if (this.edgeKeys.has(char)) {
+            charInsertionCost = this.edgeInsertionCost;
         } else {
             charInsertionCost = this.centerInsertionCost;
         }
@@ -663,8 +683,8 @@ class AutocorrectEngine {
             let dictInsertCost;
             if (charToInsert === "'") {
                 dictInsertCost = this.apostropheInsertionCost;
-            } else if (this.peripheralKeys.has(charToInsert)) {
-                dictInsertCost = this.peripheralInsertionCost;
+            } else if (this.edgeKeys.has(charToInsert)) {
+                dictInsertCost = this.edgeInsertionCost;
             } else {
                 dictInsertCost = this.centerInsertionCost;
             }
@@ -681,7 +701,12 @@ class AutocorrectEngine {
                 // Check for adjacent keys first
                 const adjacentKey = word[i - 1] + char;
                 if (this.trieDictionary.adjacentKeysSet.has(adjacentKey)) {
-                    replaceCost = this.neighborSubstitutionCost + lastRow[i - 1];
+                    // Use position-aware costs: cheaper when at least one edge key involved
+                    const char1 = word[i - 1].toLowerCase();
+                    const char2 = char.toLowerCase();
+                    const hasEdgeKey = this.edgeKeys.has(char1) || this.edgeKeys.has(char2);
+
+                    replaceCost = (hasEdgeKey ? this.neighborSubstitutionCostEdge : this.neighborSubstitutionCostMiddle) + lastRow[i - 1];
                 } else {
                     // Non-neighbor substitution - reject with very high cost
                     replaceCost = this.nonNeighborSubstitutionCost + lastRow[i - 1];
@@ -717,8 +742,8 @@ class AutocorrectEngine {
         let charInsertionCost;
         if (char === "'") {
             charInsertionCost = this.apostropheInsertionCost;
-        } else if (this.peripheralKeys.has(char)) {
-            charInsertionCost = this.peripheralInsertionCost;
+        } else if (this.edgeKeys.has(char)) {
+            charInsertionCost = this.edgeInsertionCost;
         } else {
             charInsertionCost = this.centerInsertionCost;
         }
@@ -732,8 +757,8 @@ class AutocorrectEngine {
             let dictInsertCost;
             if (charToInsert === "'") {
                 dictInsertCost = this.apostropheInsertionCost;
-            } else if (this.peripheralKeys.has(charToInsert)) {
-                dictInsertCost = this.peripheralInsertionCost;
+            } else if (this.edgeKeys.has(charToInsert)) {
+                dictInsertCost = this.edgeInsertionCost;
             } else {
                 dictInsertCost = this.centerInsertionCost;
             }
@@ -750,7 +775,12 @@ class AutocorrectEngine {
                 // Check for adjacent keys first
                 const adjacentKey = word[i - 1] + char;
                 if (this.trieDictionary.adjacentKeysSet.has(adjacentKey)) {
-                    replaceCost = (this.substitutionCost * this.adjacentKeyMultiplier) + lastRow[i - 1];
+                    // Use position-aware costs: cheaper when at least one middle key involved
+                    const char1 = word[i - 1].toLowerCase();
+                    const char2 = char.toLowerCase();
+                    const hasMiddleKey = this.middleKeys.has(char1) || this.middleKeys.has(char2);
+
+                    replaceCost = (hasMiddleKey ? this.neighborSubstitutionCostMiddle : this.neighborSubstitutionCostEdge) + lastRow[i - 1];
                 } else {
                     // Non-neighbor substitution - reject with very high cost
                     replaceCost = this.nonNeighborSubstitutionCost + lastRow[i - 1];
