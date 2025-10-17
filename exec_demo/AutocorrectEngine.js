@@ -928,6 +928,12 @@ class AutocorrectEngine {
                     }
                 }
             }
+        } else {
+            // No TrieDictionary - use fallback directly
+            const fallbackCorrection = this.findBestCorrectionForPart(lowerWord);
+            if (fallbackCorrection && fallbackCorrection !== lowerWord) {
+                singleWordCorrection = fallbackCorrection;
+            }
         }
 
         // Try word splitting if enabled

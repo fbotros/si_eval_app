@@ -1186,18 +1186,6 @@
                     return;
                 }
 
-                // Allow short words only if they have an override correction
-                if (currentWord.length < 3) {
-                    const lowerWord = currentWord.toLowerCase();
-                    const hasOverride = editorAutocorrectEngine.correctionOverrides &&
-                        editorAutocorrectEngine.correctionOverrides[lowerWord];
-                    if (!hasOverride) {
-                        currentAutocorrectSuggestion = null;
-                        hideAutocorrectTooltip();
-                        return;
-                    }
-                }
-
                 // Skip autocorrect if word contains special characters (@, #, $, _, &, +, =)
                 // These indicate emails, usernames, hashtags, variables, etc. that shouldn't be corrected
                 if (/[@#$_&+=]/.test(currentWord)) {
@@ -1227,7 +1215,8 @@
 
                 // Pass the original word with capitalization preserved
                 // AutocorrectEngine will handle skipping, lowercase conversion, and capitalization preservation internally
-                const correctedBase = editorAutocorrectEngine.findClosestWord(wordToCheck, { useFallback: false });
+                // Use fallback to enable corrections even when TrieDictionary doesn't have incremental state
+                const correctedBase = editorAutocorrectEngine.findClosestWord(wordToCheck, { useFallback: true });
 
                 // If possessive, reconstruct with possessive suffix
                 const suggestion = isPossessive ? correctedBase + possessiveSuffix : correctedBase;
