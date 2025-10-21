@@ -1638,20 +1638,34 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                 }
             }
 
-            // Quest 3 Fix: Remove unnecessary BRs from divs that have text content
+            // Quest 3 Fix: Remove unnecessary trailing BRs from divs
             function removeUnnecessaryBRs() {
                 // Find all divs in the editor
                 const divs = editor.querySelectorAll('div');
                 
                 divs.forEach(div => {
-                    // Check if div has both text content and a BR
-                    const hasText = div.textContent.trim().length > 0;
-                    const brElements = Array.from(div.childNodes).filter(node => 
-                        node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR'
-                    );
+                    // Get all child nodes
+                    const children = Array.from(div.childNodes);
                     
-                    // If div has text content and BR(s), remove the BRs
-                    if (hasText && brElements.length > 0) {
+                    // Check if div has any text content (from text nodes or nested elements)
+                    let hasTextContent = false;
+                    for (const child of children) {
+                        if (child.nodeType === Node.TEXT_NODE && child.textContent.trim().length > 0) {
+                            hasTextContent = true;
+                            break;
+                        } else if (child.nodeType === Node.ELEMENT_NODE && child.tagName !== 'BR') {
+                            // Has an element that's not a BR
+                            hasTextContent = true;
+                            break;
+                        }
+                    }
+                    
+                    // If div has text content, remove ALL BRs
+                    // BRs are only needed in empty divs as placeholders
+                    if (hasTextContent) {
+                        const brElements = children.filter(node => 
+                            node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR'
+                        );
                         brElements.forEach(br => br.remove());
                     }
                 });
