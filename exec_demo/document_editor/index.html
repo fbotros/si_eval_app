@@ -1654,7 +1654,7 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                     }
                     return false;
                 }
-                
+
                 // Helper function to remove ONLY trailing BRs from an element
                 function cleanElement(element) {
                     // First, recursively clean all child elements
@@ -1664,16 +1664,16 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                             cleanElement(child);
                         }
                     });
-                    
+
                     // Only remove trailing BRs if element has text content
                     if (hasRealTextContent(element)) {
                         const children = Array.from(element.childNodes);
-                        
+
                         // Remove BRs only if they're at the very end (trailing)
                         // Work backwards from the end
                         for (let i = children.length - 1; i >= 0; i--) {
                             const node = children[i];
-                            
+
                             if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') {
                                 // This is a trailing BR - remove it
                                 node.remove();
@@ -1687,7 +1687,7 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                         }
                     }
                 }
-                
+
                 // Start from all divs in the editor
                 const divs = editor.querySelectorAll('div');
                 divs.forEach(div => cleanElement(div));
@@ -2211,7 +2211,26 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                                     wordToReplaceWithSuggestion = null;
 
                                     if (e.key === 'Enter') {
-                                        document.execCommand('insertLineBreak', false, null);
+                                        // Create a new div for the next line
+                                        const selection = window.getSelection();
+                                        if (selection.rangeCount > 0) {
+                                            const range = selection.getRangeAt(0);
+                                        
+                                            // Create a new div for the next line
+                                            const newDiv = document.createElement('div');
+                                            newDiv.appendChild(document.createElement('br')); // Empty line placeholder
+                                        
+                                            // Insert the new div at cursor position
+                                            range.deleteContents();
+                                            range.insertNode(newDiv);
+                                        
+                                            // Move cursor to the start of the new div
+                                            range.setStart(newDiv, 0);
+                                            range.setEnd(newDiv, 0);
+                                            range.collapse(true);
+                                            selection.removeAllRanges();
+                                            selection.addRange(range);
+                                        }
                                     } else {
                                         document.execCommand('insertText', false, e.key);
                                     }
@@ -2279,15 +2298,15 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                                 const selection = window.getSelection();
                                 if (selection.rangeCount > 0) {
                                     const range = selection.getRangeAt(0);
-                                  
+
                                     // Create a new div for the next line
                                     const newDiv = document.createElement('div');
                                     newDiv.appendChild(document.createElement('br')); // Empty line placeholder
-                                  
+
                                     // Insert the new div at cursor position
                                     range.deleteContents();
                                     range.insertNode(newDiv);
-                                  
+
                                     // Move cursor to the start of the new div
                                     range.setStart(newDiv, 0);
                                     range.setEnd(newDiv, 0);
