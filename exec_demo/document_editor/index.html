@@ -295,6 +295,51 @@
             color: #4a5568;
             font-weight: 500;
         }
+
+        /* DOM Viewer styles */
+        #dom-viewer {
+            position: fixed;
+            top: 90px;
+            right: 10px;
+            width: 450px;
+            max-height: 600px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.95);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 10px;
+            padding: 10px;
+            z-index: 10000;
+            border: 2px solid #0f0;
+            border-radius: 4px;
+            display: none;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        #dom-viewer.visible {
+            display: block;
+        }
+
+        #dom-toggle {
+            position: fixed;
+            bottom: 90px;
+            right: 10px;
+            background: #333;
+            color: #0f0;
+            border: 2px solid #0f0;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 10001;
+            border-radius: 4px;
+        }
+
+        #dom-toggle:hover {
+            background: #0f0;
+            color: #000;
+        }
     </style>
 </head>
 
@@ -357,12 +402,45 @@
     <!-- Autocorrect tooltip - positioned outside of contentEditable -->
     <div id="autocorrect-tooltip" class="autocorrect-tooltip"></div>
 
+    <!-- DOM Viewer -->
+    <button id="dom-toggle">DOM</button>
+    <div id="dom-viewer"></div>
+
     <!-- Load external scripts (already loaded in head) -->
     <script src="../AutocorrectEngine.js?v=20251014-2"></script>
     <script>
 
-        // Wait for DOM to be ready
+            // Wait for DOM to be ready
         document.addEventListener('DOMContentLoaded', function () {
+            // Setup DOM viewer
+            const domToggle = document.getElementById('dom-toggle');
+            const domViewer = document.getElementById('dom-viewer');
+            const editor = document.getElementById('document-editor');
+            
+            domToggle.addEventListener('click', () => {
+                domViewer.classList.toggle('visible');
+                if (domViewer.classList.contains('visible')) {
+                    updateDOMViewer();
+                }
+            });
+            
+            function updateDOMViewer() {
+                if (!domViewer.classList.contains('visible')) return;
+                
+                const html = editor.innerHTML
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/\n/g, '↵\n');
+                
+                domViewer.innerHTML = '<div style="color: #ff0; font-weight: bold; margin-bottom: 10px;">EDITOR DOM:</div>' + html;
+            }
+            
+            // Update DOM viewer on any change
+            if (editor) {
+                editor.addEventListener('input', updateDOMViewer);
+                editor.addEventListener('keydown', () => setTimeout(updateDOMViewer, 0));
+            }
+            
             initializeEditor();
         });
 
@@ -1615,90 +1693,16 @@
                 divs.forEach(div => cleanElement(div));
             }
 
-            // Track if we're in manual insertion mode (skip cleanup)
-            let skipCleanupCount = 0;
-
-            // Quest 3 Fix: Intercept text insertion when cursor is at editor root
-            editor.addEventListener('beforeinput', function (e) {
-                if (e.inputType === 'insertText' && e.data) {
-                    const selection = window.getSelection();
-                    if (selection.rangeCount > 0) {
-                        const range = selection.getRangeAt(0);
-                        
-                        // Check if cursor is at editor root (between divs)
-                        if (range.startContainer === editor) {
-                            e.preventDefault();
-                            
-                            // Create a new div or find the appropriate one
-                            const offset = range.startOffset;
-                            const children = Array.from(editor.childNodes);
-                            
-                            let targetDiv = null;
-                            
-                            // Check if there's a div right after the cursor position
-                            if (offset < children.length) {
-                                const nextChild = children[offset];
-                                if (nextChild.nodeType === Node.ELEMENT_NODE && nextChild.tagName === 'DIV') {
-                                    targetDiv = nextChild;
-                                }
-                            }
-                            
-                            // If no suitable div found, create one
-                            if (!targetDiv) {
-                                targetDiv = document.createElement('div');
-                                if (offset < children.length) {
-                                    editor.insertBefore(targetDiv, children[offset]);
-                                } else {
-                                    editor.appendChild(targetDiv);
-                                }
-                            }
-                            
-                            // Remove any BR elements from the target div (empty line markers)
-                            // These would cause the next character to go on a new line
-                            const brs = targetDiv.querySelectorAll('br');
-                            brs.forEach(br => br.remove());
-                            
-                            // Insert text at the start of the div
-                            const textNode = document.createTextNode(e.data);
-                            targetDiv.insertBefore(textNode, targetDiv.firstChild);
-                            
-                            // Position cursor after the inserted text
-                            const newRange = document.createRange();
-                            newRange.setStart(textNode, e.data.length);
-                            newRange.setEnd(textNode, e.data.length);
-                            selection.removeAllRanges();
-                            selection.addRange(newRange);
-                            
-                            // Skip cleanup for the next 5 input events to prevent cursor issues
-                            skipCleanupCount = 5;
-                            
-                            // Trigger input event for autocorrect
-                            const inputEvent = new InputEvent('input', {
-                                bubbles: true,
-                                cancelable: false,
-                                inputType: 'insertText',
-                                data: e.data
-                            });
-                            editor.dispatchEvent(inputEvent);
-                        }
-                    }
-                }
-            });
 
             // Add input listener for autocorrect tooltips (suggestion-only)
             editor.addEventListener('input', function (e) {
-                // Skip cleanup if we're in manual insertion mode
-                if (skipCleanupCount > 0) {
-                    skipCleanupCount--;
-                } else {
-                    // Quest 3: Clean up orphaned elements on ANY input (deletion or insertion)
-                    // This catches the case where deletion leaves orphaned tags, then typing goes into them
-                    cleanupOrphanedElements();
+                // Quest 3: Clean up orphaned elements on ANY input (deletion or insertion)
+                // This catches the case where deletion leaves orphaned tags, then typing goes into them
+                cleanupOrphanedElements();
 
-                    // Quest 3: Remove unnecessary BRs from divs that now have text
-                    // When typing into <div><br></div>, remove the BR to get <div>text</div>
-                    removeUnnecessaryBRs();
-                }
+                // Quest 3: Remove unnecessary BRs from divs that now have text
+                // When typing into <div><br></div>, remove the BR to get <div>text</div>
+                removeUnnecessaryBRs();
 
                 // If tooltip is visible and user types another character, hide it AND clear the suggestion
                 // This ensures determinism - we don't apply stale suggestions
