@@ -1535,8 +1535,62 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                 }
             }
 
+            // Quest 3 Fix: Wrap orphaned inline elements in divs
+            function wrapOrphanedInlineElements() {
+                const selection = window.getSelection();
+                let savedRange = null;
+                if (selection.rangeCount > 0) {
+                    savedRange = selection.getRangeAt(0).cloneRange();
+                }
+
+                // Check all direct children of editor
+                const children = Array.from(editor.childNodes);
+                for (const child of children) {
+                    // If it's an inline element (FONT, B, I, U, SPAN) or text node at root level
+                    if (child.nodeType === Node.ELEMENT_NODE && 
+                        ['FONT', 'B', 'I', 'U', 'SPAN', 'STRONG', 'EM'].includes(child.tagName)) {
+                        
+                        // Create a div wrapper
+                        const wrapper = document.createElement('div');
+                        
+                        // Insert wrapper before the inline element
+                        editor.insertBefore(wrapper, child);
+                        
+                        // Move the inline element into the wrapper
+                        wrapper.appendChild(child);
+                        
+                        // If cursor was in this element, update the saved range
+                        if (savedRange && savedRange.startContainer.nodeType === Node.TEXT_NODE) {
+                            let parent = savedRange.startContainer.parentElement;
+                            while (parent && parent !== editor) {
+                                if (parent === child) {
+                                    // Cursor is inside this element - range is still valid
+                                    break;
+                                }
+                                parent = parent.parentElement;
+                            }
+                        }
+                    }
+                }
+
+                // Restore selection
+                if (savedRange) {
+                    try {
+                        selection.removeAllRanges();
+                        selection.addRange(savedRange);
+                    } catch (e) {
+                        // Range might be invalid, that's ok
+                    }
+                }
+            }
+
             // Add input listener for autocorrect tooltips (suggestion-only)
             editor.addEventListener('input', function (e) {
+                // Quest 3: Wrap any orphaned inline elements after deletion
+                if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') {
+                    wrapOrphanedInlineElements();
+                }
+                
                 // Update debug panel on every input
                 updateDebugPanel();
                 // If tooltip is visible and user types another character, hide it AND clear the suggestion
