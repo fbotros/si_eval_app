@@ -1425,7 +1425,7 @@
                 }
             });
 
-            // Add beforeinput listener for detailed debugging
+            // Add beforeinput listener for detailed debugging AND fixing multi-line selection issue
             editor.addEventListener('beforeinput', function (e) {
                 addDebugLog(`BEFOREINPUT: type=${e.inputType} data="${e.data}"`, 'info');
                 const selection = window.getSelection();
@@ -1435,6 +1435,77 @@
                     if (hasSelection) {
                         addDebugLog(`MULTI-LINE SELECTION DETECTED! start=${range.startContainer.nodeName}:${range.startOffset} end=${range.endContainer.nodeName}:${range.endOffset}`, 'error');
                         addDebugLog(`Selected text: "${range.toString()}"`, 'error');
+                        
+                        // Quest 3 Fix: Handle text insertion for multi-line selections
+                        // The browser's default behavior creates a new div for each character
+                        // We need to manually handle this to insert plain text
+                        if (e.inputType === 'insertText' && e.data) {
+                            e.preventDefault();
+                            
+                            addDebugLog(`Intercepting insertText for multi-line selection`, 'warn');
+                            
+                            // Delete the selected content
+                            range.deleteContents();
+                            
+                            // Find or create a proper container for the text
+                            let container = range.startContainer;
+                            
+                            // If we're at the editor root, create a new div
+                            if (container === editor) {
+                                addDebugLog(`Container is editor root, creating new div`, 'warn');
+                                const newDiv = document.createElement('div');
+                                const textNode = document.createTextNode(e.data);
+                                newDiv.appendChild(textNode);
+                                
+                                // Insert at the current position
+                                range.insertNode(newDiv);
+                                
+                                // Move cursor after the inserted text
+                                const newRange = document.createRange();
+                                newRange.setStart(textNode, e.data.length);
+                                newRange.setEnd(textNode, e.data.length);
+                                selection.removeAllRanges();
+                                selection.addRange(newRange);
+                                
+                                addDebugLog(`Created new div with text node`, 'warn');
+                            } else {
+                                // We're inside a valid container - just insert the text
+                                addDebugLog(`Container is ${container.nodeName}, inserting text directly`, 'warn');
+                                
+                                // If container is an element, find the right text node or create one
+                                if (container.nodeType === Node.ELEMENT_NODE) {
+                                    const textNode = document.createTextNode(e.data);
+                                    range.insertNode(textNode);
+                                    
+                                    // Move cursor after the inserted text
+                                    const newRange = document.createRange();
+                                    newRange.setStart(textNode, e.data.length);
+                                    newRange.setEnd(textNode, e.data.length);
+                                    selection.removeAllRanges();
+                                    selection.addRange(newRange);
+                                } else {
+                                    // Container is already a text node - insert text
+                                    const textNode = document.createTextNode(e.data);
+                                    range.insertNode(textNode);
+                                    
+                                    // Move cursor after the inserted text
+                                    const newRange = document.createRange();
+                                    newRange.setStart(textNode, e.data.length);
+                                    newRange.setEnd(textNode, e.data.length);
+                                    selection.removeAllRanges();
+                                    selection.addRange(newRange);
+                                }
+                            }
+                            
+                            // Trigger input event manually since we prevented default
+                            const inputEvent = new InputEvent('input', {
+                                bubbles: true,
+                                cancelable: false,
+                                inputType: 'insertText',
+                                data: e.data
+                            });
+                            editor.dispatchEvent(inputEvent);
+                        }
                     }
                 }
             });
