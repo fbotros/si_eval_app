@@ -1615,6 +1615,65 @@
                 divs.forEach(div => cleanElement(div));
             }
 
+            // Quest 3 Fix: Intercept text insertion when cursor is at editor root
+            editor.addEventListener('beforeinput', function (e) {
+                if (e.inputType === 'insertText' && e.data) {
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        
+                        // Check if cursor is at editor root (between divs)
+                        if (range.startContainer === editor) {
+                            e.preventDefault();
+                            
+                            // Create a new div or find the appropriate one
+                            const offset = range.startOffset;
+                            const children = Array.from(editor.childNodes);
+                            
+                            let targetDiv = null;
+                            
+                            // Check if there's a div right after the cursor position
+                            if (offset < children.length) {
+                                const nextChild = children[offset];
+                                if (nextChild.nodeType === Node.ELEMENT_NODE && nextChild.tagName === 'DIV') {
+                                    targetDiv = nextChild;
+                                }
+                            }
+                            
+                            // If no suitable div found, create one
+                            if (!targetDiv) {
+                                targetDiv = document.createElement('div');
+                                if (offset < children.length) {
+                                    editor.insertBefore(targetDiv, children[offset]);
+                                } else {
+                                    editor.appendChild(targetDiv);
+                                }
+                            }
+                            
+                            // Insert text at the start of the div
+                            const textNode = document.createTextNode(e.data);
+                            targetDiv.insertBefore(textNode, targetDiv.firstChild);
+                            
+                            // Position cursor after the inserted text
+                            const newRange = document.createRange();
+                            newRange.setStart(textNode, e.data.length);
+                            newRange.setEnd(textNode, e.data.length);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                            
+                            // Trigger input event for autocorrect
+                            const inputEvent = new InputEvent('input', {
+                                bubbles: true,
+                                cancelable: false,
+                                inputType: 'insertText',
+                                data: e.data
+                            });
+                            editor.dispatchEvent(inputEvent);
+                        }
+                    }
+                }
+            });
+
             // Add input listener for autocorrect tooltips (suggestion-only)
             editor.addEventListener('input', function (e) {
                 // Quest 3: Clean up orphaned elements on ANY input (deletion or insertion)
