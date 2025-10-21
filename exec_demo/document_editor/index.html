@@ -1638,37 +1638,46 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                 }
             }
 
-            // Quest 3 Fix: Remove unnecessary trailing BRs from divs
+            // Quest 3 Fix: Remove unnecessary trailing BRs recursively
             function removeUnnecessaryBRs() {
-                // Find all divs in the editor
-                const divs = editor.querySelectorAll('div');
-                
-                divs.forEach(div => {
-                    // Get all child nodes
-                    const children = Array.from(div.childNodes);
-                    
-                    // Check if div has any text content (from text nodes or nested elements)
-                    let hasTextContent = false;
-                    for (const child of children) {
+                // Helper function to check if an element has text content (excluding BR text)
+                function hasRealTextContent(element) {
+                    for (const child of element.childNodes) {
                         if (child.nodeType === Node.TEXT_NODE && child.textContent.trim().length > 0) {
-                            hasTextContent = true;
-                            break;
+                            return true;
                         } else if (child.nodeType === Node.ELEMENT_NODE && child.tagName !== 'BR') {
-                            // Has an element that's not a BR
-                            hasTextContent = true;
-                            break;
+                            // Recursively check nested elements
+                            if (hasRealTextContent(child)) {
+                                return true;
+                            }
                         }
                     }
+                    return false;
+                }
+                
+                // Helper function to remove BRs from an element if it has text content
+                function cleanElement(element) {
+                    // First, recursively clean all child elements
+                    const childElements = Array.from(element.children);
+                    childElements.forEach(child => {
+                        if (child.tagName !== 'BR') {
+                            cleanElement(child);
+                        }
+                    });
                     
-                    // If div has text content, remove ALL BRs
-                    // BRs are only needed in empty divs as placeholders
-                    if (hasTextContent) {
-                        const brElements = children.filter(node => 
+                    // Then check if this element has real text content
+                    if (hasRealTextContent(element)) {
+                        // Remove all BR children (at this level)
+                        const brs = Array.from(element.childNodes).filter(node => 
                             node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR'
                         );
-                        brElements.forEach(br => br.remove());
+                        brs.forEach(br => br.remove());
                     }
-                });
+                }
+                
+                // Start from all divs in the editor
+                const divs = editor.querySelectorAll('div');
+                divs.forEach(div => cleanElement(div));
             }
 
             // Add input listener for autocorrect tooltips (suggestion-only)
