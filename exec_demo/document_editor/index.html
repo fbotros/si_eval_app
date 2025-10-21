@@ -1616,9 +1616,21 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                         range.setStart(wrappedCursorNode, wrappedCursorNode.textContent.length);
                         range.setEnd(wrappedCursorNode, wrappedCursorNode.textContent.length);
                     } else {
-                        // Position at end of element
-                        range.selectNodeContents(wrappedCursorNode);
-                        range.collapse(false); // Collapse to end
+                        // wrappedCursorNode is a div wrapper
+                        // Check if it contains only a BR (empty line case)
+                        const hasOnlyBR = wrappedCursorNode.childNodes.length === 1 && 
+                                         wrappedCursorNode.firstChild.nodeType === Node.ELEMENT_NODE &&
+                                         wrappedCursorNode.firstChild.tagName === 'BR';
+                        
+                        if (hasOnlyBR) {
+                            // Position at start (before BR) so typing replaces it
+                            range.setStart(wrappedCursorNode, 0);
+                            range.setEnd(wrappedCursorNode, 0);
+                        } else {
+                            // Has content - position at end
+                            range.selectNodeContents(wrappedCursorNode);
+                            range.collapse(false); // Collapse to end
+                        }
                     }
                     
                     selection.removeAllRanges();
@@ -1626,12 +1638,35 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                 }
             }
 
+            // Quest 3 Fix: Remove unnecessary BRs from divs that have text content
+            function removeUnnecessaryBRs() {
+                // Find all divs in the editor
+                const divs = editor.querySelectorAll('div');
+                
+                divs.forEach(div => {
+                    // Check if div has both text content and a BR
+                    const hasText = div.textContent.trim().length > 0;
+                    const brElements = Array.from(div.childNodes).filter(node => 
+                        node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR'
+                    );
+                    
+                    // If div has text content and BR(s), remove the BRs
+                    if (hasText && brElements.length > 0) {
+                        brElements.forEach(br => br.remove());
+                    }
+                });
+            }
+
             // Add input listener for autocorrect tooltips (suggestion-only)
             editor.addEventListener('input', function (e) {
                 // Quest 3: Clean up orphaned elements on ANY input (deletion or insertion)
                 // This catches the case where deletion leaves orphaned tags, then typing goes into them
                 cleanupOrphanedElements();
-
+                
+                // Quest 3: Remove unnecessary BRs from divs that now have text
+                // When typing into <div><br></div>, remove the BR to get <div>text</div>
+                removeUnnecessaryBRs();
+                
                 // Update debug panel on every input
                 updateDebugPanel();
                 // If tooltip is visible and user types another character, hide it AND clear the suggestion
