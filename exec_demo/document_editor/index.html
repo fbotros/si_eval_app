@@ -1563,6 +1563,13 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                             wrapper.appendChild(child);
                         }
                     }
+                    // Handle orphaned BR elements at root level - wrap them in divs
+                    else if (child.nodeType === Node.ELEMENT_NODE && child.tagName === 'BR') {
+                        // BR represents an empty line - wrap it in a div
+                        const wrapper = document.createElement('div');
+                        editor.insertBefore(wrapper, child);
+                        wrapper.appendChild(child);
+                    }
                     // Handle orphaned TEXT NODES at root level
                     else if (child.nodeType === Node.TEXT_NODE) {
                         const isEmpty = child.textContent.trim() === '';
