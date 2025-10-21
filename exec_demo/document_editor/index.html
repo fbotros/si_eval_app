@@ -1352,7 +1352,7 @@
                             cleanupOrphanedElements();
 
                             // CRITICAL: Check if cursor is still at editor root after cleanup
-                            // If so, force it into a proper div
+                            // If so, force it into a proper text node inside a div
                             const sel = window.getSelection();
                             if (sel.rangeCount > 0) {
                                 const r = sel.getRangeAt(0);
@@ -1384,7 +1384,6 @@
                                     // If still no div, create one
                                     if (!targetDiv) {
                                         targetDiv = document.createElement('div');
-                                        targetDiv.appendChild(document.createElement('br'));
                                         if (offset < children.length) {
                                             editor.insertBefore(targetDiv, children[offset]);
                                         } else {
@@ -1392,10 +1391,30 @@
                                         }
                                     }
                                     
-                                    // Move cursor to the start of the target div
+                                    // CRITICAL: Position cursor INSIDE a text node, not at element level
+                                    // Remove any BR tags first (they mark empty lines)
+                                    const brs = targetDiv.querySelectorAll('br');
+                                    brs.forEach(br => br.remove());
+                                    
+                                    // Find or create a text node in the div
+                                    let textNode = null;
+                                    for (const child of targetDiv.childNodes) {
+                                        if (child.nodeType === Node.TEXT_NODE) {
+                                            textNode = child;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    // If no text node exists, create one
+                                    if (!textNode) {
+                                        textNode = document.createTextNode('');
+                                        targetDiv.appendChild(textNode);
+                                    }
+                                    
+                                    // Position cursor at start of text node (not element position!)
                                     const newRange = document.createRange();
-                                    newRange.setStart(targetDiv, 0);
-                                    newRange.setEnd(targetDiv, 0);
+                                    newRange.setStart(textNode, 0);
+                                    newRange.setEnd(textNode, 0);
                                     sel.removeAllRanges();
                                     sel.addRange(newRange);
                                 }
