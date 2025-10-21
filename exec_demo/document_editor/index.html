@@ -1615,6 +1615,9 @@
                 divs.forEach(div => cleanElement(div));
             }
 
+            // Track if we're in manual insertion mode (skip cleanup)
+            let skipCleanupCount = 0;
+
             // Quest 3 Fix: Intercept text insertion when cursor is at editor root
             editor.addEventListener('beforeinput', function (e) {
                 if (e.inputType === 'insertText' && e.data) {
@@ -1666,6 +1669,9 @@
                             selection.removeAllRanges();
                             selection.addRange(newRange);
                             
+                            // Skip cleanup for the next 5 input events to prevent cursor issues
+                            skipCleanupCount = 5;
+                            
                             // Trigger input event for autocorrect
                             const inputEvent = new InputEvent('input', {
                                 bubbles: true,
@@ -1681,13 +1687,18 @@
 
             // Add input listener for autocorrect tooltips (suggestion-only)
             editor.addEventListener('input', function (e) {
-                // Quest 3: Clean up orphaned elements on ANY input (deletion or insertion)
-                // This catches the case where deletion leaves orphaned tags, then typing goes into them
-                cleanupOrphanedElements();
+                // Skip cleanup if we're in manual insertion mode
+                if (skipCleanupCount > 0) {
+                    skipCleanupCount--;
+                } else {
+                    // Quest 3: Clean up orphaned elements on ANY input (deletion or insertion)
+                    // This catches the case where deletion leaves orphaned tags, then typing goes into them
+                    cleanupOrphanedElements();
 
-                // Quest 3: Remove unnecessary BRs from divs that now have text
-                // When typing into <div><br></div>, remove the BR to get <div>text</div>
-                removeUnnecessaryBRs();
+                    // Quest 3: Remove unnecessary BRs from divs that now have text
+                    // When typing into <div><br></div>, remove the BR to get <div>text</div>
+                    removeUnnecessaryBRs();
+                }
 
                 // If tooltip is visible and user types another character, hide it AND clear the suggestion
                 // This ensures determinism - we don't apply stale suggestions
