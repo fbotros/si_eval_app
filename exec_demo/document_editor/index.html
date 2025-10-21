@@ -2211,25 +2211,41 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                                     wordToReplaceWithSuggestion = null;
 
                                     if (e.key === 'Enter') {
-                                        // Create a new div for the next line
+                                        // Find the parent block-level element (div)
                                         const selection = window.getSelection();
                                         if (selection.rangeCount > 0) {
                                             const range = selection.getRangeAt(0);
+                                        
+                                            // Find the closest parent div
+                                            let currentElement = range.startContainer;
+                                            if (currentElement.nodeType === Node.TEXT_NODE) {
+                                                currentElement = currentElement.parentElement;
+                                            }
+                                        
+                                            let parentDiv = currentElement;
+                                            while (parentDiv && parentDiv !== editor && parentDiv.tagName !== 'DIV') {
+                                                parentDiv = parentDiv.parentElement;
+                                            }
                                         
                                             // Create a new div for the next line
                                             const newDiv = document.createElement('div');
                                             newDiv.appendChild(document.createElement('br')); // Empty line placeholder
                                         
-                                            // Insert the new div at cursor position
-                                            range.deleteContents();
-                                            range.insertNode(newDiv);
+                                            // Insert the new div AFTER the parent div (as a sibling)
+                                            if (parentDiv && parentDiv.tagName === 'DIV') {
+                                                parentDiv.parentNode.insertBefore(newDiv, parentDiv.nextSibling);
+                                            } else {
+                                                // Fallback: insert at cursor position
+                                                range.deleteContents();
+                                                range.insertNode(newDiv);
+                                            }
                                         
                                             // Move cursor to the start of the new div
-                                            range.setStart(newDiv, 0);
-                                            range.setEnd(newDiv, 0);
-                                            range.collapse(true);
+                                            const newRange = document.createRange();
+                                            newRange.setStart(newDiv, 0);
+                                            newRange.setEnd(newDiv, 0);
                                             selection.removeAllRanges();
-                                            selection.addRange(range);
+                                            selection.addRange(newRange);
                                         }
                                     } else {
                                         document.execCommand('insertText', false, e.key);
@@ -2293,26 +2309,41 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
 
                             // Insert the trigger key that was prevented
                             if (e.key === 'Enter') {
-                                // Create a new div for the next line instead of using insertLineBreak
-                                // insertLineBreak creates BR tags that can cause issues
+                                // Find the parent block-level element (div)
                                 const selection = window.getSelection();
                                 if (selection.rangeCount > 0) {
                                     const range = selection.getRangeAt(0);
+
+                                    // Find the closest parent div
+                                    let currentElement = range.startContainer;
+                                    if (currentElement.nodeType === Node.TEXT_NODE) {
+                                        currentElement = currentElement.parentElement;
+                                    }
+
+                                    let parentDiv = currentElement;
+                                    while (parentDiv && parentDiv !== editor && parentDiv.tagName !== 'DIV') {
+                                        parentDiv = parentDiv.parentElement;
+                                    }
 
                                     // Create a new div for the next line
                                     const newDiv = document.createElement('div');
                                     newDiv.appendChild(document.createElement('br')); // Empty line placeholder
 
-                                    // Insert the new div at cursor position
-                                    range.deleteContents();
-                                    range.insertNode(newDiv);
+                                    // Insert the new div AFTER the parent div (as a sibling)
+                                    if (parentDiv && parentDiv.tagName === 'DIV') {
+                                        parentDiv.parentNode.insertBefore(newDiv, parentDiv.nextSibling);
+                                    } else {
+                                        // Fallback: insert at cursor position
+                                        range.deleteContents();
+                                        range.insertNode(newDiv);
+                                    }
 
                                     // Move cursor to the start of the new div
-                                    range.setStart(newDiv, 0);
-                                    range.setEnd(newDiv, 0);
-                                    range.collapse(true);
+                                    const newRange = document.createRange();
+                                    newRange.setStart(newDiv, 0);
+                                    newRange.setEnd(newDiv, 0);
                                     selection.removeAllRanges();
-                                    selection.addRange(range);
+                                    selection.addRange(newRange);
                                 }
                             } else {
                                 // For space and punctuation, insert the actual character
