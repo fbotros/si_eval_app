@@ -295,86 +295,6 @@
             color: #4a5568;
             font-weight: 500;
         }
-
-        /* Debug panel styles */
-        #debug-panel {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            max-height: 300px;
-            overflow-y: auto;
-            background: rgba(0, 0, 0, 0.9);
-            color: #0f0;
-            font-family: monospace;
-            font-size: 11px;
-            padding: 10px;
-            z-index: 10000;
-            border-top: 2px solid #0f0;
-            display: none;
-        }
-
-        #debug-panel.visible {
-            display: block;
-        }
-
-        .debug-log {
-            margin: 2px 0;
-            padding: 2px;
-            border-bottom: 1px solid #333;
-        }
-
-        .debug-log.error {
-            color: #f00;
-        }
-
-        .debug-log.warn {
-            color: #ff0;
-        }
-
-        .debug-log.info {
-            color: #0ff;
-        }
-
-        #debug-toggle {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: #333;
-            color: #0f0;
-            border: 2px solid #0f0;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-family: monospace;
-            font-size: 12px;
-            z-index: 10001;
-            border-radius: 4px;
-        }
-
-        #debug-toggle:hover {
-            background: #0f0;
-            color: #000;
-        }
-
-        #debug-clear {
-            position: fixed;
-            bottom: 50px;
-            right: 10px;
-            background: #333;
-            color: #f90;
-            border: 2px solid #f90;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-family: monospace;
-            font-size: 12px;
-            z-index: 10001;
-            border-radius: 4px;
-        }
-
-        #debug-clear:hover {
-            background: #f90;
-            color: #000;
-        }
     </style>
 </head>
 
@@ -437,87 +357,12 @@
     <!-- Autocorrect tooltip - positioned outside of contentEditable -->
     <div id="autocorrect-tooltip" class="autocorrect-tooltip"></div>
 
-    <!-- Debug UI -->
-    <button id="debug-toggle">Debug</button>
-    <button id="debug-clear">Clear</button>
-    <div id="debug-panel"></div>
-
     <!-- Load external scripts (already loaded in head) -->
     <script src="../AutocorrectEngine.js?v=20251014-2"></script>
     <script>
-        // Debug logging system
-        const debugLogs = [];
-        const maxDebugLogs = 100;
-
-        function addDebugLog(message, type = 'info') {
-            const timestamp = new Date().toLocaleTimeString('en-US', { 
-                hour12: false, 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit',
-                fractionalSecondDigits: 3
-            });
-            
-            debugLogs.unshift({ timestamp, message, type });
-            if (debugLogs.length > maxDebugLogs) {
-                debugLogs.pop();
-            }
-            
-            updateDebugPanel();
-        }
-
-        function updateDebugPanel() {
-            const panel = document.getElementById('debug-panel');
-            if (!panel || !panel.classList.contains('visible')) return;
-            
-            panel.innerHTML = debugLogs.map(log => 
-                `<div class="debug-log ${log.type}">[${log.timestamp}] ${log.message}</div>`
-            ).join('');
-            
-            // Auto-scroll to bottom (newest logs)
-            panel.scrollTop = 0;
-        }
-
-        function getDOMStructure(node, depth = 0, maxDepth = 3) {
-            if (depth > maxDepth) return '...';
-            
-            const indent = '  '.repeat(depth);
-            
-            if (node.nodeType === Node.TEXT_NODE) {
-                const text = node.textContent.substring(0, 20);
-                return `${indent}TEXT: "${text}"`;
-            }
-            
-            if (node.nodeType === Node.ELEMENT_NODE) {
-                const tag = node.tagName;
-                const children = Array.from(node.childNodes)
-                    .map(child => getDOMStructure(child, depth + 1, maxDepth))
-                    .join('\n');
-                return `${indent}<${tag}>\n${children}\n${indent}</${tag}>`;
-            }
-            
-            return `${indent}[Node type: ${node.nodeType}]`;
-        }
 
         // Wait for DOM to be ready
         document.addEventListener('DOMContentLoaded', function () {
-            // Setup debug UI
-            const debugToggle = document.getElementById('debug-toggle');
-            const debugClear = document.getElementById('debug-clear');
-            const debugPanel = document.getElementById('debug-panel');
-            
-            debugToggle.addEventListener('click', () => {
-                debugPanel.classList.toggle('visible');
-                if (debugPanel.classList.contains('visible')) {
-                    updateDebugPanel();
-                }
-            });
-            
-            debugClear.addEventListener('click', () => {
-                debugLogs.length = 0;
-                updateDebugPanel();
-            });
-            
             initializeEditor();
         });
 
@@ -1414,95 +1259,22 @@
             // Add keydown listener to track what key was pressed
             editor.addEventListener('keydown', function (e) {
                 lastTypedKey = e.key;
-                
-                // Log keydown details
-                addDebugLog(`KEYDOWN: key="${e.key}" inputType=N/A`, 'info');
-                const selection = window.getSelection();
-                if (selection.rangeCount > 0) {
-                    const range = selection.getRangeAt(0);
-                    const hasSelection = !range.collapsed;
-                    addDebugLog(`Selection: ${hasSelection ? 'HAS SELECTION' : 'collapsed'} start=${range.startContainer.nodeName}:${range.startOffset} end=${range.endContainer.nodeName}:${range.endOffset}`, 'warn');
-                }
-            });
 
-            // Add beforeinput listener for detailed debugging AND fixing multi-line selection issue
-            editor.addEventListener('beforeinput', function (e) {
-                addDebugLog(`BEFOREINPUT: type=${e.inputType} data="${e.data}"`, 'info');
-                const selection = window.getSelection();
-                if (selection.rangeCount > 0) {
-                    const range = selection.getRangeAt(0);
-                    const hasSelection = !range.collapsed;
-                    if (hasSelection) {
-                        addDebugLog(`MULTI-LINE SELECTION DETECTED! start=${range.startContainer.nodeName}:${range.startOffset} end=${range.endContainer.nodeName}:${range.endOffset}`, 'error');
-                        addDebugLog(`Selected text: "${range.toString()}"`, 'error');
-                        
-                        // Quest 3 Fix: Handle text insertion for multi-line selections
-                        // The browser's default behavior creates a new div for each character
-                        // We need to manually handle this to insert plain text
-                        if (e.inputType === 'insertText' && e.data) {
+                // TEST: Make Command key act like Delete key when there's selected text
+                if (e.metaKey && e.key === 'Meta') {
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        if (!range.collapsed) {
+                            // There's a selection - delete it
                             e.preventDefault();
-                            
-                            addDebugLog(`Intercepting insertText for multi-line selection`, 'warn');
-                            
-                            // Delete the selected content
                             range.deleteContents();
-                            
-                            // Find or create a proper container for the text
-                            let container = range.startContainer;
-                            
-                            // If we're at the editor root, create a new div
-                            if (container === editor) {
-                                addDebugLog(`Container is editor root, creating new div`, 'warn');
-                                const newDiv = document.createElement('div');
-                                const textNode = document.createTextNode(e.data);
-                                newDiv.appendChild(textNode);
-                                
-                                // Insert at the current position
-                                range.insertNode(newDiv);
-                                
-                                // Move cursor after the inserted text
-                                const newRange = document.createRange();
-                                newRange.setStart(textNode, e.data.length);
-                                newRange.setEnd(textNode, e.data.length);
-                                selection.removeAllRanges();
-                                selection.addRange(newRange);
-                                
-                                addDebugLog(`Created new div with text node`, 'warn');
-                            } else {
-                                // We're inside a valid container - just insert the text
-                                addDebugLog(`Container is ${container.nodeName}, inserting text directly`, 'warn');
-                                
-                                // If container is an element, find the right text node or create one
-                                if (container.nodeType === Node.ELEMENT_NODE) {
-                                    const textNode = document.createTextNode(e.data);
-                                    range.insertNode(textNode);
-                                    
-                                    // Move cursor after the inserted text
-                                    const newRange = document.createRange();
-                                    newRange.setStart(textNode, e.data.length);
-                                    newRange.setEnd(textNode, e.data.length);
-                                    selection.removeAllRanges();
-                                    selection.addRange(newRange);
-                                } else {
-                                    // Container is already a text node - insert text
-                                    const textNode = document.createTextNode(e.data);
-                                    range.insertNode(textNode);
-                                    
-                                    // Move cursor after the inserted text
-                                    const newRange = document.createRange();
-                                    newRange.setStart(textNode, e.data.length);
-                                    newRange.setEnd(textNode, e.data.length);
-                                    selection.removeAllRanges();
-                                    selection.addRange(newRange);
-                                }
-                            }
-                            
-                            // Trigger input event manually since we prevented default
+
+                            // Trigger input event
                             const inputEvent = new InputEvent('input', {
                                 bubbles: true,
                                 cancelable: false,
-                                inputType: 'insertText',
-                                data: e.data
+                                inputType: 'deleteContentBackward'
                             });
                             editor.dispatchEvent(inputEvent);
                         }
@@ -1653,6 +1425,19 @@
                     const range = selection.getRangeAt(0);
                     if (range.startContainer === editor) {
                         cursorWasOrphaned = true;
+                    }
+                }
+
+                // First pass: Remove empty DIVs (divs that contain only empty formatting, but NOT blank line divs with BR)
+                const divs = Array.from(editor.querySelectorAll('div'));
+                for (const div of divs) {
+                    const isEmpty = div.textContent.trim() === '';
+                    const hasBR = div.querySelector('br') !== null;
+                    
+                    // Only remove if empty AND no BR (empty formatting tags)
+                    // Keep divs with BR tags - they represent intentional blank lines
+                    if (isEmpty && !hasBR) {
+                        div.remove();
                     }
                 }
 
@@ -1828,23 +1613,6 @@
 
             // Add input listener for autocorrect tooltips (suggestion-only)
             editor.addEventListener('input', function (e) {
-                addDebugLog(`INPUT: type=${e.inputType} data="${e.data}"`, 'info');
-                
-                // Log selection state
-                const selection = window.getSelection();
-                if (selection.rangeCount > 0) {
-                    const range = selection.getRangeAt(0);
-                    addDebugLog(`Selection: container=${range.startContainer.nodeName} offset=${range.startOffset}`, 'info');
-                    
-                    if (range.startContainer === editor) {
-                        addDebugLog(`WARNING: Selection at editor root!`, 'warn');
-                    }
-                }
-                
-                // Log DOM structure before cleanup
-                addDebugLog(`DOM before cleanup:`, 'info');
-                addDebugLog(getDOMStructure(editor), 'info');
-                
                 // Quest 3: Clean up orphaned elements on ANY input (deletion or insertion)
                 // This catches the case where deletion leaves orphaned tags, then typing goes into them
                 cleanupOrphanedElements();
@@ -1852,16 +1620,6 @@
                 // Quest 3: Remove unnecessary BRs from divs that now have text
                 // When typing into <div><br></div>, remove the BR to get <div>text</div>
                 removeUnnecessaryBRs();
-                
-                // Log DOM structure after cleanup
-                addDebugLog(`DOM after cleanup:`, 'info');
-                addDebugLog(getDOMStructure(editor), 'info');
-                
-                // Log selection state after cleanup
-                if (selection.rangeCount > 0) {
-                    const range = selection.getRangeAt(0);
-                    addDebugLog(`After cleanup - container=${range.startContainer.nodeName} offset=${range.startOffset}`, 'info');
-                }
 
                 // If tooltip is visible and user types another character, hide it AND clear the suggestion
                 // This ensures determinism - we don't apply stale suggestions
