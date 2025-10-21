@@ -1349,8 +1349,57 @@
                             range.deleteContents();
 
                             // CRITICAL: Clean up empty divs immediately after deletion
-                            // This must happen BEFORE typing starts, or cursor ends up at editor root
                             cleanupOrphanedElements();
+
+                            // CRITICAL: Check if cursor is still at editor root after cleanup
+                            // If so, force it into a proper div
+                            const sel = window.getSelection();
+                            if (sel.rangeCount > 0) {
+                                const r = sel.getRangeAt(0);
+                                if (r.startContainer === editor) {
+                                    // Cursor is at editor root - find or create a div to put it in
+                                    const offset = r.startOffset;
+                                    const children = Array.from(editor.childNodes);
+                                    
+                                    let targetDiv = null;
+                                    
+                                    // Look for a div at or after cursor position
+                                    for (let i = offset; i < children.length; i++) {
+                                        if (children[i].nodeType === Node.ELEMENT_NODE && children[i].tagName === 'DIV') {
+                                            targetDiv = children[i];
+                                            break;
+                                        }
+                                    }
+                                    
+                                    // If no div found after, look before
+                                    if (!targetDiv) {
+                                        for (let i = offset - 1; i >= 0; i--) {
+                                            if (children[i].nodeType === Node.ELEMENT_NODE && children[i].tagName === 'DIV') {
+                                                targetDiv = children[i];
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    
+                                    // If still no div, create one
+                                    if (!targetDiv) {
+                                        targetDiv = document.createElement('div');
+                                        targetDiv.appendChild(document.createElement('br'));
+                                        if (offset < children.length) {
+                                            editor.insertBefore(targetDiv, children[offset]);
+                                        } else {
+                                            editor.appendChild(targetDiv);
+                                        }
+                                    }
+                                    
+                                    // Move cursor to the start of the target div
+                                    const newRange = document.createRange();
+                                    newRange.setStart(targetDiv, 0);
+                                    newRange.setEnd(targetDiv, 0);
+                                    sel.removeAllRanges();
+                                    sel.addRange(newRange);
+                                }
+                            }
 
                             // Trigger input event
                             const inputEvent = new InputEvent('input', {
