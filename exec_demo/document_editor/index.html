@@ -1650,6 +1650,11 @@
                                 }
                             }
                             
+                            // Remove any BR elements from the target div (empty line markers)
+                            // These would cause the next character to go on a new line
+                            const brs = targetDiv.querySelectorAll('br');
+                            brs.forEach(br => br.remove());
+                            
                             // Insert text at the start of the div
                             const textNode = document.createTextNode(e.data);
                             targetDiv.insertBefore(textNode, targetDiv.firstChild);
