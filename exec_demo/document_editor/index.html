@@ -771,7 +771,6 @@
             document.addEventListener('selectionchange', function () {
                 if (document.activeElement === editor) {
                     updateToolbarState();
-                    updateDebugPanel();
                 }
             });
 
@@ -1467,33 +1466,59 @@
                 }
 
                 // If cursor was orphaned and we wrapped something, move cursor inside the wrapper
-                if (cursorWasOrphaned && wrappedCursorNode) {
-                    const range = document.createRange();
+                if (cursorWasOrphaned) {
+                    if (wrappedCursorNode) {
+                        // We found and wrapped something - move cursor there
+                        const range = document.createRange();
 
-                    if (wrappedCursorNode.nodeType === Node.TEXT_NODE) {
-                        // Position at end of text node
-                        range.setStart(wrappedCursorNode, wrappedCursorNode.textContent.length);
-                        range.setEnd(wrappedCursorNode, wrappedCursorNode.textContent.length);
-                    } else {
-                        // wrappedCursorNode is a div wrapper
-                        // Check if it contains only a BR (empty line case)
-                        const hasOnlyBR = wrappedCursorNode.childNodes.length === 1 &&
-                            wrappedCursorNode.firstChild.nodeType === Node.ELEMENT_NODE &&
-                            wrappedCursorNode.firstChild.tagName === 'BR';
-
-                        if (hasOnlyBR) {
-                            // Position at start (before BR) so typing replaces it
-                            range.setStart(wrappedCursorNode, 0);
-                            range.setEnd(wrappedCursorNode, 0);
+                        if (wrappedCursorNode.nodeType === Node.TEXT_NODE) {
+                            // Position at end of text node
+                            range.setStart(wrappedCursorNode, wrappedCursorNode.textContent.length);
+                            range.setEnd(wrappedCursorNode, wrappedCursorNode.textContent.length);
                         } else {
-                            // Has content - position at end
-                            range.selectNodeContents(wrappedCursorNode);
-                            range.collapse(false); // Collapse to end
-                        }
-                    }
+                            // wrappedCursorNode is a div wrapper
+                            // Check if it contains only a BR (empty line case)
+                            const hasOnlyBR = wrappedCursorNode.childNodes.length === 1 &&
+                                wrappedCursorNode.firstChild.nodeType === Node.ELEMENT_NODE &&
+                                wrappedCursorNode.firstChild.tagName === 'BR';
 
-                    selection.removeAllRanges();
-                    selection.addRange(range);
+                            if (hasOnlyBR) {
+                                // Position at start (before BR) so typing replaces it
+                                range.setStart(wrappedCursorNode, 0);
+                                range.setEnd(wrappedCursorNode, 0);
+                            } else {
+                                // Has content - position at end
+                                range.selectNodeContents(wrappedCursorNode);
+                                range.collapse(false); // Collapse to end
+                            }
+                        }
+
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    } else {
+                        // Cursor was orphaned but we didn't wrap anything
+                        // This means there was nothing at cursor position - create a new div
+                        const newDiv = document.createElement('div');
+                        newDiv.appendChild(document.createElement('br'));
+
+                        // Get cursor position to know where to insert
+                        const range = selection.getRangeAt(0);
+                        const offset = range.startOffset;
+                        const children = Array.from(editor.childNodes);
+
+                        if (offset < children.length) {
+                            editor.insertBefore(newDiv, children[offset]);
+                        } else {
+                            editor.appendChild(newDiv);
+                        }
+
+                        // Move cursor into the new div
+                        const newRange = document.createRange();
+                        newRange.setStart(newDiv, 0);
+                        newRange.setEnd(newDiv, 0);
+                        selection.removeAllRanges();
+                        selection.addRange(newRange);
+                    }
                 }
             }
 
