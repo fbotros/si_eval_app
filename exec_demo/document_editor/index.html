@@ -1540,7 +1540,7 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                 const selection = window.getSelection();
                 let cursorWasOrphaned = false;
                 let wrappedCursorNode = null;
-                
+
                 // Check if cursor is currently at editor root (between divs)
                 if (selection.rangeCount > 0) {
                     const range = selection.getRangeAt(0);
@@ -1553,12 +1553,12 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                 const children = Array.from(editor.childNodes);
                 for (const child of children) {
                     // If it's an inline element at root level (not wrapped in div)
-                    if (child.nodeType === Node.ELEMENT_NODE && 
+                    if (child.nodeType === Node.ELEMENT_NODE &&
                         ['FONT', 'B', 'I', 'U', 'SPAN', 'STRONG', 'EM'].includes(child.tagName)) {
-                        
+
                         // Check if it's empty or only whitespace
                         const isEmpty = child.textContent.trim() === '';
-                        
+
                         if (isEmpty) {
                             // Remove empty orphaned elements completely
                             child.remove();
@@ -1567,7 +1567,7 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                             const wrapper = document.createElement('div');
                             editor.insertBefore(wrapper, child);
                             wrapper.appendChild(child);
-                            
+
                             // If cursor was orphaned, it's probably meant to be in this new wrapper
                             if (cursorWasOrphaned && !wrappedCursorNode) {
                                 wrappedCursorNode = wrapper;
@@ -1580,7 +1580,7 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                         const wrapper = document.createElement('div');
                         editor.insertBefore(wrapper, child);
                         wrapper.appendChild(child);
-                        
+
                         // If cursor was orphaned and this is the first BR we wrapped, move cursor here
                         if (cursorWasOrphaned && !wrappedCursorNode) {
                             wrappedCursorNode = wrapper;
@@ -1589,7 +1589,7 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                     // Handle orphaned TEXT NODES at root level
                     else if (child.nodeType === Node.TEXT_NODE) {
                         const isEmpty = child.textContent.trim() === '';
-                        
+
                         if (isEmpty) {
                             // Remove empty text nodes
                             child.remove();
@@ -1598,7 +1598,7 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                             const wrapper = document.createElement('div');
                             editor.insertBefore(wrapper, child);
                             wrapper.appendChild(child);
-                            
+
                             // If cursor was orphaned, it's probably meant to be in this text node
                             if (cursorWasOrphaned && !wrappedCursorNode) {
                                 wrappedCursorNode = child; // Set to the text node inside the wrapper
@@ -1610,7 +1610,7 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                 // If cursor was orphaned and we wrapped something, move cursor inside the wrapper
                 if (cursorWasOrphaned && wrappedCursorNode) {
                     const range = document.createRange();
-                    
+
                     if (wrappedCursorNode.nodeType === Node.TEXT_NODE) {
                         // Position at end of text node
                         range.setStart(wrappedCursorNode, wrappedCursorNode.textContent.length);
@@ -1618,10 +1618,10 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                     } else {
                         // wrappedCursorNode is a div wrapper
                         // Check if it contains only a BR (empty line case)
-                        const hasOnlyBR = wrappedCursorNode.childNodes.length === 1 && 
-                                         wrappedCursorNode.firstChild.nodeType === Node.ELEMENT_NODE &&
-                                         wrappedCursorNode.firstChild.tagName === 'BR';
-                        
+                        const hasOnlyBR = wrappedCursorNode.childNodes.length === 1 &&
+                            wrappedCursorNode.firstChild.nodeType === Node.ELEMENT_NODE &&
+                            wrappedCursorNode.firstChild.tagName === 'BR';
+
                         if (hasOnlyBR) {
                             // Position at start (before BR) so typing replaces it
                             range.setStart(wrappedCursorNode, 0);
@@ -1632,7 +1632,7 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                             range.collapse(false); // Collapse to end
                         }
                     }
-                    
+
                     selection.removeAllRanges();
                     selection.addRange(range);
                 }
@@ -1655,7 +1655,7 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                     return false;
                 }
                 
-                // Helper function to remove BRs from an element if it has text content
+                // Helper function to remove ONLY trailing BRs from an element
                 function cleanElement(element) {
                     // First, recursively clean all child elements
                     const childElements = Array.from(element.children);
@@ -1665,13 +1665,26 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                         }
                     });
                     
-                    // Then check if this element has real text content
+                    // Only remove trailing BRs if element has text content
                     if (hasRealTextContent(element)) {
-                        // Remove all BR children (at this level)
-                        const brs = Array.from(element.childNodes).filter(node => 
-                            node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR'
-                        );
-                        brs.forEach(br => br.remove());
+                        const children = Array.from(element.childNodes);
+                        
+                        // Remove BRs only if they're at the very end (trailing)
+                        // Work backwards from the end
+                        for (let i = children.length - 1; i >= 0; i--) {
+                            const node = children[i];
+                            
+                            if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') {
+                                // This is a trailing BR - remove it
+                                node.remove();
+                            } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() === '') {
+                                // Empty text node at end - skip it and continue
+                                continue;
+                            } else {
+                                // Hit non-BR, non-empty content - stop checking
+                                break;
+                            }
+                        }
                     }
                 }
                 
@@ -1685,11 +1698,11 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                 // Quest 3: Clean up orphaned elements on ANY input (deletion or insertion)
                 // This catches the case where deletion leaves orphaned tags, then typing goes into them
                 cleanupOrphanedElements();
-                
+
                 // Quest 3: Remove unnecessary BRs from divs that now have text
                 // When typing into <div><br></div>, remove the BR to get <div>text</div>
                 removeUnnecessaryBRs();
-                
+
                 // Update debug panel on every input
                 updateDebugPanel();
                 // If tooltip is visible and user types another character, hide it AND clear the suggestion
