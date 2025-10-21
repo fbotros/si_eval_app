@@ -1270,6 +1270,10 @@
                             e.preventDefault();
                             range.deleteContents();
 
+                            // CRITICAL: Clean up empty divs immediately after deletion
+                            // This must happen BEFORE typing starts, or cursor ends up at editor root
+                            cleanupOrphanedElements();
+
                             // Trigger input event
                             const inputEvent = new InputEvent('input', {
                                 bubbles: true,
@@ -1433,7 +1437,7 @@
                 for (const div of divs) {
                     const isEmpty = div.textContent.trim() === '';
                     const hasBR = div.querySelector('br') !== null;
-                    
+
                     // Only remove if empty AND no BR (empty formatting tags)
                     // Keep divs with BR tags - they represent intentional blank lines
                     if (isEmpty && !hasBR) {
