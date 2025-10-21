@@ -1535,7 +1535,7 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                 }
             }
 
-            // Quest 3 Fix: Clean up orphaned inline elements
+            // Quest 3 Fix: Clean up orphaned inline elements and text nodes
             function cleanupOrphanedElements() {
                 const selection = window.getSelection();
                 let savedRange = null;
@@ -1563,9 +1563,19 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                             wrapper.appendChild(child);
                         }
                     }
-                    // Also remove orphaned text nodes at root level (shouldn't happen but just in case)
-                    else if (child.nodeType === Node.TEXT_NODE && child.textContent.trim() === '') {
-                        child.remove();
+                    // Handle orphaned TEXT NODES at root level
+                    else if (child.nodeType === Node.TEXT_NODE) {
+                        const isEmpty = child.textContent.trim() === '';
+                        
+                        if (isEmpty) {
+                            // Remove empty text nodes
+                            child.remove();
+                        } else {
+                            // Has content - wrap it in a div
+                            const wrapper = document.createElement('div');
+                            editor.insertBefore(wrapper, child);
+                            wrapper.appendChild(child);
+                        }
                     }
                 }
 
