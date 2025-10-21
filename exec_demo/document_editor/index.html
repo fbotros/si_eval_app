@@ -248,6 +248,67 @@
             margin-top: -1px;
         }
 
+        /* Debug Panel */
+        #debug-panel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 400px;
+            max-height: 90vh;
+            background: rgba(0, 0, 0, 0.9);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 10000;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #debug-panel h3 {
+            color: #0ff;
+            font-size: 13px;
+            margin: 0 0 8px 0;
+            border-bottom: 1px solid #0ff;
+            padding-bottom: 4px;
+        }
+
+        #debug-panel .debug-section {
+            margin-bottom: 12px;
+        }
+
+        #debug-panel .debug-label {
+            color: #ff0;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        #debug-panel .debug-value {
+            color: #0f0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: rgba(0, 255, 0, 0.1);
+            padding: 4px;
+            border-radius: 3px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        #debug-panel .cursor-marker {
+            background: yellow;
+            color: black;
+            font-weight: bold;
+            padding: 0 2px;
+        }
+
+        #debug-panel .word-marker {
+            background: cyan;
+            color: black;
+            font-weight: bold;
+            padding: 0 2px;
+        }
+
         /* Loading overlay */
         #loading-overlay {
             position: fixed;
@@ -356,6 +417,36 @@
 
     <!-- Autocorrect tooltip - positioned outside of contentEditable -->
     <div id="autocorrect-tooltip" class="autocorrect-tooltip"></div>
+
+    <!-- Debug Panel -->
+    <div id="debug-panel">
+        <h3>DEBUG PANEL</h3>
+        
+        <div class="debug-section">
+            <div class="debug-label">DOM innerHTML:</div>
+            <div class="debug-value" id="debug-dom"></div>
+        </div>
+
+        <div class="debug-section">
+            <div class="debug-label">Editor innerText:</div>
+            <div class="debug-value" id="debug-text"></div>
+        </div>
+
+        <div class="debug-section">
+            <div class="debug-label">Cursor Position:</div>
+            <div class="debug-value" id="debug-cursor"></div>
+        </div>
+
+        <div class="debug-section">
+            <div class="debug-label">Current Word:</div>
+            <div class="debug-value" id="debug-word"></div>
+        </div>
+
+        <div class="debug-section">
+            <div class="debug-label">Autocorrect State:</div>
+            <div class="debug-value" id="debug-autocorrect"></div>
+        </div>
+    </div>
 
     <!-- Load external scripts (already loaded in head) -->
     <script src="../AutocorrectEngine.js?v=20251014-2"></script>
@@ -771,6 +862,7 @@
             document.addEventListener('selectionchange', function () {
                 if (document.activeElement === editor) {
                     updateToolbarState();
+                    updateDebugPanel();
                 }
             });
 
@@ -783,6 +875,7 @@
                 // Small delay to ensure selection is finalized
                 setTimeout(() => {
                     updateToolbarState();
+                    updateDebugPanel();
                 }, 10);
             });
 
@@ -1392,8 +1485,60 @@
             }
 
 
+            // Debug panel update function
+            function updateDebugPanel() {
+                try {
+                    const debugDom = document.getElementById('debug-dom');
+                    const debugText = document.getElementById('debug-text');
+                    const debugCursor = document.getElementById('debug-cursor');
+                    const debugWord = document.getElementById('debug-word');
+                    const debugAutocorrect = document.getElementById('debug-autocorrect');
+
+                    if (!debugDom || !debugText || !debugCursor || !debugWord || !debugAutocorrect) return;
+
+                    // Get the raw innerHTML and escape it for display
+                    const rawHTML = editor.innerHTML;
+                    const escapedHTML = rawHTML
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;');
+                    debugDom.innerHTML = escapedHTML;
+
+                    // Get the innerText
+                    const editorText = getEditorText();
+                    debugText.textContent = editorText;
+
+                    // Get cursor position
+                    const selection = window.getSelection();
+                    if (selection.rangeCount > 0) {
+                        const cursorOffset = getCursorOffset();
+                        const range = selection.getRangeAt(0);
+                        debugCursor.textContent = `Offset: ${cursorOffset}\nContainer: ${range.startContainer.nodeName}\nOffset in container: ${range.startOffset}`;
+                    } else {
+                        debugCursor.textContent = 'No selection';
+                    }
+
+                    // Get current word
+                    const currentWord = getCurrentWord();
+                    debugWord.textContent = currentWord || '(none)';
+
+                    // Get autocorrect state
+                    const autocorrectState = `Enabled: ${autocorrectEnabled}
+Editing existing word: ${isEditingExistingWord}
+Chars since backspace: ${charsTypedSinceLastBackspace}
+Current suggestion: ${currentAutocorrectSuggestion || '(none)'}
+Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
+                    debugAutocorrect.textContent = autocorrectState;
+
+                } catch (error) {
+                    console.error('Error updating debug panel:', error);
+                }
+            }
+
             // Add input listener for autocorrect tooltips (suggestion-only)
             editor.addEventListener('input', function (e) {
+                // Update debug panel on every input
+                updateDebugPanel();
                 // If tooltip is visible and user types another character, hide it AND clear the suggestion
                 // This ensures determinism - we don't apply stale suggestions
                 if (e.inputType === 'insertText' && e.data && e.data.length === 1) {
