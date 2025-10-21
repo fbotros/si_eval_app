@@ -1538,9 +1538,15 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
             // Quest 3 Fix: Clean up orphaned inline elements and text nodes
             function cleanupOrphanedElements() {
                 const selection = window.getSelection();
-                let savedRange = null;
+                let cursorWasOrphaned = false;
+                let wrappedCursorNode = null;
+                
+                // Check if cursor is currently at editor root (between divs)
                 if (selection.rangeCount > 0) {
-                    savedRange = selection.getRangeAt(0).cloneRange();
+                    const range = selection.getRangeAt(0);
+                    if (range.startContainer === editor) {
+                        cursorWasOrphaned = true;
+                    }
                 }
 
                 // Check all direct children of editor
@@ -1561,6 +1567,11 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                             const wrapper = document.createElement('div');
                             editor.insertBefore(wrapper, child);
                             wrapper.appendChild(child);
+                            
+                            // If cursor was orphaned, it's probably meant to be in this new wrapper
+                            if (cursorWasOrphaned && !wrappedCursorNode) {
+                                wrappedCursorNode = wrapper;
+                            }
                         }
                     }
                     // Handle orphaned BR elements at root level - wrap them in divs
@@ -1569,6 +1580,11 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                         const wrapper = document.createElement('div');
                         editor.insertBefore(wrapper, child);
                         wrapper.appendChild(child);
+                        
+                        // If cursor was orphaned and this is the first BR we wrapped, move cursor here
+                        if (cursorWasOrphaned && !wrappedCursorNode) {
+                            wrappedCursorNode = wrapper;
+                        }
                     }
                     // Handle orphaned TEXT NODES at root level
                     else if (child.nodeType === Node.TEXT_NODE) {
@@ -1582,18 +1598,31 @@ Word to replace: ${wordToReplaceWithSuggestion || '(none)'}`;
                             const wrapper = document.createElement('div');
                             editor.insertBefore(wrapper, child);
                             wrapper.appendChild(child);
+                            
+                            // If cursor was orphaned, it's probably meant to be in this text node
+                            if (cursorWasOrphaned && !wrappedCursorNode) {
+                                wrappedCursorNode = child; // Set to the text node inside the wrapper
+                            }
                         }
                     }
                 }
 
-                // Restore selection
-                if (savedRange) {
-                    try {
-                        selection.removeAllRanges();
-                        selection.addRange(savedRange);
-                    } catch (e) {
-                        // Range might be invalid, that's ok
+                // If cursor was orphaned and we wrapped something, move cursor inside the wrapper
+                if (cursorWasOrphaned && wrappedCursorNode) {
+                    const range = document.createRange();
+                    
+                    if (wrappedCursorNode.nodeType === Node.TEXT_NODE) {
+                        // Position at end of text node
+                        range.setStart(wrappedCursorNode, wrappedCursorNode.textContent.length);
+                        range.setEnd(wrappedCursorNode, wrappedCursorNode.textContent.length);
+                    } else {
+                        // Position at end of element
+                        range.selectNodeContents(wrappedCursorNode);
+                        range.collapse(false); // Collapse to end
                     }
+                    
+                    selection.removeAllRanges();
+                    selection.addRange(range);
                 }
             }
 
