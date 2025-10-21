@@ -1392,36 +1392,6 @@
             }
 
 
-            // Detect if we're on Quest 3 browser
-            const isQuest3 = /OculusBrowser/.test(navigator.userAgent);
-
-            // Quest 3 Fix: When text is selected and user types, break it into two steps
-            // Quest 3 handles "select + delete + type" correctly, but "select + type" is broken
-            if (isQuest3) {
-                editor.addEventListener('beforeinput', function (e) {
-                    if (e.inputType === 'insertText' && e.data) {
-                        const selection = window.getSelection();
-                        if (selection.rangeCount > 0) {
-                            const range = selection.getRangeAt(0);
-
-                            // Check if we have a non-collapsed selection (something is selected)
-                            if (!range.collapsed) {
-                                // Prevent the default "replace selection" behavior
-                                e.preventDefault();
-
-                                // Step 1: Delete the selection (this works correctly on Quest 3)
-                                document.execCommand('delete', false, null);
-
-                                // Step 2: Insert the typed character (this also works correctly)
-                                document.execCommand('insertText', false, e.data);
-
-                                // The input event will be dispatched automatically by execCommand
-                            }
-                        }
-                    }
-                });
-            }
-
             // Add input listener for autocorrect tooltips (suggestion-only)
             editor.addEventListener('input', function (e) {
                 // If tooltip is visible and user types another character, hide it AND clear the suggestion
@@ -1440,9 +1410,6 @@
                         debouncedAutocorrectCheck();
                     }
                 }
-                
-                // Track if this is inserting text (even if it looks like deletion due to length change)
-                const isInsertingText = e.inputType === 'insertText' || e.inputType === 'insertFromPaste';
 
                 // Handle backspace: check if we backspaced from whitespace into a word
                 if (e.inputType === 'deleteContentBackward') {
@@ -1562,8 +1529,7 @@
                 const textLengthChange = currentTextLength - lastTextLength;
 
                 // Intelligent suppression logic for backspace
-                // BUT: Don't treat insertText as deletion even if length decreases (selection replacement)
-                if (textLengthChange < 0 && !isInsertingText) {
+                if (textLengthChange < 0) {
                     // User is backspacing/deleting - reset counter and hide tooltip
                     charsTypedSinceLastBackspace = 0;
                     hideAutocorrectTooltip();
@@ -1593,7 +1559,7 @@
                             // Don't explicitly disable here - let the counter mechanism handle it
                         }
                     }
-                } else if (textLengthChange > 0 || isInsertingText) {
+                } else if (textLengthChange > 0) {
                     // User is typing forward
                     const justTypedDelimiter = isDelimiterBeforeCursor();
 
@@ -1771,13 +1737,9 @@
                     // Enable if: in whitespace OR at end of document (unless clearly in middle of word)
                     autocorrectEnabled = (inWhitespace || atEndOfDocument) && !inMiddleOfWord;
 
-                    // Reset counter and editing flag when at safe boundary
+                    // Reset counter when at safe boundary
                     if (autocorrectEnabled) {
                         charsTypedSinceLastBackspace = 0;
-                        isEditingExistingWord = false; // Clear the editing flag when clicking in safe position
-                    } else {
-                        // If we're in the middle of a word, set the editing flag
-                        isEditingExistingWord = true;
                     }
                 }, 0);
             });
