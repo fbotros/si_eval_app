@@ -166,16 +166,6 @@ function getWordAtPosition(text, position) {
     if (!text || position < 0 || position > text.length) {
         return { word: '', start: position, end: position, beforeCursor: '', afterCursor: '' };
     }
-}
-
-// Calculate Levenshtein distance between two strings with optional keyboard-aware substitution costs
-function levenshteinDistance(a, b, maxEditDist = 2, useKeyboardAwareness = true) {
-    if (a.length === 0) return b.length > maxEditDist ? maxEditDist + 1 : b.length;
-    if (b.length === 0) return a.length > maxEditDist ? maxEditDist + 1 : a.length;
-
-    // Early exit if length difference exceeds maxEditDist
-    if (Math.abs(a.length - b.length) > maxEditDist) {
-        return maxEditDist + 1;
 
     // Define word boundaries (letters, apostrophes, hyphens, and special chars like @#$_ are part of words)
     // This prevents autocorrect on emails, usernames, hashtags, etc.
