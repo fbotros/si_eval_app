@@ -1186,6 +1186,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         document.getElementById('result_total_uncorrected_errors').value = data.uncorrectedErrors;
         document.getElementById('result_surface_difference_mm').value = data.surfaceDifference * 1000;
         document.getElementById('result_platform').value = getURLParameter('platform');
+        document.getElementById('result_condition_id').value = data.conditionId;
+        document.getElementById('result_condition_value').value = data.conditionValue;
 
         console.log("Submitting prompt result to Google Form: " + JSON.stringify(data));
 
