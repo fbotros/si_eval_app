@@ -985,8 +985,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         const typedLength = typedText.length;
         const promptLength = promptText.length;
 
-        // Use Levenshtein distance to calculate edit distance
-        const editDistance = levenshteinDistance(typedText, promptText);
+        // Use Levenshtein distance to calculate edit distance (no cap for accuracy measurement)
+        const editDistance = levenshteinDistance(typedText, promptText, Infinity);
 
         // Calculate accuracy as 1 minus normalized edit distance
         const maxDistance = Math.max(typedLength, promptLength);
