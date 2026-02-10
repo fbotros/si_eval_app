@@ -88,16 +88,21 @@ class TrieDictionary {
             rowBuffer1[i] = i;
         }
 
+        // DEBUG logging for "fantastic" searches
+        if (word.includes('fantastic')) {
+            console.log(`🔎 Searching for "${word}": minLen=${minLength}, maxLen=${maxLength}, maxDist=${maxEditDist}`);
+            console.log(`🔎 Root has ${this.root.children.size} children:`, Array.from(this.root.children.keys()).slice(0, 10));
+        }
 
         // Start search from root's children
         for (const [char, node] of this.root.children) {
             this.searchImpl(
-                node,
-                char,
-                rowBuffer1,
+                node, 
+                char, 
+                rowBuffer1, 
                 rowBuffer2,
-                lowercaseWord,
-                maxEditDist,
+                lowercaseWord, 
+                maxEditDist, 
                 results,
                 1, // current depth
                 minLength,
@@ -115,7 +120,7 @@ class TrieDictionary {
             return;
         }
 
-      // AGGRESSIVE PRUNING: Check if we can possibly reach acceptable length
+        // AGGRESSIVE PRUNING: Check if we can possibly reach acceptable length
         // If current depth already exceeds maxLength, bail immediately
         if (depth > maxLength) {
             return;
@@ -142,22 +147,28 @@ class TrieDictionary {
 
             const minVal = Math.min(insertCondition, deleteCondition, replaceCondition);
             currentRow[i] = minVal;
-
+            
             // Track minimum inline to avoid second pass
             if (minVal < minInRow) {
                 minInRow = minVal;
             }
         }
 
-
         // If we found a complete word, check length constraint AND edit distance
         if (node.word.length > 0) {
             const wordLength = node.word.length;
             const editDist = currentRow[sz - 1];
-
-
+            
+            // DEBUG: Log when we find candidate words
+            if (word.includes('facilitat') || word.includes('archival')) {
+                console.log(`📊 Found "${node.word}": depth=${depth}, len=${wordLength}, minLen=${minLength}, maxLen=${maxLength}, editDist=${editDist}, maxDist=${maxEditDist}`);
+                console.log(`   Length OK: ${wordLength >= minLength && wordLength <= maxLength}`);
+                console.log(`   Edit distance OK: ${editDist <= maxEditDist}`);
+                console.log(`   currentRow:`, Array.from(currentRow));
+            }
+            
             // CRITICAL: Check length constraint before adding to results
-            if (wordLength >= minLength && wordLength <= maxLength &&
+            if (wordLength >= minLength && wordLength <= maxLength && 
                 editDist <= maxEditDist) {
                 results.push({
                     word: node.word,
@@ -166,24 +177,23 @@ class TrieDictionary {
             }
         }
 
-        // SMART PRUNING: Only continue if there's mathematical possibility of finding a match
-        // The minimum value in the row represents the best possible alignment at this point
-        // If minInRow > maxEditDist, no future path can achieve editDistance <= maxEditDist
-        // This is safe because edit distance can only increase or stay the same as we go deeper
-        if (minInRow > maxEditDist) {
-            return;
-        }
+        // AGGRESSIVE PRUNING: Only continue if there's hope
+        // Stop early if minimum cost in row already exceeds threshold
+        // DISABLED: Too aggressive, cuts off valid paths
+        // if (minInRow > maxEditDist) {
+        //     return;
+        // }
 
         // Recurse to children - need fresh buffer for next row
         for (const [nextChar, childNode] of node.children) {
             const nextRow = new Float32Array(sz);
             this.searchImpl(
-                childNode,
-                nextChar,
+                childNode, 
+                nextChar, 
                 currentRow,  // current becomes last for next level
                 nextRow,     // fresh buffer for next level
-                word,
-                maxEditDist,
+                word, 
+                maxEditDist, 
                 results,
                 depth + 1,
                 minLength,
