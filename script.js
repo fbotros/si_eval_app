@@ -688,16 +688,13 @@ document.addEventListener('DOMContentLoaded', async function () {
             });
 
             document.addEventListener('promptFinishedEvent', function (e) {
+                let result = e.detail.message;
+                result['conditionId'] = conditionId;
+                result['conditionValue'] = conditionValue;
                 if (surfaceDifference != -1) {
-                    let result = e.detail.message;
                     result['surfaceDifference'] = surfaceDifference;
-                    result['conditionId'] = conditionId;
-                    result['conditionValue'] = conditionValue;
-                    submitPromptResultToGoogleForm(result);
                 }
-                else {
-                    submitPromptResultToGoogleForm(e.detail.message);
-                }
+                submitPromptResultToGoogleForm(result);
             });
         }
     }
