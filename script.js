@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     let surfaceDifference = -1;
+    let conditionId = -1;
+    let conditionValue = -1;
 
     // Array of prompts for the typing test - loaded from prompts.txt
     let originalPrompts = [];
@@ -671,9 +673,17 @@ document.addEventListener('DOMContentLoaded', async function () {
             // register listener for data passed to WebView from Unity
             window.addEventListener('vuplexmessage', event => {
                 const surfaces = JSON.parse(event.value);
-                console.log("received surfaces: " + surfaces.handBasedSurface + ", " + surfaces.fiducialBasedSurface);
+                console.log("received surfaces: " + surfaces.handBasedSurface + ", " + surfaces.fiducialBasedSurface + ", " + surfaces.conditionId + ", " + surfaces.conditionValue);
                 if (surfaces.handBasedSurface && surfaces.fiducialBasedSurface) {
                     surfaceDifference = surfaces.handBasedSurface - surfaces.fiducialBasedSurface;
+                }
+
+                if (surfaces.conditionId){
+                    conditionId = surfaces.conditionId;
+                }
+
+                if (surfaces.conditionValue){
+                    conditionValue = surfaces.conditionValue;
                 }
             });
 
@@ -681,6 +691,8 @@ document.addEventListener('DOMContentLoaded', async function () {
                 if (surfaceDifference != -1) {
                     let result = e.detail.message;
                     result['surfaceDifference'] = surfaceDifference;
+                    result['conditionId'] = conditionId;
+                    result['conditionValue'] = conditionValue;
                     submitPromptResultToGoogleForm(result);
                 }
                 else {
