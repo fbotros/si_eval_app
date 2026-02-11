@@ -719,6 +719,44 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     checkSettingPresetInUrlParameter();
 
+    // Check for URL parameter overrides (these take priority over presets)
+    function applyURLParameterOverrides() {
+        // Check for num_prompts URL parameter (takes priority over preset)
+        const numPromptsParam = getURLParameter('num_prompts');
+        if (numPromptsParam !== null) {
+            const numPrompts = parseInt(numPromptsParam, 10);
+            if (!isNaN(numPrompts) && numPrompts > 0) {
+                updatePromptCount(numPrompts);
+            }
+        }
+
+        // Check for user_id URL parameter
+        const userIdParam = getURLParameter('user_id');
+        if (userIdParam !== null) {
+            const userIdInputElement = document.getElementById('user-id');
+            userIdInputElement.value = userIdParam;
+            // Show user ID field if it was set via URL
+            document.getElementById('user-id-group').style.display = 'block';
+            // Update input area state in case UXR mode is enabled
+            checkAndUpdateInputAreaState();
+        }
+
+        // Check for dataset URL parameter
+        const datasetParam = getURLParameter('dataset');
+        if (datasetParam !== null) {
+            // Find the radio button with the matching value
+            const datasetRadio = document.querySelector(`input[name="dataset"][value="${datasetParam}"]`);
+            if (datasetRadio) {
+                datasetRadio.checked = true;
+                // Trigger the change event to reload prompts for the new dataset
+                datasetRadio.dispatchEvent(new Event('change'));
+            }
+        }
+    }
+
+    // Apply URL parameter overrides after presets are applied
+    applyURLParameterOverrides();
+
     // Add event listener for user ID input to handle UXR mode restrictions
     const userIdInput = document.getElementById('user-id');
     userIdInput.addEventListener('input', function() {
