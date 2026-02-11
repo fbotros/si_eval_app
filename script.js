@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     let surfaceDifference = -1;
     let conditionId = -1;
     let conditionValue = -1;
+    let qrHeight = -1;
 
     // Array of prompts for the typing test - loaded from prompts.txt
     let originalPrompts = [];
@@ -674,6 +675,10 @@ document.addEventListener('DOMContentLoaded', async function () {
             window.addEventListener('vuplexmessage', event => {
                 const surfaces = JSON.parse(event.value);
                 console.log("received surfaces: " + surfaces.handBasedSurface + ", " + surfaces.fiducialBasedSurface + ", " + surfaces.conditionId + ", " + surfaces.conditionValue);
+                if (surfaces.fiducialBasedSurface){
+                    qrHeight = surfaces.fiducialBasedSurface;
+                }
+
                 if (surfaces.handBasedSurface && surfaces.fiducialBasedSurface) {
                     surfaceDifference = surfaces.handBasedSurface - surfaces.fiducialBasedSurface;
                 }
@@ -691,6 +696,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 let result = e.detail.message;
                 result['conditionId'] = conditionId;
                 result['conditionValue'] = conditionValue;
+                result['qrHeight'] = qrHeight;
                 if (surfaceDifference != -1) {
                     result['surfaceDifference'] = surfaceDifference;
                 }
@@ -1228,6 +1234,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         document.getElementById('result_platform').value = getURLParameter('platform');
         document.getElementById('result_condition_id').value = data.conditionId;
         document.getElementById('result_condition_value').value = data.conditionValue;
+        document.getElementById('result_qr_height').value = data.qrHeight;
 
         console.log("Submitting prompt result to Google Form: " + JSON.stringify(data));
 
