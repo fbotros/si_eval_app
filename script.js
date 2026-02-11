@@ -984,8 +984,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Calculate and display average results
         calculateAverageResults();
 
-        // Display results
-        results.style.display = 'block';
+        // Display results (hide in UXR mode)
+        if (!uxrModeEnabled) {
+            results.style.display = 'block';
+        }
     }
 
     function resetTest() {
