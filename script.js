@@ -758,6 +758,17 @@ document.addEventListener('DOMContentLoaded', async function () {
                 datasetRadio.dispatchEvent(new Event('change'));
             }
         }
+
+        // Check for autocorrect URL parameter
+        const autocorrectParam = getURLParameter('autocorrect');
+        if (autocorrectParam !== null) {
+            const modeUpper = autocorrectParam.toUpperCase();
+            if (AUTOCORRECT_MODE[modeUpper]) {
+                userSelectedAutocorrectMode = AUTOCORRECT_MODE[modeUpper];
+                updateAutocorrectRadioButtons(userSelectedAutocorrectMode);
+                configureInputArea();
+            }
+        }
     }
 
     // Apply URL parameter overrides after presets are applied

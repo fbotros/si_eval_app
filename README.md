@@ -46,3 +46,7 @@ Then open **http://localhost:8000** in your browser.
 |---|---|---|
 | `setting_preset` | `qa`, `uxr`, `uxr_webview` | Activates preset configurations |
 | `platform` | any string | Recorded in form submissions |
+| `dataset` | `practice`, `nat_lang_no_punc`, `nat_lang_with_cap_punc`, `emails`, `passwords`, `metal_keys` | Selects the prompt dataset |
+| `autocorrect` | `off`, `system`, `custom` | Sets the autocorrect mode |
+| `num_prompts` | integer | Limits the number of prompts to display |
+| `user_id` | any string | Sets the user ID for form submissions |
