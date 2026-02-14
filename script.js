@@ -1246,6 +1246,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         document.getElementById('result_condition_id').value = data.conditionId;
         document.getElementById('result_condition_value').value = data.conditionValue;
         document.getElementById('result_qr_height').value = data.qrHeight;
+        document.getElementById('result_session_id').value = getURLParameter('session_id');
 
         console.log("Submitting prompt result to Google Form: " + JSON.stringify(data));
 
