@@ -769,6 +769,16 @@ document.addEventListener('DOMContentLoaded', async function () {
                 configureInputArea();
             }
         }
+
+        // Check for input_type URL parameter (physical-keyboard, floating-keyboard, skb)
+        const inputTypeParam = getURLParameter('input_type');
+        if (inputTypeParam !== null) {
+            const inputTypeRadio = document.querySelector(`input[name="input-type"][value="${inputTypeParam}"]`);
+            if (inputTypeRadio) {
+                inputTypeRadio.checked = true;
+                inputType = inputTypeParam;
+            }
+        }
     }
 
     // Apply URL parameter overrides after presets are applied
