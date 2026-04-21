@@ -631,6 +631,74 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Track if UXR mode is enabled
     let uxrModeEnabled = false;
 
+    // === Detailed logging mode (URL-gated via ?detailedLog=true) ===
+    // Captures three event types per prompt — keydown, keyup, textChange —
+    // and auto-downloads a JSON file when the user submits each prompt.
+    let detailedLogEnabled = false;
+    let detailedLogEvents = [];
+    let detailedLogPromptStartedAt = null;
+
+    function detailedLogTimestamps() {
+        const now = Date.now();
+        return {
+            timestamp: now,
+            timestampIso: new Date(now).toISOString(),
+            timeSincePromptStartMs: detailedLogPromptStartedAt ? now - detailedLogPromptStartedAt : null
+        };
+    }
+
+    function logKeyEvent(type, e) {
+        if (!detailedLogEnabled) return;
+        detailedLogEvents.push(Object.assign({ type: type }, detailedLogTimestamps(), {
+            key: e.key,
+            code: e.code,
+            keyCode: e.keyCode,
+            isComposing: e.isComposing
+        }));
+    }
+
+    function logTextChange(prevValue, currValue) {
+        if (!detailedLogEnabled) return;
+        detailedLogEvents.push(Object.assign({ type: 'textChange' }, detailedLogTimestamps(), {
+            previousValue: prevValue,
+            currentValue: currValue,
+            selectionStart: inputArea.selectionStart,
+            selectionEnd: inputArea.selectionEnd
+        }));
+    }
+
+    function downloadDetailedLog(promptResult) {
+        const userId = document.getElementById('user-id').value || 'anonymous';
+        const datasetEl = document.querySelector('input[name="dataset"]:checked');
+        const dataset = datasetEl ? datasetEl.value : 'unknown';
+        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        const sanitize = (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = `${sanitize(userId)}_${sanitize(dataset)}_${ts}.json`;
+
+        const payload = {
+            userId: userId,
+            dataset: dataset,
+            inputType: inputType,
+            autocorrectMode: getAutocorrectMode(),
+            uxrMode: uxrModeEnabled,
+            prompt: getCurrentPromptText(),
+            promptStartedAt: detailedLogPromptStartedAt,
+            promptSubmittedAt: Date.now(),
+            results: promptResult,
+            events: detailedLogEvents
+        };
+
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
     function checkSettingPresetInUrlParameter() {
         let value = getURLParameter('setting_preset')
         if (value == null) {
@@ -779,6 +847,11 @@ document.addEventListener('DOMContentLoaded', async function () {
                 inputType = inputTypeParam;
             }
         }
+
+        // Check for detailedLog URL parameter
+        if (getURLParameter('detailedLog') === 'true') {
+            detailedLogEnabled = true;
+        }
     }
 
     // Apply URL parameter overrides after presets are applied
@@ -826,11 +899,16 @@ document.addEventListener('DOMContentLoaded', async function () {
             startTime = Date.now();
             endTime = startTime; // Reset endTime to startTime for new prompt
             promptTimingStarted = true;
+            detailedLogPromptStartedAt = startTime;
         }
 
         // Get the current input value and length
         const currentValue = inputArea.value;
         const currentLength = currentValue.length;
+
+        // Detailed logging: capture the textarea change before previousInputValue
+        // is overwritten below.
+        logTextChange(previousInputValue, currentValue);
 
         // Reset the correction flag if the user is typing a new character.
         // keyPressCount and correctedErrorCount are tracked from keydown
@@ -846,18 +924,36 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
         }
 
-        // Update previous values for next comparison
-        previousInputValue = currentValue;
-        previousInputLength = currentLength;
+        // Update previous values for next comparison.
+        // Re-read inputArea.value because performAutocorrect may have mutated
+        // it synchronously above, and we want previousInputValue to reflect
+        // the actual current state (otherwise the next textChange in the
+        // detailed log records a stale previousValue).
+        previousInputValue = inputArea.value;
+        previousInputLength = inputArea.value.length;
 
         // Update QA Mode highlighting if enabled
         if (qaMode) {
-            updateQAHighlighting(currentValue);
+            updateQAHighlighting(inputArea.value);
         }
+    });
+
+    // Detailed logging: only log keyup for modifier keys, since their release
+    // timing is meaningful (e.g., Shift held during a sequence). For
+    // character keys the keyup adds noise without new information.
+    const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta']);
+    inputArea.addEventListener('keyup', function (e) {
+        if (!MODIFIER_KEYS.has(e.key)) return;
+        logKeyEvent('keyup', e);
     });
 
     // Handle key presses for Enter key
     inputArea.addEventListener('keydown', function (e) {
+        // Detailed logging: log every keydown except the submit Enter.
+        if (e.key !== 'Enter') {
+            logKeyEvent('keydown', e);
+        }
+
         // Count user keystrokes here (not from input-event length deltas) so
         // autocorrect — which fires input events without keydowns — can't
         // inflate the metrics. Counted regardless of testActive so the very
@@ -925,6 +1021,13 @@ document.addEventListener('DOMContentLoaded', async function () {
             const promptResult = calculatePromptResult();
             promptResults.push(promptResult);
 
+            // Detailed logging: download per-prompt JSON, then clear the buffer
+            if (detailedLogEnabled) {
+                downloadDetailedLog(promptResult);
+                detailedLogEvents = [];
+                detailedLogPromptStartedAt = null;
+            }
+
             // Move to the next prompt or end the test
             if (currentPromptIndex < prompts.length - 1) {
                 currentPromptIndex++;
@@ -985,6 +1088,9 @@ document.addEventListener('DOMContentLoaded', async function () {
                         if (lastIndex !== -1) {
                             const newText = text.substring(0, lastIndex) + finalCorrectedWord;
 
+                            // Capture pre-correction value for the detailed log
+                            const preCorrectionValue = inputArea.value;
+
                             // Direct update approach for better cross-browser compatibility
                             inputArea.value = newText + appendChar;
 
@@ -996,6 +1102,11 @@ document.addEventListener('DOMContentLoaded', async function () {
                                 // Some browsers might not support selection manipulation
                                 console.log("Selection adjustment not supported");
                             }
+
+                            // Detailed logging: programmatic .value writes don't fire
+                            // input events, so manually emit a textChange so the
+                            // custom-autocorrect replacement appears in the log.
+                            logTextChange(preCorrectionValue, inputArea.value);
 
                             return true; // Correction was made
                         }
@@ -1055,6 +1166,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Reset counters
         keyPressCount = 0;
         correctedErrorCount = 0;
+
+        // Reset detailed log buffer
+        detailedLogEvents = [];
+        detailedLogPromptStartedAt = null;
 
         // Focus the input area after reset
         inputArea.focus();
