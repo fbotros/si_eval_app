@@ -830,7 +830,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             }
         }
 
-        // Check for input_type URL parameter (physical-keyboard, floating-keyboard, skb)
+        // Check for input_type URL parameter (physical-keyboard, floating-keyboard, skb, phone, tablet)
         const inputTypeParam = getURLParameter('input_type');
         if (inputTypeParam !== null) {
             const inputTypeRadio = document.querySelector(`input[name="input-type"][value="${inputTypeParam}"]`);
