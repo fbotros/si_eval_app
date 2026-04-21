@@ -636,72 +636,17 @@ document.addEventListener('DOMContentLoaded', async function () {
     let detailedLogEvents = [];
     let detailedLogPromptStartedAt = null;
 
-    // Pre-change caret tracking — saved before any text mutation so we can
-    // tell whether a subsequent input event happened at the user's cursor
-    // (=> user typed) or somewhere else (=> autocorrect).
-    let lastCaretBeforeStart = 0;
-    let lastCaretBeforeEnd = 0;
-
-    function captureCaret() {
-        lastCaretBeforeStart = inputArea.selectionStart;
-        lastCaretBeforeEnd = inputArea.selectionEnd;
-    }
-
-    function commonPrefixLength(a, b) {
-        const max = Math.min(a.length, b.length);
-        let i = 0;
-        while (i < max && a.charCodeAt(i) === b.charCodeAt(i)) i++;
-        return i;
-    }
-
-    function commonSuffixLength(a, b, prefixLen) {
-        const max = Math.min(a.length, b.length) - prefixLen;
-        let i = 0;
-        while (i < max &&
-               a.charCodeAt(a.length - 1 - i) === b.charCodeAt(b.length - 1 - i)) i++;
-        return i;
-    }
-
-    // Decide whether a text change matches the user's caret/selection at the
-    // moment the change began. If it does, the user caused it; if not, an
-    // out-of-band edit (autocorrect) caused it.
-    function detectSourceFromCaret(prev, curr, caretStart, caretEnd) {
-        if (prev === curr) return 'user';
-        const cp = commonPrefixLength(prev, curr);
-        const cs = commonSuffixLength(prev, curr, cp);
-        const changeStart = cp;
-        const changeEndPrev = prev.length - cs;
-        const changeEndCurr = curr.length - cs;
-
-        // Selection replacement: change spans exactly the previous selection
-        if (caretStart !== caretEnd &&
-            changeStart === caretStart && changeEndPrev === caretEnd) {
-            return 'user';
-        }
-        // Append at caret
-        if (changeStart === caretEnd && changeEndPrev === caretEnd && curr.length > prev.length) {
-            return 'user';
-        }
-        // Backspace at caret (delete char immediately before caret)
-        if (changeStart === caretEnd - 1 && changeEndPrev === caretEnd && curr.length < prev.length) {
-            return 'user';
-        }
-        // Forward delete at caret (delete char at caret)
-        if (changeStart === caretEnd && changeEndPrev === caretEnd + 1 && changeEndCurr === caretEnd) {
-            return 'user';
-        }
-        return 'autocorrect';
-    }
-
     function logDetailedEvent(e, prevValue, currValue) {
         if (!detailedLogEnabled) return;
-        const source = detectSourceFromCaret(prevValue, currValue, lastCaretBeforeStart, lastCaretBeforeEnd);
+        const inputTypeRaw = e && e.inputType ? e.inputType : null;
+        const source = inputTypeRaw === 'insertReplacementText' ? 'autocorrect' : 'user';
         const now = Date.now();
         detailedLogEvents.push({
             timestamp: now,
             timestampIso: new Date(now).toISOString(),
             timeSincePromptStartMs: detailedLogPromptStartedAt ? now - detailedLogPromptStartedAt : null,
             source: source,
+            inputType: inputTypeRaw,
             data: e && 'data' in e ? e.data : null,
             previousValue: prevValue,
             currentValue: currValue,
@@ -935,13 +880,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Track input value changes for cross-browser compatibility
     let previousInputLength = 0;
 
-    // Capture caret position before any text mutation so detectSourceFromCaret
-    // can compare the change location against where the user's cursor was.
-    inputArea.addEventListener('keydown', captureCaret);
-    inputArea.addEventListener('mousedown', captureCaret);
-    inputArea.addEventListener('touchstart', captureCaret, { passive: true });
-    inputArea.addEventListener('focus', captureCaret);
-
     // Handle all input events in a single handler for better cross-browser compatibility
     inputArea.addEventListener('input', function (e) {
         if (!testActive) {
@@ -1133,6 +1071,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                                     timestampIso: new Date(now).toISOString(),
                                     timeSincePromptStartMs: detailedLogPromptStartedAt ? now - detailedLogPromptStartedAt : null,
                                     source: 'autocorrect',
+                                    inputType: 'insertReplacementText',
                                     data: finalCorrectedWord,
                                     previousValue: preCorrectionValue,
                                     currentValue: inputArea.value,
