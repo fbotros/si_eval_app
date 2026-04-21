@@ -631,66 +631,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Track if UXR mode is enabled
     let uxrModeEnabled = false;
 
-    // === Detailed logging mode (URL-gated via ?detailedLog=true) ===
-    let detailedLogEnabled = false;
-    let detailedLogEvents = [];
-    let detailedLogPromptStartedAt = null;
-
-    function logDetailedEvent(e, prevValue, currValue) {
-        if (!detailedLogEnabled) return;
-        const inputTypeRaw = e && e.inputType ? e.inputType : null;
-        const source = inputTypeRaw === 'insertReplacementText' ? 'autocorrect' : 'user';
-        const now = Date.now();
-        detailedLogEvents.push({
-            timestamp: now,
-            timestampIso: new Date(now).toISOString(),
-            timeSincePromptStartMs: detailedLogPromptStartedAt ? now - detailedLogPromptStartedAt : null,
-            source: source,
-            inputType: inputTypeRaw,
-            data: e && 'data' in e ? e.data : null,
-            previousValue: prevValue,
-            currentValue: currValue,
-            delta: {
-                lengthChange: currValue.length - prevValue.length,
-                inserted: e && 'data' in e ? e.data : null
-            },
-            selectionStart: inputArea.selectionStart,
-            selectionEnd: inputArea.selectionEnd
-        });
-    }
-
-    function downloadDetailedLog(promptResult) {
-        const userId = document.getElementById('user-id').value || 'anonymous';
-        const datasetEl = document.querySelector('input[name="dataset"]:checked');
-        const dataset = datasetEl ? datasetEl.value : 'unknown';
-        const ts = new Date().toISOString().replace(/[:.]/g, '-');
-        const sanitize = (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, '_');
-        const filename = `${sanitize(userId)}_${sanitize(dataset)}_${ts}.json`;
-
-        const payload = {
-            userId: userId,
-            dataset: dataset,
-            inputType: inputType,
-            autocorrectMode: getAutocorrectMode(),
-            uxrMode: uxrModeEnabled,
-            prompt: getCurrentPromptText(),
-            promptStartedAt: detailedLogPromptStartedAt,
-            promptSubmittedAt: Date.now(),
-            results: promptResult,
-            events: detailedLogEvents
-        };
-
-        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    }
-
     function checkSettingPresetInUrlParameter() {
         let value = getURLParameter('setting_preset')
         if (value == null) {
@@ -839,12 +779,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                 inputType = inputTypeParam;
             }
         }
-
-        // Check for detailedLog URL parameter
-        const detailedLogParam = getURLParameter('detailedLog');
-        if (detailedLogParam === 'true') {
-            detailedLogEnabled = true;
-        }
     }
 
     // Apply URL parameter overrides after presets are applied
@@ -881,7 +815,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     let previousInputLength = 0;
 
     // Handle all input events in a single handler for better cross-browser compatibility
-    inputArea.addEventListener('input', function (e) {
+    inputArea.addEventListener('input', function () {
         if (!testActive) {
             startTest();
             previousInputLength = 0;
@@ -892,15 +826,11 @@ document.addEventListener('DOMContentLoaded', async function () {
             startTime = Date.now();
             endTime = startTime; // Reset endTime to startTime for new prompt
             promptTimingStarted = true;
-            detailedLogPromptStartedAt = startTime;
         }
 
         // Get the current input value and length
         const currentValue = inputArea.value;
         const currentLength = currentValue.length;
-
-        // Detailed logging: capture this event before previousInputValue is overwritten below
-        logDetailedEvent(e, previousInputValue, currentValue);
 
         // Reset the correction flag if the user is typing a new character
         if (currentLength > previousInputLength) {
@@ -923,14 +853,13 @@ document.addEventListener('DOMContentLoaded', async function () {
             correctedErrorCount += 1;
         }
 
-        // Update previous values for next comparison.
-        // Re-read inputArea.value because performAutocorrect may have mutated it synchronously above.
-        previousInputValue = inputArea.value;
-        previousInputLength = inputArea.value.length;
+        // Update previous values for next comparison
+        previousInputValue = currentValue;
+        previousInputLength = currentLength;
 
         // Update QA Mode highlighting if enabled
         if (qaMode) {
-            updateQAHighlighting(inputArea.value);
+            updateQAHighlighting(currentValue);
         }
     });
 
@@ -980,13 +909,6 @@ document.addEventListener('DOMContentLoaded', async function () {
             // Calculate results for the current prompt
             const promptResult = calculatePromptResult();
             promptResults.push(promptResult);
-
-            // Detailed logging: download per-prompt JSON, then clear the buffer
-            if (detailedLogEnabled) {
-                downloadDetailedLog(promptResult);
-                detailedLogEvents = [];
-                detailedLogPromptStartedAt = null;
-            }
 
             // Move to the next prompt or end the test
             if (currentPromptIndex < prompts.length - 1) {
@@ -1048,9 +970,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                         if (lastIndex !== -1) {
                             const newText = text.substring(0, lastIndex) + finalCorrectedWord;
 
-                            // Capture pre-correction state for detailed log (must be read before mutating .value)
-                            const preCorrectionValue = inputArea.value;
-
                             // Direct update approach for better cross-browser compatibility
                             inputArea.value = newText + appendChar;
 
@@ -1061,28 +980,6 @@ document.addEventListener('DOMContentLoaded', async function () {
                             } catch (e) {
                                 // Some browsers might not support selection manipulation
                                 console.log("Selection adjustment not supported");
-                            }
-
-                            // Detailed logging: record the custom autocorrect replacement
-                            if (detailedLogEnabled) {
-                                const now = Date.now();
-                                detailedLogEvents.push({
-                                    timestamp: now,
-                                    timestampIso: new Date(now).toISOString(),
-                                    timeSincePromptStartMs: detailedLogPromptStartedAt ? now - detailedLogPromptStartedAt : null,
-                                    source: 'autocorrect',
-                                    inputType: 'insertReplacementText',
-                                    data: finalCorrectedWord,
-                                    previousValue: preCorrectionValue,
-                                    currentValue: inputArea.value,
-                                    delta: {
-                                        lengthChange: inputArea.value.length - preCorrectionValue.length,
-                                        inserted: finalCorrectedWord,
-                                        replacedWord: originalLastWord
-                                    },
-                                    selectionStart: inputArea.selectionStart,
-                                    selectionEnd: inputArea.selectionEnd
-                                });
                             }
 
                             return true; // Correction was made
@@ -1143,10 +1040,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Reset counters
         keyPressCount = 0;
         correctedErrorCount = 0;
-
-        // Reset detailed log buffer
-        detailedLogEvents = [];
-        detailedLogPromptStartedAt = null;
 
         // Focus the input area after reset
         inputArea.focus();
