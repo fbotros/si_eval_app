@@ -195,6 +195,18 @@ document.addEventListener('DOMContentLoaded', async function () {
     let currentPromptIndex = 0;
     let promptResults = [];
 
+    // Normalize iOS "smart punctuation" substitutions back to ASCII so
+    // accuracy / QA-mode comparisons aren't penalized when iOS rewrites the
+    // user's straight quotes/dashes into typographic variants.
+    function normalizeText(s) {
+        return s
+            .replace(/[\u2018\u2019\u201A\u201B]/g, "'")  // single quotes
+            .replace(/[\u201C\u201D\u201E\u201F]/g, '"')  // double quotes
+            .replace(/\u2014/g, '--')                       // em dash
+            .replace(/\u2013/g, '-')                        // en dash
+            .replace(/\u2026/g, '...');                     // ellipsis
+    }
+
     // Fisher-Yates shuffle algorithm
     function shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
@@ -247,6 +259,10 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         const sampleTextHighlighted = document.getElementById('sample-text-highlighted');
         const promptText = getCurrentPromptText();
+        // Normalize both sides so iOS smart-punctuation substitutions don't
+        // light up as red mismatches in QA-mode highlighting.
+        const normalizedTyped = normalizeText(typedText);
+        const normalizedPrompt = normalizeText(promptText);
 
         let highlightedHtml = '';
 
@@ -254,9 +270,9 @@ document.addEventListener('DOMContentLoaded', async function () {
             const promptChar = promptText[i];
             let className = 'char-untyped';
 
-            if (i < typedText.length) {
-                const typedChar = typedText[i];
-                if (typedChar === promptChar) {
+            if (i < normalizedTyped.length) {
+                const typedChar = normalizedTyped[i];
+                if (typedChar === normalizedPrompt[i]) {
                     className = 'char-correct';
                 } else {
                     className = 'char-incorrect';
@@ -887,6 +903,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Track input value changes for cross-browser compatibility
     let previousInputLength = 0;
 
+    // Quest/Android soft keyboards report every tap (letter, backspace,
+    // mode switch) as keydown(keyCode: 229, key: "Unidentified") — there's
+    // no way to tell what was tapped at keydown time. We defer counting
+    // until the input event reveals whether the textarea grew (typing) or
+    // shrunk (delete). Stays at most 1 because new keydowns supersede
+    // unresolved ones (a 229 tap that produced no input event was a no-op).
+    let pendingSoftKeyTap = false;
+
     // Handle all input events in a single handler for better cross-browser compatibility
     inputArea.addEventListener('input', function () {
         if (!testActive) {
@@ -909,6 +933,19 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Detailed logging: capture the textarea change before previousInputValue
         // is overwritten below.
         logTextChange(previousInputValue, currentValue);
+
+        // Resolve a pending Quest/Android soft-key tap based on diff direction.
+        // No input event would fire if the tap didn't change text, so just
+        // checking the delta here guarantees we only count real edits.
+        if (pendingSoftKeyTap) {
+            const lengthDelta = currentLength - previousInputLength;
+            if (lengthDelta < 0) {
+                correctedErrorCount += 1;
+            } else if (lengthDelta > 0) {
+                keyPressCount += 1;
+            }
+            pendingSoftKeyTap = false;
+        }
 
         // Reset the correction flag if the user is typing a new character.
         // keyPressCount and correctedErrorCount are tracked from keydown
@@ -972,7 +1009,12 @@ document.addEventListener('DOMContentLoaded', async function () {
             if (hasSelection || canBackspace || canForwardDelete) {
                 correctedErrorCount += 1;
             }
-        } else if (e.key !== 'Enter' && (e.key.length === 1 || e.keyCode === 229)) {
+        } else if (e.keyCode === 229) {
+            // Quest/Android soft-keyboard tap — could be typing OR backspace
+            // OR a no-op (mode switch, backspace at pos 0). Defer to the
+            // input event handler to classify by diff direction.
+            pendingSoftKeyTap = true;
+        } else if (e.key !== 'Enter' && e.key.length === 1) {
             keyPressCount += 1;
         }
 
@@ -989,9 +1031,11 @@ document.addEventListener('DOMContentLoaded', async function () {
             const typedText = inputArea.value;
             const promptText = getCurrentPromptText();
 
-            // Check QA Mode - if enabled, require 100% match
+            // Check QA Mode - if enabled, require 100% match (after normalizing
+            // iOS smart-punctuation substitutions so the user isn't blocked
+            // when iOS rewrites their straight quotes to curly).
             if (qaMode) {
-                if (typedText !== promptText) {
+                if (normalizeText(typedText) !== normalizeText(promptText)) {
                     // Show error message for QA Mode mismatch
                     const qaErrorElement = document.getElementById('qa-error-message');
                     qaErrorElement.style.display = 'block';
@@ -1040,6 +1084,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 // Reset counters for new prompt
                 keyPressCount = 0;
                 correctedErrorCount = 0;
+                pendingSoftKeyTap = false;
             } else {
                 // End the test if all prompts are completed
                 endTest();
@@ -1166,6 +1211,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Reset counters
         keyPressCount = 0;
         correctedErrorCount = 0;
+        pendingSoftKeyTap = false;
 
         // Reset detailed log buffer
         detailedLogEvents = [];
@@ -1182,8 +1228,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         const typedLength = typedText.length;
         const promptLength = promptText.length;
 
-        // Use Levenshtein distance to calculate edit distance (no cap for accuracy measurement)
-        const editDistance = levenshteinDistance(typedText, promptText, Infinity);
+        // Use Levenshtein distance to calculate edit distance (no cap for accuracy measurement).
+        // Normalize iOS smart-punctuation substitutions so they don't inflate the distance.
+        const editDistance = levenshteinDistance(normalizeText(typedText), normalizeText(promptText), Infinity);
 
         // Calculate accuracy as 1 minus normalized edit distance
         const maxDistance = Math.max(typedLength, promptLength);
