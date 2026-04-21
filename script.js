@@ -832,25 +832,18 @@ document.addEventListener('DOMContentLoaded', async function () {
         const currentValue = inputArea.value;
         const currentLength = currentValue.length;
 
-        // Reset the correction flag if the user is typing a new character
+        // Reset the correction flag if the user is typing a new character.
+        // keyPressCount and correctedErrorCount are tracked from keydown
+        // events instead of textarea length changes so that autocorrect-
+        // induced insertions/deletions don't inflate the metrics.
         if (currentLength > previousInputLength) {
             lastWordCorrected = false;
 
-            // Count the difference as key presses (not backspace)
-            const charsAdded = currentLength - previousInputLength;
-            keyPressCount += charsAdded;
-
             // Check if a space or punctuation was added for autocorrect
             const lastChar = currentValue.slice(-1);
-            // log last char
             if (/[\s.,.!?;:"()]/.test(lastChar) && isCustomAutocorrectEnabled() && !lastWordCorrected) {
                 performAutocorrect(previousInputValue, lastChar);
             }
-        }
-        // If length decreased, count as corrected error (backspace)
-        else if (currentLength < previousInputLength) {
-            // Count as one corrected error regardless of how many characters were deleted
-            correctedErrorCount += 1;
         }
 
         // Update previous values for next comparison
@@ -865,6 +858,28 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Handle key presses for Enter key
     inputArea.addEventListener('keydown', function (e) {
+        // Count user keystrokes here (not from input-event length deltas) so
+        // autocorrect — which fires input events without keydowns — can't
+        // inflate the metrics. Counted regardless of testActive so the very
+        // first keystroke (which itself starts the test) is included.
+        //   Backspace / Delete  → corrected error
+        //   key.length === 1    → printable char on hardware keyboard / iOS
+        //   keyCode === 229     → Quest/Android soft-keyboard tap (key is
+        //                         reported as "Unidentified")
+        if (e.key === 'Backspace' || e.key === 'Delete') {
+            // Only count if the keystroke will actually delete something:
+            // a non-empty selection, OR Backspace with chars before the caret,
+            // OR Delete with chars after the caret.
+            const hasSelection = inputArea.selectionStart !== inputArea.selectionEnd;
+            const canBackspace = e.key === 'Backspace' && inputArea.selectionStart > 0;
+            const canForwardDelete = e.key === 'Delete' && inputArea.selectionStart < inputArea.value.length;
+            if (hasSelection || canBackspace || canForwardDelete) {
+                correctedErrorCount += 1;
+            }
+        } else if (e.key !== 'Enter' && (e.key.length === 1 || e.keyCode === 229)) {
+            keyPressCount += 1;
+        }
+
         if (!testActive) return;
 
         // Update end time for all keys except Enter (to track until last key entered)
