@@ -685,7 +685,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         }));
     }
 
-    function downloadDetailedLog(promptResult) {
+    let driveUploadUrl = getURLParameter('driveUpload') || '';
+
+    function buildDetailedLogPayload(promptResult) {
         const userId = document.getElementById('user-id').value || 'anonymous';
         const datasetEl = document.querySelector('input[name="dataset"]:checked');
         const dataset = datasetEl ? datasetEl.value : 'unknown';
@@ -706,6 +708,12 @@ document.addEventListener('DOMContentLoaded', async function () {
             events: detailedLogEvents
         };
 
+        return { payload, filename };
+    }
+
+    function downloadDetailedLog(promptResult) {
+        const { payload, filename } = buildDetailedLogPayload(promptResult);
+
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -715,6 +723,21 @@ document.addEventListener('DOMContentLoaded', async function () {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+
+        if (driveUploadUrl) {
+            uploadToDrive(payload, filename);
+        }
+    }
+
+    function uploadToDrive(payload, filename) {
+        fetch(driveUploadUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ filename: filename, data: payload })
+        }).catch(function (err) {
+            console.error('Drive upload failed:', err);
+        });
     }
 
     function checkSettingPresetInUrlParameter() {
