@@ -732,32 +732,13 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     function uploadToDrive(payload, filename) {
         var body = JSON.stringify({ filename: filename, data: payload });
-
-        var iframe = document.createElement('iframe');
-        iframe.name = 'driveUpload_' + Date.now();
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-
-        var form = document.createElement('form');
-        form.method = 'POST';
-        form.action = driveUploadUrl;
-        form.target = iframe.name;
-
-        var input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'payload';
-        input.value = body;
-        form.appendChild(input);
-
-        document.body.appendChild(form);
-        form.submit();
-
-        iframe.addEventListener('load', function () {
-            console.log('Drive upload: success');
-            setTimeout(function () {
-                if (form.parentNode) document.body.removeChild(form);
-                if (iframe.parentNode) document.body.removeChild(iframe);
-            }, 1000);
+        fetch(driveUploadUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'payload=' + encodeURIComponent(body)
+        }).catch(function (err) {
+            console.error('Drive upload failed:', err);
         });
     }
 
