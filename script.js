@@ -917,6 +917,18 @@ document.addEventListener('DOMContentLoaded', async function () {
     // tap actually was (e.g., "a", "Backspace").
     let pendingSoftKeyLogEntry = null;
 
+    // Log beforeinput events to test what inputType the Quest keyboard reports
+    inputArea.addEventListener('beforeinput', function (e) {
+        if (detailedLogEnabled && detailedLogBuffer) {
+            detailedLogBuffer.push({
+                type: 'beforeinput',
+                timestamp: Date.now(),
+                inputType: e.inputType,
+                data: e.data,
+            });
+        }
+    });
+
     // Handle all input events in a single handler for better cross-browser compatibility
     inputArea.addEventListener('input', function () {
         if (!testActive) {
