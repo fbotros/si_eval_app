@@ -664,13 +664,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     function logKeyEvent(type, e) {
-        if (!detailedLogEnabled) return;
-        detailedLogEvents.push(Object.assign({ type: type }, detailedLogTimestamps(), {
+        if (!detailedLogEnabled) return null;
+        const entry = Object.assign({ type: type }, detailedLogTimestamps(), {
             key: e.key,
             code: e.code,
             keyCode: e.keyCode,
             isComposing: e.isComposing
-        }));
+        });
+        detailedLogEvents.push(entry);
+        return entry;
     }
 
     function logTextChange(prevValue, currValue) {
@@ -910,6 +912,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     // shrunk (delete). Stays at most 1 because new keydowns supersede
     // unresolved ones (a 229 tap that produced no input event was a no-op).
     let pendingSoftKeyTap = false;
+    // Reference to the most recent keyCode-229 keydown log entry, so the
+    // input event can backfill a derivedKey field once it knows what the
+    // tap actually was (e.g., "a", "Backspace").
+    let pendingSoftKeyLogEntry = null;
 
     // Handle all input events in a single handler for better cross-browser compatibility
     inputArea.addEventListener('input', function () {
@@ -939,12 +945,33 @@ document.addEventListener('DOMContentLoaded', async function () {
         // checking the delta here guarantees we only count real edits.
         if (pendingSoftKeyTap) {
             const lengthDelta = currentLength - previousInputLength;
+            let derivedKey = null;
             if (lengthDelta < 0) {
                 correctedErrorCount += 1;
+                derivedKey = 'Backspace';
             } else if (lengthDelta > 0) {
                 keyPressCount += 1;
+                // Derive the inserted text from the diff so the keydown log
+                // entry can show what was actually typed instead of just
+                // "Unidentified". Find the change region between previous
+                // and current values.
+                let cp = 0;
+                const minLen = Math.min(previousInputValue.length, currentValue.length);
+                while (cp < minLen && previousInputValue.charCodeAt(cp) === currentValue.charCodeAt(cp)) cp++;
+                let cs = 0;
+                const maxSuffix = minLen - cp;
+                while (cs < maxSuffix &&
+                       previousInputValue.charCodeAt(previousInputValue.length - 1 - cs) ===
+                       currentValue.charCodeAt(currentValue.length - 1 - cs)) cs++;
+                derivedKey = currentValue.substring(cp, currentValue.length - cs);
+            }
+            // Backfill the keydown log entry's derivedKey (preserves raw
+            // key/code/keyCode for forensic accuracy).
+            if (pendingSoftKeyLogEntry && derivedKey !== null) {
+                pendingSoftKeyLogEntry.derivedKey = derivedKey;
             }
             pendingSoftKeyTap = false;
+            pendingSoftKeyLogEntry = null;
         }
 
         // Reset the correction flag if the user is typing a new character.
@@ -987,8 +1014,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Handle key presses for Enter key
     inputArea.addEventListener('keydown', function (e) {
         // Detailed logging: log every keydown except the submit Enter.
+        let keydownEntry = null;
         if (e.key !== 'Enter') {
-            logKeyEvent('keydown', e);
+            keydownEntry = logKeyEvent('keydown', e);
         }
 
         // Count user keystrokes here (not from input-event length deltas) so
@@ -1012,8 +1040,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         } else if (e.keyCode === 229) {
             // Quest/Android soft-keyboard tap — could be typing OR backspace
             // OR a no-op (mode switch, backspace at pos 0). Defer to the
-            // input event handler to classify by diff direction.
+            // input event handler to classify by diff direction. Also stash
+            // the log entry so we can backfill a derivedKey field once the
+            // input event reveals what the tap actually was.
             pendingSoftKeyTap = true;
+            pendingSoftKeyLogEntry = keydownEntry;
         } else if (e.key !== 'Enter' && e.key.length === 1) {
             keyPressCount += 1;
         }
@@ -1085,6 +1116,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                 keyPressCount = 0;
                 correctedErrorCount = 0;
                 pendingSoftKeyTap = false;
+                pendingSoftKeyLogEntry = null;
             } else {
                 // End the test if all prompts are completed
                 endTest();
@@ -1212,6 +1244,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         keyPressCount = 0;
         correctedErrorCount = 0;
         pendingSoftKeyTap = false;
+        pendingSoftKeyLogEntry = null;
 
         // Reset detailed log buffer
         detailedLogEvents = [];
