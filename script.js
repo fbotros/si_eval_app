@@ -1059,6 +1059,12 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (e.key === 'Enter') {
             e.preventDefault(); // Prevent default Enter behavior
 
+            if (pendingSoftKeyLogEntry) {
+                pendingSoftKeyLogEntry.derivedKey = 'Enter';
+                pendingSoftKeyTap = false;
+                pendingSoftKeyLogEntry = null;
+            }
+
             const typedText = inputArea.value;
             const promptText = getCurrentPromptText();
 
