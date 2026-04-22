@@ -701,6 +701,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             inputType: inputType,
             autocorrectMode: getAutocorrectMode(),
             uxrMode: uxrModeEnabled,
+            userAgent: navigator.userAgent,
             prompt: getCurrentPromptText(),
             promptStartedAt: detailedLogPromptStartedAt,
             promptSubmittedAt: Date.now(),
