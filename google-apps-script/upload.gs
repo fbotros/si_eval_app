@@ -22,12 +22,8 @@ function doPost(e) {
     var folder = DriveApp.getFolderById(FOLDER_ID);
     folder.createFile(filename, data, 'application/json');
 
-    return ContentService
-      .createTextOutput(JSON.stringify({ status: 'ok' }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return HtmlService.createHtmlOutput('<html><body>ok</body></html>');
   } catch (err) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ status: 'error', message: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return HtmlService.createHtmlOutput('<html><body>error: ' + err.toString() + '</body></html>');
   }
 }
