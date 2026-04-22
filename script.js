@@ -731,20 +731,14 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     function uploadToDrive(payload, filename) {
         var body = JSON.stringify({ filename: filename, data: payload });
-        var encoded = 'payload=' + encodeURIComponent(body);
-        var blob = new Blob([encoded], { type: 'application/x-www-form-urlencoded' });
-
-        var sent = navigator.sendBeacon(driveUploadUrl, blob);
-        if (!sent) {
-            fetch(driveUploadUrl, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: encoded
-            }).catch(function (err) {
-                console.error('Drive upload failed:', err);
-            });
-        }
+        fetch(driveUploadUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'payload=' + encodeURIComponent(body)
+        }).catch(function (err) {
+            console.error('Drive upload failed:', err);
+        });
     }
 
     function checkSettingPresetInUrlParameter() {
