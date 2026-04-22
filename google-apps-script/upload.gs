@@ -10,11 +10,12 @@
 //    - Who has access: Anyone
 // 5. Copy the deployment URL and pass it as ?driveUpload=URL
 
-var FOLDER_ID = '1jQQ1wxV71aaZstmRV63evP-2rHuk9AM6';
+var FOLDER_ID = '1PlJqEqtJ-eNUWNv_2Xvjq3oDRPY-kH58';
 
 function doPost(e) {
   try {
-    var body = JSON.parse(e.postData.contents);
+    var raw = e.parameter.payload || e.postData.contents;
+    var body = JSON.parse(raw);
     var filename = body.filename || 'unknown.json';
     var data = JSON.stringify(body.data, null, 2);
 

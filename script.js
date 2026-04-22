@@ -685,7 +685,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         }));
     }
 
-    let driveUploadUrl = getURLParameter('driveUpload') || '';
+    let driveUploadUrl = 'https://script.google.com/macros/s/AKfycbwXV5TvCZFosM059lP6EBGlSEqCDGzzYMbVHcDhSOvRv7vkKyiigX-tXIp_Z_8rZR0f/exec';
 
     function buildDetailedLogPayload(promptResult) {
         const userId = document.getElementById('user-id').value || 'anonymous';
@@ -730,11 +730,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     function uploadToDrive(payload, filename) {
+        var body = JSON.stringify({ filename: filename, data: payload });
         fetch(driveUploadUrl, {
             method: 'POST',
             mode: 'no-cors',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ filename: filename, data: payload })
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'payload=' + encodeURIComponent(body)
         }).catch(function (err) {
             console.error('Drive upload failed:', err);
         });
