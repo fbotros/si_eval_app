@@ -714,6 +714,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     function downloadDetailedLog(promptResult) {
         const { payload, filename } = buildDetailedLogPayload(promptResult);
 
+        if (driveUploadUrl) {
+            uploadToDrive(payload, filename);
+        }
+
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -723,10 +727,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-
-        if (driveUploadUrl) {
-            uploadToDrive(payload, filename);
-        }
     }
 
     function uploadToDrive(payload, filename) {
