@@ -161,6 +161,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Function to reload prompts when dataset changes
     async function reloadPromptsForNewDataset() {
+        flushDetailedLogs();
+
         // Reset test state
         testActive = false;
         inputArea.value = '';
@@ -713,7 +715,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         return { payload, filename };
     }
 
-    function downloadAccumulatedLogs() {
+    function flushDetailedLogs() {
+        if (!detailedLogEnabled || detailedLogAccumulated.length === 0) return;
+
         const userId = document.getElementById('user-id').value || 'anonymous';
         const datasetEl = document.querySelector('input[name="dataset"]:checked');
         const dataset = datasetEl ? datasetEl.value : 'unknown';
@@ -730,6 +734,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+
+        detailedLogAccumulated = [];
+        detailedLogEvents = [];
+        detailedLogPromptStartedAt = null;
     }
 
     function checkSettingPresetInUrlParameter() {
@@ -1221,11 +1229,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     function endTest() {
         testActive = false;
 
-        // Download accumulated detailed logs
-        if (detailedLogEnabled && detailedLogAccumulated.length > 0) {
-            downloadAccumulatedLogs();
-            detailedLogAccumulated = [];
-        }
+        flushDetailedLogs();
 
         // Disable the input area so users can't type anymore
         inputArea.disabled = true;
@@ -1268,13 +1272,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         pendingSoftKeyTap = false;
         pendingSoftKeyLogEntry = null;
 
-        // Download accumulated detailed logs and reset
-        if (detailedLogEnabled && detailedLogAccumulated.length > 0) {
-            downloadAccumulatedLogs();
-        }
-        detailedLogEvents = [];
-        detailedLogPromptStartedAt = null;
-        detailedLogAccumulated = [];
+        flushDetailedLogs();
 
         // Focus the input area after reset
         inputArea.focus();
