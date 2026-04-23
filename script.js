@@ -32,15 +32,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     const datasetConfig = {
         'practice': {
             file: 'prompts/practice.txt',
-            autocorrect: AUTOCORRECT_MODE.CUSTOM
+            autocorrect: AUTOCORRECT_MODE.SYSTEM
         },
         'natural-language': {
             file: 'prompts/nat_lang_no_punc.txt',
-            autocorrect: AUTOCORRECT_MODE.CUSTOM
+            autocorrect: AUTOCORRECT_MODE.SYSTEM
         },
         'natural-language-punct': {
             file: 'prompts/nat_lang_with_cap_punc.txt',
-            autocorrect: AUTOCORRECT_MODE.CUSTOM
+            autocorrect: AUTOCORRECT_MODE.SYSTEM
         },
         'emails': {
             file: 'prompts/emails.txt',
@@ -67,8 +67,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         return config ? config.file : datasetConfig['practice'].file; // Default fallback
     }
 
-    // Track user-selected autocorrect mode (initialize with CUSTOM as default)
-    let userSelectedAutocorrectMode = AUTOCORRECT_MODE.CUSTOM;
+    // Track user-selected autocorrect mode (initialize with SYSTEM as default)
+    let userSelectedAutocorrectMode = AUTOCORRECT_MODE.SYSTEM;
 
     // Track QA Mode state (initialize with false as default - off)
     let qaMode = false;
@@ -536,7 +536,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                     // Get the dataset's default autocorrect mode
                     const datasetValue = this.value;
                     const config = datasetConfig[datasetValue];
-                    const datasetAutocorrectMode = config ? config.autocorrect : AUTOCORRECT_MODE.CUSTOM;
+                    const datasetAutocorrectMode = config ? config.autocorrect : AUTOCORRECT_MODE.SYSTEM;
 
                     // Update the user-selected mode to match the dataset's default
                     userSelectedAutocorrectMode = datasetAutocorrectMode;
