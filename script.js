@@ -989,7 +989,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
     });
 
+    // Skip Enter keyup — its keydown isn't logged (it triggers submission),
+    // and the keyup fires after the buffer resets, leaking into the next prompt.
     inputArea.addEventListener('keyup', function (e) {
+        if (e.key === 'Enter') return;
         logKeyEvent('keyup', e);
     });
 
