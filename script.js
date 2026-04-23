@@ -689,8 +689,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (!detailedLogEnabled || detailedLogAccumulated.length === 0) return;
 
         const userId = document.getElementById('user-id').value || 'anonymous';
-        const datasetEl = document.querySelector('input[name="dataset"]:checked');
-        const dataset = datasetEl ? datasetEl.value : 'unknown';
+        const dataset = detailedLogAccumulated[0].dataset || 'unknown';
         const ts = new Date().toISOString().replace(/[:.]/g, '-');
         const sanitize = (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, '_');
         const filename = `${sanitize(userId)}_${sanitize(dataset)}_${ts}.json`;
@@ -724,6 +723,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
         else if (value === 'uxr') {
             uxrModeEnabled = true;
+            detailedLogEnabled = true;
             inputType = "physical-keyboard";
             document.getElementById("physical-keyboard").checked = true;
             updatePromptCount(100);
@@ -740,6 +740,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
         else if (value === 'uxr_webview') {
             uxrModeEnabled = true;
+            detailedLogEnabled = true;
             inputType = "skb";
             document.getElementById("skb").checked = true;
             updatePromptCount(100);
