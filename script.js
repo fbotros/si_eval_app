@@ -971,12 +971,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
     });
 
-    // Detailed logging: only log keyup for modifier keys, since their release
-    // timing is meaningful (e.g., Shift held during a sequence). For
-    // character keys the keyup adds noise without new information.
-    const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta']);
     inputArea.addEventListener('keyup', function (e) {
-        if (!MODIFIER_KEYS.has(e.key)) return;
         logKeyEvent('keyup', e);
     });
 
