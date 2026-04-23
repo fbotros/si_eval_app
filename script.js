@@ -653,6 +653,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     let detailedLogEnabled = false;
     let detailedLogEvents = [];
     let detailedLogPromptStartedAt = null;
+    let detailedLogAccumulated = [];
 
     function detailedLogTimestamps() {
         const now = Date.now();
@@ -685,8 +686,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         }));
     }
 
-    let driveUploadUrl = 'https://script.google.com/macros/s/AKfycbwXV5TvCZFosM059lP6EBGlSEqCDGzzYMbVHcDhSOvRv7vkKyiigX-tXIp_Z_8rZR0f/exec';
-
     function buildDetailedLogPayload(promptResult) {
         const userId = document.getElementById('user-id').value || 'anonymous';
         const datasetEl = document.querySelector('input[name="dataset"]:checked');
@@ -712,14 +711,15 @@ document.addEventListener('DOMContentLoaded', async function () {
         return { payload, filename };
     }
 
-    function downloadDetailedLog(promptResult) {
-        const { payload, filename } = buildDetailedLogPayload(promptResult);
+    function downloadAccumulatedLogs() {
+        const userId = document.getElementById('user-id').value || 'anonymous';
+        const datasetEl = document.querySelector('input[name="dataset"]:checked');
+        const dataset = datasetEl ? datasetEl.value : 'unknown';
+        const ts = new Date().toISOString().replace(/[:.]/g, '-');
+        const sanitize = (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = `${sanitize(userId)}_${sanitize(dataset)}_${ts}.json`;
 
-        if (driveUploadUrl) {
-            uploadToDrive(payload, filename);
-        }
-
-        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const blob = new Blob([JSON.stringify(detailedLogAccumulated, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -728,37 +728,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-    }
-
-    function uploadToDrive(payload, filename) {
-        var body = JSON.stringify({ filename: filename, data: payload });
-
-        var iframe = document.createElement('iframe');
-        iframe.name = 'driveUpload_' + Date.now();
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-
-        var form = document.createElement('form');
-        form.method = 'POST';
-        form.action = driveUploadUrl;
-        form.target = iframe.name;
-
-        var input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'payload';
-        input.value = body;
-        form.appendChild(input);
-
-        document.body.appendChild(form);
-        form.submit();
-
-        iframe.addEventListener('load', function () {
-            console.log('Drive upload: success');
-            setTimeout(function () {
-                if (form.parentNode) document.body.removeChild(form);
-                if (iframe.parentNode) document.body.removeChild(iframe);
-            }, 1000);
-        });
     }
 
     function checkSettingPresetInUrlParameter() {
@@ -1146,9 +1115,10 @@ document.addEventListener('DOMContentLoaded', async function () {
             const promptResult = calculatePromptResult();
             promptResults.push(promptResult);
 
-            // Detailed logging: download per-prompt JSON, then clear the buffer
+            // Detailed logging: accumulate per-prompt log, clear event buffer
             if (detailedLogEnabled) {
-                downloadDetailedLog(promptResult);
+                const { payload } = buildDetailedLogPayload(promptResult);
+                detailedLogAccumulated.push(payload);
                 detailedLogEvents = [];
                 detailedLogPromptStartedAt = null;
             }
@@ -1255,6 +1225,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     function endTest() {
         testActive = false;
 
+        // Download accumulated detailed logs
+        if (detailedLogEnabled && detailedLogAccumulated.length > 0) {
+            downloadAccumulatedLogs();
+            detailedLogAccumulated = [];
+        }
+
         // Disable the input area so users can't type anymore
         inputArea.disabled = true;
 
@@ -1296,9 +1272,13 @@ document.addEventListener('DOMContentLoaded', async function () {
         pendingSoftKeyTap = false;
         pendingSoftKeyLogEntry = null;
 
-        // Reset detailed log buffer
+        // Download accumulated detailed logs and reset
+        if (detailedLogEnabled && detailedLogAccumulated.length > 0) {
+            downloadAccumulatedLogs();
+        }
         detailedLogEvents = [];
         detailedLogPromptStartedAt = null;
+        detailedLogAccumulated = [];
 
         // Focus the input area after reset
         inputArea.focus();
