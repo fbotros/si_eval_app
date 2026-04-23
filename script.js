@@ -354,6 +354,24 @@ document.addEventListener('DOMContentLoaded', async function () {
         };
     }
 
+    function standardLevenshtein(a, b) {
+        if (a.length === 0) return b.length;
+        if (b.length === 0) return a.length;
+        let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+        for (let i = 1; i <= a.length; i++) {
+            const curr = [i];
+            for (let j = 1; j <= b.length; j++) {
+                curr[j] = Math.min(
+                    curr[j - 1] + 1,
+                    prev[j] + 1,
+                    prev[j - 1] + (a[i - 1] !== b[j - 1] ? 1 : 0)
+                );
+            }
+            prev = curr;
+        }
+        return prev[b.length];
+    }
+
     // Function to check if two characters are neighbors on the keyboard
     function areNeighboringKeys(char1, char2) {
         const c1 = char1.toLowerCase();
@@ -1234,7 +1252,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         // Use Levenshtein distance to calculate edit distance (no cap for accuracy measurement).
         // Normalize iOS smart-punctuation substitutions so they don't inflate the distance.
-        const editDistance = levenshteinDistance(normalizeText(typedText), normalizeText(promptText), Infinity);
+        const editDistance = standardLevenshtein(normalizeText(typedText), normalizeText(promptText));
 
         // Calculate accuracy as 1 minus normalized edit distance
         const maxDistance = Math.max(typedLength, promptLength);
