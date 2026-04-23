@@ -113,11 +113,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         return getAutocorrectMode() === AUTOCORRECT_MODE.CUSTOM;
     }
 
-    // Helper function to get dataset configuration
-    function getDatasetConfig(datasetName) {
-        return datasetConfig[datasetName] || { file: 'prompts/practice.txt', autocorrect: true }; // Default config
-    }
-
     // Function to load prompts from the selected dataset file
     async function loadPromptsFromFile() {
         try {
@@ -161,32 +156,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Function to reload prompts when dataset changes
     async function reloadPromptsForNewDataset() {
-        flushDetailedLogs();
-
-        // Reset test state
-        testActive = false;
-        inputArea.value = '';
-        inputArea.disabled = false;
-        startButton.textContent = 'Reset Test';
-        results.style.display = 'none';
-
-        // Load new prompts
         await loadPromptsFromFile();
-
-        // Update dictionary with new prompt words
-        addPromptWordsToDictionary();
-
-        // Initialize prompts for testing
-        initializePromptsForTest();
-        promptResults = [];
-
-        // Reset tracking variables
-        previousInputValue = '';
-        lastWordCorrected = false;
-        promptTimingStarted = false;
-
-        // Focus the input area after reload
-        inputArea.focus();
+        resetTest();
     }
 
     // Create a copy of the prompts that we'll shuffle
@@ -240,7 +211,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Function to update QA Mode display
     function updateQAModeDisplay() {
-        const sampleTextElement = document.getElementById('sample-text');
         const sampleTextHighlighted = document.getElementById('sample-text-highlighted');
 
         if (qaMode) {
@@ -308,8 +278,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     const accuracyElement = document.getElementById('accuracy');
 
     let testActive = false;
-    let lastTypedWord = '';
-    let lastSuggestion = '';
     let startTime = 0; // Track when the current prompt started
     let endTime = 0; // Track when the last key was entered
     let promptTimingStarted = false; // Track if timing has started for current prompt
@@ -567,13 +535,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
 
     let inputType = 'physical-keyboard';
-    // Function to enable/disable autocorrect radio buttons
-    function setInputTypeRadioButtonsEnabled(enabled) {
-        const inputTypeRadios = document.querySelectorAll('input[name="input-type"]');
-        inputTypeRadios.forEach(radio => {
-            radio.disabled = !enabled;
-        });
-    }
 
     // Add event listeners for dataset radio buttons
     const inputTypeRadios = document.querySelectorAll('input[name="input-type"]');
@@ -691,16 +652,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     function buildDetailedLogPayload(promptResult) {
-        const userId = document.getElementById('user-id').value || 'anonymous';
-        const datasetEl = document.querySelector('input[name="dataset"]:checked');
-        const dataset = datasetEl ? datasetEl.value : 'unknown';
-        const ts = new Date().toISOString().replace(/[:.]/g, '-');
-        const sanitize = (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, '_');
-        const filename = `${sanitize(userId)}_${sanitize(dataset)}_${ts}.json`;
-
-        const payload = {
-            userId: userId,
-            dataset: dataset,
+        return {
+            userId: document.getElementById('user-id').value || 'anonymous',
+            dataset: (document.querySelector('input[name="dataset"]:checked') || {}).value || 'unknown',
             inputType: inputType,
             autocorrectMode: getAutocorrectMode(),
             uxrMode: uxrModeEnabled,
@@ -711,8 +665,6 @@ document.addEventListener('DOMContentLoaded', async function () {
             results: promptResult,
             events: detailedLogEvents
         };
-
-        return { payload, filename };
     }
 
     function flushDetailedLogs() {
@@ -1121,7 +1073,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
             // Detailed logging: accumulate per-prompt log, clear event buffer
             if (detailedLogEnabled) {
-                const { payload } = buildDetailedLogPayload(promptResult);
+                const payload = buildDetailedLogPayload(promptResult);
                 detailedLogAccumulated.push(payload);
                 detailedLogEvents = [];
                 detailedLogPromptStartedAt = null;
@@ -1387,63 +1339,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         document.getElementById('cer').textContent = `${cer}%`;
         document.getElementById('ter').textContent = `${ter}%`;
 
-        // Create results object with both individual prompt results and averages
-        const resultsData = {
-            date: new Date().toISOString(),
-            averageWpm: avgWpm,
-            averageAwpm: avgAwpm,
-            averageAccuracy: avgAccuracy,
-            uer: parseFloat(uer),
-            cer: parseFloat(cer),
-            ter: parseFloat(ter),
-            totalChars: totalChars,
-            totalKeyPresses: totalKeyPresses,
-            totalCorrectedErrors: totalCorrectedErrors,
-            totalUncorrectedErrors: totalUncorrectedErrors,
-            promptsCompleted: promptResults.length,
-            totalPrompts: prompts.length,
-            promptOrder: prompts.map(p => p.originalIndex), // Include the order of prompts in this test
-            promptResults: promptResults,
-            inputType: inputType,
-            userId: document.getElementById('user-id').value,
-        };
-
-        /*
-        const testFinishedEvent = new CustomEvent('testFinishedEvent', {
-            detail: { message: resultsData },
-        });
-        document.dispatchEvent(testFinishedEvent);
-        */
-    }
-
-    function downloadResultsAsJson(data) {
-        // Create a JSON string from the data
-        const jsonString = JSON.stringify(data, null, 2);
-
-        // Create a Blob with the JSON data
-        const blob = new Blob([jsonString], { type: 'application/json' });
-
-        // Create a URL for the Blob
-        const url = URL.createObjectURL(blob);
-
-        // Create a temporary link element
-        const link = document.createElement('a');
-        link.href = url;
-
-        // Set the filename with date
-        const date = new Date();
-        const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-        link.download = `typing-test-results-${formattedDate}.json`;
-
-        // Append the link to the body
-        document.body.appendChild(link);
-
-        // Trigger the download
-        link.click();
-
-        // Clean up
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
     }
 
     function submitPromptResultToGoogleForm(data) {
