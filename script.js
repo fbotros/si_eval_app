@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Counters for tracking during a prompt
     let keyPressCount = 0;
     let correctedErrorCount = 0;
+    let pendingSoftKeyTap = false;
+    let pendingSoftKeyLogEntry = null;
 
     // Autocorrect modes enum
     const AUTOCORRECT_MODE = {
@@ -924,12 +926,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     // until the input event reveals whether the textarea grew (typing) or
     // shrunk (delete). Stays at most 1 because new keydowns supersede
     // unresolved ones (a 229 tap that produced no input event was a no-op).
-    let pendingSoftKeyTap = false;
-    // Reference to the most recent keyCode-229 keydown log entry, so the
-    // input event can backfill a derivedKey field once it knows what the
-    // tap actually was (e.g., "a", "Backspace").
-    let pendingSoftKeyLogEntry = null;
-
     // Handle all input events in a single handler for better cross-browser compatibility
     inputArea.addEventListener('input', function () {
         if (!testActive) {
