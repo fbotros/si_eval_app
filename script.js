@@ -896,6 +896,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Configure input area on page load
     configureInputArea();
 
+    inputArea.addEventListener('focus', function () {
+        setTimeout(function () {
+            document.getElementById('sample-text').scrollIntoView({ block: 'start', behavior: 'smooth' });
+        }, 300);
+    });
+
     // Track input value changes for cross-browser compatibility
     let previousInputLength = 0;
 
