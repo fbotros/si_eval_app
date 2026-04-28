@@ -896,6 +896,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Configure input area on page load
     configureInputArea();
 
+    // Toggle compact landscape layout when textarea is focused
+    inputArea.addEventListener('focus', () => document.body.classList.add('input-focused'));
+    inputArea.addEventListener('blur', () => document.body.classList.remove('input-focused'));
+
     // Track input value changes for cross-browser compatibility
     let previousInputLength = 0;
 
