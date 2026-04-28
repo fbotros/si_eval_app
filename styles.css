@@ -464,7 +464,7 @@ h1 {
 
 /* Landscape mobile: side-by-side prompt and textarea so iOS auto-scroll
    to the cursor can't hide the prompt (both share the same vertical position). */
-@media (orientation: landscape) and (pointer: coarse) and (max-height: 500px) {
+@media (orientation: landscape) and (pointer: coarse) {
     .test-container {
         display: grid;
         grid-template-columns: 1fr 1fr;
