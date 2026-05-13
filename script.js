@@ -630,6 +630,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Track if UXR mode is enabled
     let uxrModeEnabled = false;
 
+    // Track if DF mode is enabled
+    let dfModeEnabled = false;
+
     // === Detailed logging mode (URL-gated via ?detailedLog=true) ===
     // Captures three event types per prompt — keydown, keyup, textChange —
     // and auto-downloads a JSON file when the user submits each prompt.
@@ -671,7 +674,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     function buildDetailedLogPayload(promptResult) {
         return {
-            userId: document.getElementById('user-id').value || 'anonymous',
+            userId: dfModeEnabled
+                ? (document.getElementById('unix-name').value || 'anonymous')
+                : (document.getElementById('user-id').value || 'anonymous'),
             dataset: (document.querySelector('input[name="dataset"]:checked') || {}).value || 'unknown',
             inputType: inputType,
             autocorrectMode: getAutocorrectMode(),
@@ -688,7 +693,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     function flushDetailedLogs() {
         if (!detailedLogEnabled || detailedLogAccumulated.length === 0) return;
 
-        const userId = document.getElementById('user-id').value || 'anonymous';
+        const userId = dfModeEnabled
+            ? (document.getElementById('unix-name').value || 'anonymous')
+            : (document.getElementById('user-id').value || 'anonymous');
         const dataset = detailedLogAccumulated[0].dataset || 'unknown';
         const ts = new Date().toISOString().replace(/[:.]/g, '-');
         const sanitize = (s) => String(s).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -738,6 +745,23 @@ document.addEventListener('DOMContentLoaded', async function () {
                 submitPromptResultToGoogleForm(e.detail.message);
             });
         }
+        else if (value === 'df') {
+            dfModeEnabled = true;
+            detailedLogEnabled = true;
+            inputType = "physical-keyboard";
+            document.getElementById("physical-keyboard").checked = true;
+            updatePromptCount(5);
+
+            // Show unix name field when DF mode is enabled
+            document.getElementById('unix-name-group').style.display = 'block';
+
+            // Disable input area until unix name is provided
+            checkAndUpdateInputAreaState();
+
+            document.addEventListener('promptFinishedEvent', function (e) {
+                submitPromptResultToDFGoogleForm(e.detail.message);
+            });
+        }
         else if (value === 'uxr_webview') {
             uxrModeEnabled = true;
             detailedLogEnabled = true;
@@ -785,18 +809,27 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
     }
 
-    // Function to check if input area should be disabled based on UXR mode and user ID
+    // Function to check if input area should be disabled based on UXR/DF mode and user ID/unix name
     function checkAndUpdateInputAreaState() {
         if (uxrModeEnabled) {
             const userIdInput = document.getElementById('user-id');
             const userIdValue = userIdInput.value.trim();
 
             if (userIdValue === '') {
-                // Disable input area and show message
                 inputArea.disabled = true;
                 inputArea.placeholder = "Please enter a User ID first to begin typing test";
             } else {
-                // Enable input area
+                inputArea.disabled = false;
+                inputArea.placeholder = "Start typing here...";
+            }
+        } else if (dfModeEnabled) {
+            const unixNameInput = document.getElementById('unix-name');
+            const unixNameValue = unixNameInput.value.trim();
+
+            if (unixNameValue === '') {
+                inputArea.disabled = true;
+                inputArea.placeholder = "Please enter your unix name first to begin typing test";
+            } else {
                 inputArea.disabled = false;
                 inputArea.placeholder = "Start typing here...";
             }
@@ -872,6 +905,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Add event listener for user ID input to handle UXR mode restrictions
     const userIdInput = document.getElementById('user-id');
     userIdInput.addEventListener('input', function() {
+        checkAndUpdateInputAreaState();
+    });
+
+    // Add event listener for unix name input to handle DF mode restrictions
+    const unixNameInput = document.getElementById('unix-name');
+    unixNameInput.addEventListener('input', function() {
+        // Strip non-alphanumeric characters
+        this.value = this.value.replace(/[^a-zA-Z0-9]/g, '');
         checkAndUpdateInputAreaState();
     });
 
@@ -1209,8 +1250,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Calculate and display average results
         calculateAverageResults();
 
-        // Display results (hide in UXR mode)
-        if (!uxrModeEnabled) {
+        // Display results (hide in UXR/DF mode)
+        if (!uxrModeEnabled && !dfModeEnabled) {
             results.style.display = 'block';
         }
     }
@@ -1407,6 +1448,56 @@ document.addEventListener('DOMContentLoaded', async function () {
         console.log("Submitting prompt result to Google Form: " + JSON.stringify(data));
 
         // Dispatch a synthetic submit event
+        form.dispatchEvent(new Event('submit', { cancelable: true }));
+    }
+
+    function submitPromptResultToDFGoogleForm(data) {
+        const form = document.getElementById('dfResultForm');
+        if (!form.dataset.submitHandlerAdded) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const formData = new FormData(form);
+                fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    mode: 'no-cors'
+                })
+                    .then(() => {
+                        console.log('DF Form submitted successfully');
+                    })
+                    .catch((error) => {
+                        console.error('Error submitting DF form:', error);
+                    });
+            });
+            form.dataset.submitHandlerAdded = 'true';
+        }
+
+        document.getElementById('df_result_user_id').value = document.getElementById('unix-name').value;
+        document.getElementById('df_result_corpus').value = document.querySelector('input[name="dataset"]:checked').value;
+        document.getElementById('df_result_input_type').value = inputType;
+        document.getElementById('df_result_auto_correct').value = getAutocorrectMode();
+        document.getElementById('df_result_expected_prompt').value = data.promptText;
+        document.getElementById('df_result_typed_prompt').value = data.typedText;
+        document.getElementById('df_result_wpm').value = data.wpm;
+        document.getElementById('df_result_awpm').value = data.awpm;
+        document.getElementById('df_result_accuracy').value = data.accuracy;
+        document.getElementById('df_result_time_spent_ms').value = data.timeSpentMs;
+        document.getElementById('df_result_uer').value = data.uer;
+        document.getElementById('df_result_cer').value = data.cer;
+        document.getElementById('df_result_ter').value = data.ter;
+        document.getElementById('df_result_total_chars').value = data.totalChars;
+        document.getElementById('df_result_total_key_presses').value = data.keyPresses;
+        document.getElementById('df_result_total_corrected_errors').value = data.correctedErrors;
+        document.getElementById('df_result_total_uncorrected_errors').value = data.uncorrectedErrors;
+        document.getElementById('df_result_surface_difference_mm').value = data.surfaceDifference * 1000;
+        document.getElementById('df_result_platform').value = getURLParameter('platform');
+        document.getElementById('df_result_condition_id').value = data.conditionId;
+        document.getElementById('df_result_condition_value').value = data.conditionValue;
+        document.getElementById('df_result_qr_height').value = data.qrHeight;
+        document.getElementById('df_result_session_id').value = getURLParameter('session_id');
+
+        console.log("Submitting prompt result to DF Google Form: " + JSON.stringify(data));
+
         form.dispatchEvent(new Event('submit', { cancelable: true }));
     }
 });
