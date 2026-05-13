@@ -747,7 +747,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
         else if (value === 'df') {
             dfModeEnabled = true;
-            detailedLogEnabled = true;
             inputType = "physical-keyboard";
             document.getElementById("physical-keyboard").checked = true;
             updatePromptCount(5);
