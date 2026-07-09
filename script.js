@@ -53,6 +53,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         'metal-keys': {
             file: 'prompts/metal_keys.txt',
             autocorrect: AUTOCORRECT_MODE.OFF
+        },
+        'shortcuts': {
+            file: 'prompts/shortcuts.txt',
+            autocorrect: AUTOCORRECT_MODE.OFF,
+            mode: 'keychord' // key-chord capture instead of textarea typing
         }
     };
 
@@ -65,6 +70,15 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         const config = datasetConfig[selectedDataset.value];
         return config ? config.file : datasetConfig['practice'].file; // Default fallback
+    }
+
+    // Interaction mode for the current dataset: 'text' (type into textarea) or
+    // 'keychord' (capture keyboard shortcuts). Datasets opt into 'keychord' via
+    // datasetConfig.mode.
+    function getSelectedDatasetMode() {
+        const selectedDataset = document.querySelector('input[name="dataset"]:checked');
+        const config = selectedDataset ? datasetConfig[selectedDataset.value] : null;
+        return (config && config.mode) ? config.mode : 'text';
     }
 
     // Track user-selected autocorrect mode (initialize with SYSTEM as default)
@@ -192,6 +206,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     function updateCurrentPrompt() {
+        // In key-chord mode the textarea/sample-text flow is inactive; the
+        // keychord UI renders the target instead.
+        if (currentMode === 'keychord') {
+            updateKeychordProgress();
+            renderKeychordTarget();
+            return;
+        }
+
         currentPromptElement.textContent = currentPromptIndex + 1;
         sampleTextElement.innerText = prompts[currentPromptIndex].text;
 
@@ -293,6 +315,338 @@ document.addEventListener('DOMContentLoaded', async function () {
         promptTimingStarted = false; // Reset timing flag
 
     }
+
+    // ======================================================================
+    // Shortcut (key-chord) mode
+    // ----------------------------------------------------------------------
+    // The "shortcuts" dataset reuses the normal test UI (sample-text box,
+    // progress indicator, results panel, Start button) but captures keyboard
+    // shortcuts instead of typed text. Fullscreen + the Keyboard Lock API let
+    // us intercept even browser-reserved combos (Ctrl+T / Ctrl+W / Ctrl+N).
+    // Matching is platform-agnostic: Ctrl and Cmd (Meta) are interchangeable.
+    // ======================================================================
+    let currentMode = 'text';       // 'text' | 'keychord'
+    let keychordActive = false;     // true from Start until finish/exit
+    let keychordLocked = false;     // Keyboard Lock currently held
+    let kcPromptStartedAt = null;   // timestamp of the first key tap this prompt
+    let kcWrongAttempts = 0;        // wrong presses on the current target
+    let kcResults = [];             // per-sequence results for the run
+    let kcPrompts = [];             // sequences: array of arrays of combo strings
+    let kcStepIndex = 0;            // index of the current combo within a sequence
+
+    const DEFAULT_INSTRUCTIONS = document.querySelector('.instructions').textContent;
+    const SHORTCUT_INSTRUCTIONS = 'Press each shortcut in order - each turns green as you complete it. Reserved combos (Ctrl+T / Ctrl+W) are captured in full-screen; hold Esc or tap X to exit. Cmd works for Ctrl on Mac.';
+    const kcExitBtn = document.getElementById('kc-exit-btn');
+
+    function escapeHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Map a key token ("z", "Escape", "Tab", "1") to a KeyboardEvent.code.
+    function tokenToCode(tok) {
+        if (tok.length === 1 && /[a-z]/i.test(tok)) return 'Key' + tok.toUpperCase();
+        if (tok.length === 1 && /[0-9]/.test(tok)) return 'Digit' + tok;
+        const map = {
+            escape: 'Escape', esc: 'Escape', tab: 'Tab', space: 'Space',
+            enter: 'Enter', up: 'ArrowUp', down: 'ArrowDown',
+            left: 'ArrowLeft', right: 'ArrowRight'
+        };
+        return map[tok.toLowerCase()] || tok;
+    }
+
+    function displayKey(tok) {
+        if (tok.length === 1) return tok.toUpperCase();
+        return tok.charAt(0).toUpperCase() + tok.slice(1);
+    }
+
+    // Parse "Ctrl+Shift+Z" into a chord descriptor.
+    function parseChord(str) {
+        const raw = (str || '').trim();
+        const tokens = raw.split('+').map(s => s.trim()).filter(Boolean);
+        const chord = { ctrl: false, shift: false, alt: false, code: null, key: null, parts: [] };
+        tokens.forEach(tok => {
+            const low = tok.toLowerCase();
+            if (['ctrl', 'control', 'cmd', 'command', 'meta'].includes(low)) {
+                chord.ctrl = true; chord.parts.push('Ctrl');
+            } else if (low === 'shift') {
+                chord.shift = true; chord.parts.push('Shift');
+            } else if (['alt', 'option', 'opt'].includes(low)) {
+                chord.alt = true; chord.parts.push('Alt');
+            } else {
+                chord.key = tok; chord.code = tokenToCode(tok); chord.parts.push(displayKey(tok));
+            }
+        });
+        return chord;
+    }
+
+    // Does a keydown event satisfy the chord? Ctrl and Cmd are interchangeable.
+    function chordMatches(e, chord) {
+        const primaryMod = e.ctrlKey || e.metaKey;
+        if (chord.ctrl !== primaryMod) return false;
+        if (chord.shift !== e.shiftKey) return false;
+        if (chord.alt !== e.altKey) return false;
+        if (e.code && chord.code && e.code === chord.code) return true;
+        if (e.key && chord.key && e.key.toLowerCase() === chord.key.toLowerCase()) return true;
+        return false;
+    }
+
+    // Load static sequences from the shortcuts file, in order (no shuffle).
+    // Each line is one sequence; combos within a line are space-separated.
+    function buildShortcutSequences() {
+        kcPrompts = originalPrompts
+            .slice(0, maxPromptsPerTest)
+            .map(function (line) { return line.split(/\s+/).filter(Boolean); });
+        currentPromptIndex = 0;
+        kcStepIndex = 0;
+    }
+
+    // Toggle the visible UI between text-typing and key-chord modes. Both modes
+    // share the same DOM; we only swap which metrics/instructions show and what
+    // the sample-text box and Start button do.
+    function updateModeUI() {
+        currentMode = getSelectedDatasetMode();
+        const sampleHighlighted = document.getElementById('sample-text-highlighted');
+        const autocorrectGroup = document.querySelector('input[name="autocorrect-mode"]').closest('.settings-group');
+        const qaGroup = document.querySelector('input[name="qa-mode"]').closest('.settings-group');
+        const textMetrics = document.getElementById('text-metrics');
+        const shortcutMetrics = document.getElementById('shortcut-metrics');
+        const instructions = document.querySelector('.instructions');
+
+        // The exit-X only belongs on-screen during an active full-screen run.
+        if (kcExitBtn) kcExitBtn.style.display = 'none';
+
+        if (currentMode === 'keychord') {
+            inputArea.style.display = 'none';
+            if (sampleHighlighted) sampleHighlighted.style.display = 'none';
+            sampleTextElement.style.display = 'block';
+            if (autocorrectGroup) autocorrectGroup.style.display = 'none';
+            if (qaGroup) qaGroup.style.display = 'none';
+            if (textMetrics) textMetrics.style.display = 'none';
+            if (shortcutMetrics) shortcutMetrics.style.display = 'block';
+            if (instructions) instructions.textContent = SHORTCUT_INSTRUCTIONS;
+            results.style.display = 'none';
+            startButton.style.display = 'block';
+            startButton.textContent = 'Start';
+            keychordActive = false;
+            kcResults = [];
+            kcWrongAttempts = 0;
+            buildShortcutSequences();
+            updateKeychordProgress();
+            renderKeychordTarget();
+        } else {
+            inputArea.style.display = '';
+            if (autocorrectGroup) autocorrectGroup.style.display = '';
+            if (qaGroup) qaGroup.style.display = '';
+            if (textMetrics) textMetrics.style.display = '';
+            if (shortcutMetrics) shortcutMetrics.style.display = 'none';
+            if (instructions) instructions.textContent = DEFAULT_INSTRUCTIONS;
+            releaseKeychordLock();
+            // Clear any leftover key-chord content/flash from the sample-text box
+            // and re-render the text prompt (updateCurrentPrompt ran earlier with
+            // a stale mode, so the box may still show the shortcut sequence).
+            sampleTextElement.classList.remove('kc-wrong');
+            if (prompts.length) {
+                updateCurrentPrompt();
+            } else {
+                updateQAModeDisplay(); // restores sample-text vs highlighted visibility
+            }
+        }
+    }
+
+    function updateKeychordProgress() {
+        if (!kcPrompts.length) return;
+        currentPromptElement.textContent = currentPromptIndex + 1;
+        totalPromptsElement.textContent = kcPrompts.length;
+    }
+
+    // Render the current sequence into the shared sample-text box. Completed
+    // combos are green, the current one is outlined, upcoming ones plain.
+    function renderKeychordTarget() {
+        if (!kcPrompts.length) return;
+        const seq = kcPrompts[currentPromptIndex] || [];
+        sampleTextElement.innerHTML = seq.map(function (comboStr, idx) {
+            const chord = parseChord(comboStr);
+            const keys = chord.parts.map(p => `<kbd class="kc-key">${escapeHtml(p)}</kbd>`).join('+');
+            let cls = 'kc-combo';
+            if (idx < kcStepIndex) cls += ' kc-done';
+            else if (idx === kcStepIndex) cls += ' kc-current';
+            return `<span class="${cls}">${keys}</span>`;
+        }).join('<span class="kc-sep">&rarr;</span>');
+    }
+
+    // Flash the sample-text box red as wrong-press feedback.
+    function flashWrong() {
+        sampleTextElement.classList.remove('kc-wrong');
+        void sampleTextElement.offsetWidth; // reflow so the flash restarts
+        sampleTextElement.classList.add('kc-wrong');
+        setTimeout(function () { sampleTextElement.classList.remove('kc-wrong'); }, 250);
+    }
+
+    async function startShortcutRun() {
+        // Fresh run: build new random sequences + reset counters.
+        buildShortcutSequences();
+        kcResults = [];
+        kcWrongAttempts = 0;
+        results.style.display = 'none';
+        startButton.style.display = 'none';
+
+        // Fullscreen + Keyboard Lock: allowed only inside a user gesture. We
+        // fullscreen the whole test card so the UI is unchanged, just filling
+        // the screen.
+        const card = document.querySelector('.container');
+        let fsOk = false;
+        try {
+            if (card && card.requestFullscreen) {
+                await card.requestFullscreen();
+                fsOk = !!document.fullscreenElement;
+            }
+        } catch (err) {
+            fsOk = false;
+        }
+
+        if (!fsOk) {
+            // No fullscreen (e.g. selection came from a synthetic event with no
+            // user gesture) -> stay idle and let the user start with a click.
+            startButton.style.display = 'block';
+            startButton.textContent = 'Start';
+            if (kcExitBtn) kcExitBtn.style.display = 'none';
+            updateKeychordProgress();
+            renderKeychordTarget();
+            return;
+        }
+
+        if (navigator.keyboard && navigator.keyboard.lock) {
+            try {
+                await navigator.keyboard.lock();
+                keychordLocked = true;
+            } catch (err) {
+                console.warn('Keyboard lock failed:', err);
+            }
+        }
+
+        if (kcExitBtn) kcExitBtn.style.display = 'block';
+        keychordActive = true;
+        testActive = true;
+        kcPromptStartedAt = null; // timer starts on the first key tap
+        updateKeychordProgress();
+        renderKeychordTarget();
+    }
+
+    function recordKeychordResult() {
+        const seq = kcPrompts[currentPromptIndex] || [];
+        const correct = seq.length;                 // one correct press per combo
+        const total = correct + kcWrongAttempts;    // correct + wrong presses
+        kcResults.push({
+            timeMs: kcPromptStartedAt ? Date.now() - kcPromptStartedAt : 0,
+            accuracy: total > 0 ? (correct / total) * 100 : 0
+        });
+    }
+
+    function advanceKeychord() {
+        if (currentPromptIndex < kcPrompts.length - 1) {
+            currentPromptIndex += 1;
+            kcStepIndex = 0;
+            kcWrongAttempts = 0;
+            kcPromptStartedAt = null; // timer starts on the first key of the new prompt
+            updateKeychordProgress();
+            renderKeychordTarget();
+        } else {
+            finishKeychord();
+        }
+    }
+
+    function finishKeychord() {
+        keychordActive = false;
+        testActive = false;
+        releaseKeychordLock();
+
+        const n = kcResults.length;
+        const avgAccuracy = n ? kcResults.reduce((s, r) => s + r.accuracy, 0) / n : 0;
+        const totalMs = kcResults.reduce((s, r) => s + r.timeMs, 0);
+        const avgMs = n ? totalMs / n : 0;
+
+        document.getElementById('kc-accuracy').textContent = avgAccuracy.toFixed(0) + '%';
+        document.getElementById('kc-time').textContent = (totalMs / 1000).toFixed(1);
+        document.getElementById('kc-avg-time').textContent = (avgMs / 1000).toFixed(1);
+
+        // Reuse the normal results panel (shortcut-metrics are the visible set
+        // in key-chord mode).
+        if (kcExitBtn) kcExitBtn.style.display = 'none';
+        results.style.display = 'block';
+        startButton.style.display = 'block';
+        startButton.textContent = 'Start New Test';
+    }
+
+    function releaseKeychordLock() {
+        if (keychordLocked && navigator.keyboard && navigator.keyboard.unlock) {
+            try { navigator.keyboard.unlock(); } catch (e) { /* ignore */ }
+        }
+        keychordLocked = false;
+        if (document.fullscreenElement) {
+            try { document.exitFullscreen(); } catch (e) { /* ignore */ }
+        }
+    }
+
+    // Capture-phase document listener so we intercept shortcuts before anything
+    // else on the page. Only acts while a key-chord run is live.
+    document.addEventListener('keydown', function (e) {
+        if (currentMode !== 'keychord' || !keychordActive) return;
+        // Ignore auto-repeat from held keys: otherwise holding Esc (the
+        // fullscreen exit gesture) would blast through Escape-target prompts,
+        // and any held key would rack up matches/errors.
+        if (e.repeat) return;
+        // Ignore lone modifier presses: wait for the actual key.
+        if (['Control', 'Shift', 'Alt', 'Meta', 'CapsLock', 'OS'].includes(e.key)) return;
+
+        e.preventDefault();
+        if (!kcPrompts.length) return;
+        // Start this prompt's timer on the first key tap.
+        if (kcPromptStartedAt === null) kcPromptStartedAt = Date.now();
+        const seq = kcPrompts[currentPromptIndex];
+        const chord = parseChord(seq[kcStepIndex]);
+        if (chordMatches(e, chord)) {
+            kcStepIndex += 1;
+            renderKeychordTarget(); // turn the just-completed combo green
+            if (kcStepIndex >= seq.length) {
+                recordKeychordResult();
+                advanceKeychord();
+            }
+        } else {
+            kcWrongAttempts += 1;
+            flashWrong();
+        }
+    }, true);
+
+    // If the user leaves fullscreen mid-run (hold Esc), reset back to idle so
+    // they can restart with the Start button.
+    document.addEventListener('fullscreenchange', function () {
+        if (currentMode === 'keychord' && keychordActive && !document.fullscreenElement) {
+            keychordActive = false;
+            if (keychordLocked && navigator.keyboard && navigator.keyboard.unlock) {
+                try { navigator.keyboard.unlock(); } catch (e) { /* ignore */ }
+            }
+            keychordLocked = false;
+            if (kcExitBtn) kcExitBtn.style.display = 'none';
+            results.style.display = 'none';
+            startButton.style.display = 'block';
+            startButton.textContent = 'Start';
+            updateKeychordProgress();
+            renderKeychordTarget();
+        }
+    });
+
+    // Exit (X) button: bail out of a running shortcut test back to idle.
+    function exitShortcutRun() {
+        keychordActive = false;
+        releaseKeychordLock(); // unlock + exit fullscreen
+        if (kcExitBtn) kcExitBtn.style.display = 'none';
+        results.style.display = 'none';
+        startButton.style.display = 'block';
+        startButton.textContent = 'Start';
+        updateKeychordProgress();
+        renderKeychordTarget();
+    }
+    if (kcExitBtn) kcExitBtn.addEventListener('click', exitShortcutRun);
 
     // Base dictionary of common words - make it a global window property for debugging
     window.typingTestDictionary = [
@@ -547,7 +901,17 @@ document.addEventListener('DOMContentLoaded', async function () {
 
                 // Update input area configuration when dataset changes
                 configureInputArea();
-                reloadPromptsForNewDataset();
+
+                // Key-chord datasets auto-start (enter fullscreen + lock) right
+                // after prompts load. Selecting the radio is a user gesture, so
+                // the fullscreen request is allowed. Without a gesture (e.g.
+                // dataset set via URL -> synthetic change event) startShortcutRun
+                // falls back to showing the Start button.
+                if (getSelectedDatasetMode() === 'keychord') {
+                    reloadPromptsForNewDataset().then(startShortcutRun);
+                } else {
+                    reloadPromptsForNewDataset();
+                }
             }
         });
     });
@@ -901,6 +1265,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Apply URL parameter overrides after presets are applied
     applyURLParameterOverrides();
 
+    // Ensure the correct mode UI (text vs key-chord) is shown on load.
+    updateModeUI();
+
     // Add event listener for user ID input to handle UXR mode restrictions
     const userIdInput = document.getElementById('user-id');
     userIdInput.addEventListener('input', function() {
@@ -1232,6 +1599,10 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Reset button functionality
     startButton.addEventListener('click', function () {
+        if (currentMode === 'keychord') {
+            startShortcutRun();
+            return;
+        }
         resetTest();
     });
 
@@ -1282,6 +1653,14 @@ document.addEventListener('DOMContentLoaded', async function () {
         pendingSoftKeyLogEntry = null;
 
         flushDetailedLogs();
+
+        // Show/hide key-chord vs text UI for the current dataset.
+        updateModeUI();
+
+        // Key-chord mode manages its own entry/focus via the overlay button.
+        if (currentMode === 'keychord') {
+            return;
+        }
 
         // Focus the input area after reset
         inputArea.focus();

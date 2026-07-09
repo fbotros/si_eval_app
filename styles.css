@@ -421,6 +421,88 @@ h1 {
     border-color: #3498db;
 }
 
+/* Shortcut (key-chord) mode styles */
+.kc-key {
+    display: inline-block;
+    background-color: #ffffff;
+    border: 2px solid #ccc;
+    border-bottom-width: 4px;
+    border-radius: 8px;
+    padding: 0.15rem 0.6rem;
+    margin: 0 0.1rem;
+    font-family: monospace;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+/* One combo within a sequence prompt. */
+.kc-combo {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+    border-radius: 6px;
+    vertical-align: middle;
+}
+
+/* The combo the user should press next. */
+.kc-combo.kc-current {
+    outline: 2px solid #3498db;
+    outline-offset: 2px;
+}
+
+/* A combo already completed in the current sequence: turn its keys green. */
+.kc-combo.kc-done .kc-key {
+    background-color: #d4edda;
+    border-color: #2ecc71;
+    color: #155724;
+}
+
+.kc-sep {
+    margin: 0 0.5rem;
+    color: #7f8c8d;
+    font-weight: 700;
+}
+
+.sample-text.kc-wrong {
+    border-left-color: #e74c3c;
+    background-color: #fdecea;
+    transition: background-color 0.1s, border-color 0.1s;
+}
+
+/* Exit (X) button shown while a shortcut run is in full-screen. */
+.kc-exit-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 1.2rem;
+    line-height: 44px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 2000;
+}
+
+.kc-exit-btn:hover {
+    background-color: rgba(0, 0, 0, 0.78);
+}
+
+/* When the test card is full-screen for shortcut capture, fill and center. */
+.container:fullscreen {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background-color: #ffffff;
+    overflow: auto;
+    padding: 2rem;
+}
+
 /* Responsive design */
 @media (max-width: 960px) {
     body {

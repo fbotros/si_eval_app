@@ -12,6 +12,8 @@
 <body>
     <div class="app-wrapper">
         <div class="container">
+            <button id="kc-exit-btn" class="kc-exit-btn" style="display: none;" title="Exit full screen"
+                aria-label="Exit full screen">&#10005;</button>
             <h1>Typing Test App</h1>
             <p class="instructions">Type the text shown below. Press Enter when you finish a prompt to move to the next
                 one.</p>
@@ -40,14 +42,23 @@
 
             <div class="results" id="results">
                 <h2>Your Average Results</h2>
-                <div class="primary-metric-container">
-                    <div class="metric primary-metric">Adjusted WPM (AWPM): <span id="awpm">0</span></div>
+                <div id="text-metrics">
+                    <div class="primary-metric-container">
+                        <div class="metric primary-metric">Adjusted WPM (AWPM): <span id="awpm">0</span></div>
+                    </div>
+                    <div class="metric">Words per minute (WPM): <span id="wpm">0</span></div>
+                    <div class="metric">Accuracy: <span id="accuracy">0%</span></div>
+                    <div class="metric">Uncorrected Error Rate (UER): <span id="uer">0%</span></div>
+                    <div class="metric">Corrected Error Rate (CER): <span id="cer">0%</span></div>
+                    <div class="metric">Total Error Rate (TER): <span id="ter">0%</span></div>
                 </div>
-                <div class="metric">Words per minute (WPM): <span id="wpm">0</span></div>
-                <div class="metric">Accuracy: <span id="accuracy">0%</span></div>
-                <div class="metric">Uncorrected Error Rate (UER): <span id="uer">0%</span></div>
-                <div class="metric">Corrected Error Rate (CER): <span id="cer">0%</span></div>
-                <div class="metric">Total Error Rate (TER): <span id="ter">0%</span></div>
+                <div id="shortcut-metrics" style="display: none;">
+                    <div class="primary-metric-container">
+                        <div class="metric primary-metric">Average accuracy: <span id="kc-accuracy">0%</span></div>
+                    </div>
+                    <div class="metric">Total time: <span id="kc-time">0</span> s</div>
+                    <div class="metric">Average time per prompt: <span id="kc-avg-time">0</span> s</div>
+                </div>
             </div>
         </div>
 
@@ -88,6 +99,10 @@
                     <div class="radio-option">
                         <input type="radio" id="metal-keys" name="dataset" value="metal-keys">
                         <label for="metal-keys">Metal Keys</label>
+                    </div>
+                    <div class="radio-option">
+                        <input type="radio" id="shortcuts" name="dataset" value="shortcuts">
+                        <label for="shortcuts">Shortcuts</label>
                     </div>
                 </div>
             </div>
