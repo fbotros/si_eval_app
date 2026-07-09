@@ -335,7 +335,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     let kcStepIndex = 0;            // index of the current combo within a sequence
 
     const DEFAULT_INSTRUCTIONS = document.querySelector('.instructions').textContent;
-    const SHORTCUT_INSTRUCTIONS = 'Press each shortcut in order - each turns green as you complete it. Reserved combos (Ctrl+T / Ctrl+W) are captured in full-screen; hold Esc or tap X to exit. Cmd works for Ctrl on Mac.';
+    const SHORTCUT_INSTRUCTIONS = 'Press each shortcut in order - each turns green as you complete it. Tap X or press Esc to exit full-screen. Cmd works for Ctrl on Mac.';
     const kcExitBtn = document.getElementById('kc-exit-btn');
 
     function escapeHtml(s) {
