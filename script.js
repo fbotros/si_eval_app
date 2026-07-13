@@ -333,6 +333,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     let kcResults = [];             // per-sequence results for the run
     let kcPrompts = [];             // sequences: array of arrays of combo strings
     let kcStepIndex = 0;            // index of the current combo within a sequence
+    let kcKeysDown = new Set();     // codes physically down (auto-repeat filter)
 
     const DEFAULT_INSTRUCTIONS = document.querySelector('.instructions').textContent;
     const SHORTCUT_INSTRUCTIONS = 'Press each shortcut in order - each turns green as you complete it. Tap X or press Esc to exit full-screen. Cmd works for Ctrl on Mac.';
@@ -493,6 +494,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         buildShortcutSequences();
         kcResults = [];
         kcWrongAttempts = 0;
+        kcKeysDown.clear();
         detailedLogEvents = [];
         detailedLogAccumulated = [];
         results.style.display = 'none';
@@ -653,6 +655,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         // Ignore auto-repeat from held keys so a held key doesn't flood the log
         // or rack up matches.
         if (e.repeat) return;
+        // OculusBrowser fires auto-repeat keydowns for held keys WITHOUT setting
+        // e.repeat, flooding the log with duplicate (esp. modifier) presses.
+        // Track physically-down keys and ignore a keydown already marked down.
+        if (kcKeysDown.has(e.code)) return;
+        kcKeysDown.add(e.code);
         // First key tap of the prompt starts the timer (modifier or not).
         if (kcPromptStartedAt === null) kcPromptStartedAt = Date.now();
 
@@ -685,6 +692,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Log key releases during a run (modifiers included) for full down/up pairs.
     document.addEventListener('keyup', function (e) {
         if (currentMode !== 'keychord' || !keychordActive) return;
+        kcKeysDown.delete(e.code);
         const isModifier = ['Control', 'Shift', 'Alt', 'Meta', 'CapsLock', 'OS'].includes(e.key);
         logKeychordEvent('keyup', e, { isModifier: isModifier });
     }, true);
