@@ -493,6 +493,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         buildShortcutSequences();
         kcResults = [];
         kcWrongAttempts = 0;
+        detailedLogEvents = [];
+        detailedLogAccumulated = [];
         results.style.display = 'none';
         startButton.style.display = 'none';
 
@@ -542,10 +544,59 @@ document.addEventListener('DOMContentLoaded', async function () {
         const seq = kcPrompts[currentPromptIndex] || [];
         const correct = seq.length;                 // one correct press per combo
         const total = correct + kcWrongAttempts;    // correct + wrong presses
-        kcResults.push({
-            timeMs: kcPromptStartedAt ? Date.now() - kcPromptStartedAt : 0,
-            accuracy: total > 0 ? (correct / total) * 100 : 0
-        });
+        const timeMs = kcPromptStartedAt ? Date.now() - kcPromptStartedAt : 0;
+        const accuracy = total > 0 ? (correct / total) * 100 : 0;
+        kcResults.push({ timeMs: timeMs, accuracy: accuracy });
+
+        // Detailed logging: accumulate a per-prompt record, then clear the
+        // per-prompt event buffer for the next sequence.
+        if (detailedLogEnabled) {
+            detailedLogAccumulated.push(buildKeychordPayload(seq, currentPromptIndex, {
+                timeMs: timeMs, accuracy: accuracy, correct: correct,
+                total: total, wrongAttempts: kcWrongAttempts
+            }));
+            detailedLogEvents = [];
+        }
+    }
+
+    // Detailed-log one key event (keydown/keyup, modifier or not) during a run.
+    function logKeychordEvent(type, e, extra) {
+        if (!detailedLogEnabled) return;
+        const now = Date.now();
+        const entry = {
+            type: type,
+            timestamp: now,
+            timestampIso: new Date(now).toISOString(),
+            timeSincePromptStartMs: kcPromptStartedAt ? now - kcPromptStartedAt : null,
+            key: e.key,
+            code: e.code,
+            keyCode: e.keyCode,
+            ctrlKey: e.ctrlKey,
+            shiftKey: e.shiftKey,
+            altKey: e.altKey,
+            metaKey: e.metaKey
+        };
+        if (extra) Object.assign(entry, extra);
+        detailedLogEvents.push(entry);
+    }
+
+    // Assemble the per-prompt detailed-log record (mirrors buildDetailedLogPayload).
+    function buildKeychordPayload(seq, promptIndex, result) {
+        return {
+            userId: dfModeEnabled
+                ? (document.getElementById('unix-name').value || 'anonymous')
+                : (document.getElementById('user-id').value || 'anonymous'),
+            dataset: (document.querySelector('input[name="dataset"]:checked') || {}).value || 'shortcuts',
+            inputType: inputType,
+            uxrMode: uxrModeEnabled,
+            userAgent: navigator.userAgent,
+            prompt: seq.join(' '),
+            promptIndex: promptIndex,
+            promptStartedAt: kcPromptStartedAt,
+            promptSubmittedAt: Date.now(),
+            results: result,
+            events: detailedLogEvents
+        };
     }
 
     function advanceKeychord() {
@@ -581,6 +632,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         results.style.display = 'block';
         startButton.style.display = 'block';
         startButton.textContent = 'Start New Test';
+
+        flushDetailedLogs(); // download the per-prompt JSON (no-op if logging off)
     }
 
     function releaseKeychordLock() {
@@ -597,20 +650,26 @@ document.addEventListener('DOMContentLoaded', async function () {
     // else on the page. Only acts while a key-chord run is live.
     document.addEventListener('keydown', function (e) {
         if (currentMode !== 'keychord' || !keychordActive) return;
-        // Ignore auto-repeat from held keys: otherwise holding Esc (the
-        // fullscreen exit gesture) would blast through Escape-target prompts,
-        // and any held key would rack up matches/errors.
+        // Ignore auto-repeat from held keys so a held key doesn't flood the log
+        // or rack up matches.
         if (e.repeat) return;
-        // Ignore lone modifier presses: wait for the actual key.
-        if (['Control', 'Shift', 'Alt', 'Meta', 'CapsLock', 'OS'].includes(e.key)) return;
+        // First key tap of the prompt starts the timer (modifier or not).
+        if (kcPromptStartedAt === null) kcPromptStartedAt = Date.now();
+
+        // Log lone modifier presses, but never score/advance on them.
+        if (['Control', 'Shift', 'Alt', 'Meta', 'CapsLock', 'OS'].includes(e.key)) {
+            logKeychordEvent('keydown', e, { isModifier: true });
+            return;
+        }
 
         e.preventDefault();
         if (!kcPrompts.length) return;
-        // Start this prompt's timer on the first key tap.
-        if (kcPromptStartedAt === null) kcPromptStartedAt = Date.now();
         const seq = kcPrompts[currentPromptIndex];
-        const chord = parseChord(seq[kcStepIndex]);
-        if (chordMatches(e, chord)) {
+        const expected = seq[kcStepIndex];
+        const chord = parseChord(expected);
+        const matched = chordMatches(e, chord);
+        logKeychordEvent('keydown', e, { expectedCombo: expected, stepIndex: kcStepIndex, matched: matched });
+        if (matched) {
             kcStepIndex += 1;
             renderKeychordTarget(); // turn the just-completed combo green
             if (kcStepIndex >= seq.length) {
@@ -621,6 +680,13 @@ document.addEventListener('DOMContentLoaded', async function () {
             kcWrongAttempts += 1;
             flashWrong();
         }
+    }, true);
+
+    // Log key releases during a run (modifiers included) for full down/up pairs.
+    document.addEventListener('keyup', function (e) {
+        if (currentMode !== 'keychord' || !keychordActive) return;
+        const isModifier = ['Control', 'Shift', 'Alt', 'Meta', 'CapsLock', 'OS'].includes(e.key);
+        logKeychordEvent('keyup', e, { isModifier: isModifier });
     }, true);
 
     // If the user leaves fullscreen mid-run (hold Esc), reset back to idle so
@@ -638,6 +704,9 @@ document.addEventListener('DOMContentLoaded', async function () {
             startButton.textContent = 'Start';
             updateKeychordProgress();
             renderKeychordTarget();
+            flushDetailedLogs(); // save any completed-prompt logs
+            detailedLogEvents = [];       // don't leak partial-run events into other datasets
+            detailedLogAccumulated = [];
         }
     });
 
@@ -651,6 +720,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         startButton.textContent = 'Start';
         updateKeychordProgress();
         renderKeychordTarget();
+        flushDetailedLogs(); // save any completed-prompt logs
+        detailedLogEvents = [];       // don't leak partial-run events into other datasets
+        detailedLogAccumulated = [];
     }
     if (kcExitBtn) kcExitBtn.addEventListener('click', exitShortcutRun);
 
