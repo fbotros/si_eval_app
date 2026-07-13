@@ -334,6 +334,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     let kcPrompts = [];             // sequences: array of arrays of combo strings
     let kcStepIndex = 0;            // index of the current combo within a sequence
     let kcKeysDown = new Set();     // codes physically down (auto-repeat filter)
+    let kcTyped = [];               // combos actually pressed this prompt (incl. wrong)
 
     const DEFAULT_INSTRUCTIONS = document.querySelector('.instructions').textContent;
     const SHORTCUT_INSTRUCTIONS = 'Press each shortcut in order - each turns green as you complete it. Tap X or press Esc to exit full-screen. Cmd works for Ctrl on Mac.';
@@ -395,6 +396,17 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (e.code && chord.code && e.code === chord.code) return true;
         if (e.key && chord.key && e.key.toLowerCase() === chord.key.toLowerCase()) return true;
         return false;
+    }
+
+    // Turn an actual keydown into a combo label (e.g. "Ctrl+C", "Tab", "Ctrl+←")
+    // for the "typed" record — reflects what was really pressed, mistakes and all.
+    function eventToComboLabel(e) {
+        const parts = [];
+        if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
+        if (e.shiftKey) parts.push('Shift');
+        if (e.altKey) parts.push('Alt');
+        parts.push(displayKey(e.key));
+        return parts.join('+');
     }
 
     // Load static sequences from the shortcuts file, in order (no shuffle).
@@ -490,10 +502,23 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     async function startShortcutRun() {
+        // In DF/UXR mode, require the identifier before starting so form
+        // submissions are attributable (keychord mode bypasses the textarea
+        // gate that normally enforces this).
+        if (uxrModeEnabled && !document.getElementById('user-id').value.trim()) {
+            alert('Please enter a User ID first.');
+            return;
+        }
+        if (dfModeEnabled && !document.getElementById('unix-name').value.trim()) {
+            alert('Please enter your unix name first.');
+            return;
+        }
+
         // Fresh run: build new random sequences + reset counters.
         buildShortcutSequences();
         kcResults = [];
         kcWrongAttempts = 0;
+        kcTyped = [];
         kcKeysDown.clear();
         detailedLogEvents = [];
         detailedLogAccumulated = [];
@@ -559,6 +584,30 @@ document.addEventListener('DOMContentLoaded', async function () {
             }));
             detailedLogEvents = [];
         }
+
+        // Google Form submission: reuse the same promptFinishedEvent the text
+        // mode dispatches, so the DF/UXR preset listeners submit each prompt.
+        // Shortcut data is mapped onto the existing form fields (text-only
+        // metrics like WPM/UER/CER/TER are N/A here and sent as 0).
+        document.dispatchEvent(new CustomEvent('promptFinishedEvent', {
+            detail: {
+                message: {
+                    promptText: seq.join(' '),   // e.g. "Ctrl+C Ctrl+V Ctrl+Z Ctrl+X"
+                    typedText: kcTyped.join(' '), // combos actually pressed (incl. wrong)
+                    wpm: 0, awpm: 0, uer: 0, cer: 0, ter: 0,
+                    accuracy: accuracy,          // per-prompt: correct / total
+                    timeSpentMs: timeMs,         // first key -> completion
+                    totalChars: correct,         // # shortcuts in the sequence
+                    keyPresses: total,           // correct + wrong presses
+                    correctedErrors: 0,
+                    uncorrectedErrors: kcWrongAttempts,
+                    surfaceDifference: -1,
+                    conditionId: -1,
+                    conditionValue: -1,
+                    qrHeight: -1
+                }
+            }
+        }));
     }
 
     // Detailed-log one key event (keydown/keyup, modifier or not) during a run.
@@ -606,6 +655,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             currentPromptIndex += 1;
             kcStepIndex = 0;
             kcWrongAttempts = 0;
+            kcTyped = [];
             kcPromptStartedAt = null; // timer starts on the first key of the new prompt
             updateKeychordProgress();
             renderKeychordTarget();
@@ -676,6 +726,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         const chord = parseChord(expected);
         const matched = chordMatches(e, chord);
         logKeychordEvent('keydown', e, { expectedCombo: expected, stepIndex: kcStepIndex, matched: matched });
+        kcTyped.push(eventToComboLabel(e)); // what was actually pressed (incl. wrong)
         if (matched) {
             kcStepIndex += 1;
             renderKeychordTarget(); // turn the just-completed combo green
