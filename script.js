@@ -1257,6 +1257,30 @@ document.addEventListener('DOMContentLoaded', async function () {
                 submitPromptResultToGoogleForm(e.detail.message);
             });
         }
+        else if (value === 'uxr2') {
+            // Second parallel UXR study. Identical to 'uxr' but routes results
+            // to the UXR2 form (schema-identical copy, so we just override the
+            // resultForm action and reuse the same submitter).
+            uxrModeEnabled = true;
+            detailedLogEnabled = true;
+            inputType = "physical-keyboard";
+            document.getElementById("physical-keyboard").checked = true;
+            updatePromptCount(100);
+
+            // Route submissions to the UXR2 form.
+            document.getElementById('resultForm').action =
+                'https://docs.google.com/forms/d/e/1FAIpQLSdAuVaWh53BvFkNTSHVki0QqIlw7CQn-xTptVpmRtHrk2ULEA/formResponse';
+
+            // Show User ID field when UXR mode is enabled
+            document.getElementById('user-id-group').style.display = 'block';
+
+            // Disable input area until user ID is provided
+            checkAndUpdateInputAreaState();
+
+            document.addEventListener('promptFinishedEvent', function (e) {
+                submitPromptResultToGoogleForm(e.detail.message);
+            });
+        }
         else if (value === 'df') {
             dfModeEnabled = true;
             inputType = "physical-keyboard";
