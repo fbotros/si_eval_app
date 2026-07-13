@@ -58,6 +58,11 @@ document.addEventListener('DOMContentLoaded', async function () {
             file: 'prompts/shortcuts.txt',
             autocorrect: AUTOCORRECT_MODE.OFF,
             mode: 'keychord' // key-chord capture instead of textarea typing
+        },
+        'arrows': {
+            file: 'prompts/arrows.txt',
+            autocorrect: AUTOCORRECT_MODE.OFF,
+            mode: 'keychord' // plain arrow-key sequences (same capture path)
         }
     };
 
@@ -398,14 +403,20 @@ document.addEventListener('DOMContentLoaded', async function () {
         return false;
     }
 
-    // Turn an actual keydown into a combo label (e.g. "Ctrl+C", "Tab", "Ctrl+←")
-    // for the "typed" record — reflects what was really pressed, mistakes and all.
+    // Turn an actual keydown into a combo label for the "typed" record — using
+    // the same word tokens as the prompt file (e.g. "Ctrl+C", "Tab", "Ctrl+Left")
+    // so typed_prompt is directly comparable to expected_prompt. Reflects what
+    // was really pressed, mistakes and all. (On-screen display uses arrow
+    // symbols separately via displayKey.)
     function eventToComboLabel(e) {
         const parts = [];
         if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
         if (e.shiftKey) parts.push('Shift');
         if (e.altKey) parts.push('Alt');
-        parts.push(displayKey(e.key));
+        const arrowWords = { ArrowLeft: 'Left', ArrowRight: 'Right', ArrowUp: 'Up', ArrowDown: 'Down' };
+        let k = arrowWords[e.key] || e.key;
+        k = (k.length === 1) ? k.toUpperCase() : k.charAt(0).toUpperCase() + k.slice(1);
+        parts.push(k);
         return parts.join('+');
     }
 
