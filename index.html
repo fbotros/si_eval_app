@@ -96,7 +96,9 @@
                         <input type="radio" id="passwords" name="dataset" value="passwords">
                         <label for="passwords">Passwords</label>
                     </div>
-                    <div class="radio-option">
+                    <!-- Metal Keys hidden from the UI but kept selectable via
+                         ?dataset=metal-keys (dataset + prompts retained). -->
+                    <div class="radio-option" style="display: none;">
                         <input type="radio" id="metal-keys" name="dataset" value="metal-keys">
                         <label for="metal-keys">Metal Keys</label>
                     </div>
