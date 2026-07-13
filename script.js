@@ -355,6 +355,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     function displayKey(tok) {
+        const arrows = {
+            left: '←', right: '→', up: '↑', down: '↓',
+            arrowleft: '←', arrowright: '→', arrowup: '↑', arrowdown: '↓'
+        };
+        const low = tok.toLowerCase();
+        if (arrows[low]) return arrows[low];
         if (tok.length === 1) return tok.toUpperCase();
         return tok.charAt(0).toUpperCase() + tok.slice(1);
     }
