@@ -12,13 +12,13 @@ Ctrl+Up Ctrl+8 Ctrl+A Ctrl+P
 Ctrl+X Ctrl+3 Ctrl+Z Ctrl+8
 Ctrl+7 Ctrl+1 Ctrl+S Ctrl+T
 Ctrl+Left Ctrl+X Ctrl+N Ctrl+I
-Ctrl+S Ctrl+Up Ctrl+Sown Ctrl+9
+Ctrl+S Ctrl+Up Ctrl+Down Ctrl+9
 Ctrl+F Ctrl+Left Ctrl+T Ctrl+U
 Ctrl+7 Ctrl+W Ctrl+Y Ctrl+V
 Ctrl+5 Ctrl+9 Ctrl+Left Ctrl+C
 Ctrl+Z Ctrl+3 Ctrl+6 Ctrl+B
 Ctrl+2 Ctrl+6 Ctrl+5 Ctrl+1
-Ctrl+Sown Ctrl+C Ctrl+Up Ctrl+T
+Ctrl+Down Ctrl+C Ctrl+Up Ctrl+T
 Ctrl+6 Ctrl+7 Ctrl+S Tab
 Ctrl+3 Ctrl+S Ctrl+2 Ctrl+7
 Ctrl+Z Ctrl+F Ctrl+9 Ctrl+Right
