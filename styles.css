@@ -430,10 +430,7 @@ h1 {
     border-radius: 8px;
     padding: 0.15rem 0.6rem;
     margin: 0 0.1rem;
-    /* Fonts with a dotted/slashed zero so "O" and "0" don't look alike. */
-    font-family: "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", "Roboto Mono", monospace;
-    font-variant-numeric: slashed-zero;
-    font-feature-settings: "zero" 1;
+    font-family: monospace;
     font-weight: 700;
     color: #2c3e50;
 }
